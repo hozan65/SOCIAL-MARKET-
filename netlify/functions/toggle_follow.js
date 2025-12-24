@@ -1,71 +1,69 @@
-// netlify/functions/toggle_follow.js
 const { createClient } = require("@supabase/supabase-js");
-const authUser = require("./_auth_user");
+const { authUser } = require("./_auth_user");
 
-function json(statusCode, body) {
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+function json(statusCode, bodyObj) {
     return {
         statusCode,
         headers: {
-            "Content-Type": "application/json; charset=utf-8",
+            "Content-Type": "application/json",
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(bodyObj),
     };
 }
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+function getBearer(event) {
+    const h = event.headers.authorization || event.headers.Authorization || "";
+    return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
+}
 
 exports.handler = async (event) => {
-    if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-    if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method not allowed" });
-
     try {
-        const { userId } = await authUser(event);
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+        if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        let body = {};
-        try { body = JSON.parse(event.body || "{}"); } catch {}
-        const following_id = body.following_id || body.targetUserId || body.userId || body.followingId;
-        if (!following_id) return json(400, { ok: false, error: "following_id missing" });
-        if (following_id === userId) return json(400, { ok: false, error: "You can't follow yourself" });
+        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
 
-        const sel = await supabase
+        const jwt = getBearer(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
+
+        const user = await authUser(jwt);
+
+        const body = JSON.parse(event.body || "{}");
+        const following_id = String(body.following_id || "").trim();
+        if (!following_id) return json(400, { error: "Missing following_id" });
+        if (following_id === user.uid) return json(400, { error: "Cannot follow yourself" });
+
+        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+        const { data: existing, error: e1 } = await sb
             .from("follows")
-            .select("follower_id", { head: true })
-            .eq("follower_id", userId)
+            .select("id")
+            .eq("follower_id", user.uid)
             .eq("following_id", following_id)
             .maybeSingle();
 
-        if (sel.error && sel.status !== 406) {
-            return json(500, { ok: false, error: "Supabase select failed", detail: sel.error });
-        }
+        if (e1) throw e1;
 
-        let following;
-        if (sel.data) {
-            const del = await supabase
-                .from("follows")
-                .delete()
-                .eq("follower_id", userId)
-                .eq("following_id", following_id);
-
-            if (del.error) return json(500, { ok: false, error: "Supabase delete failed", detail: del.error });
-            following = false;
+        if (existing?.id) {
+            const { error: delErr } = await sb.from("follows").delete().eq("id", existing.id);
+            if (delErr) throw delErr;
+            return json(200, { ok: true, following: false });
         } else {
-            const ins = await supabase
+            const { error: insErr } = await sb
                 .from("follows")
-                .insert({ follower_id: userId, following_id });
-
-            if (ins.error) return json(500, { ok: false, error: "Supabase insert failed", detail: ins.error });
-            following = true;
+                .insert([{ follower_id: user.uid, following_id }]);
+            if (insErr) throw insErr;
+            return json(200, { ok: true, following: true });
         }
-
-        return json(200, { ok: true, following });
     } catch (e) {
-        return json(401, { ok: false, error: e?.message || "Unauthorized" });
+        console.error("toggle_follow error:", e);
+        return json(500, { error: e.message || "Server error" });
     }
 };

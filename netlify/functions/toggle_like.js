@@ -1,79 +1,70 @@
-// netlify/functions/toggle_like.js
 const { createClient } = require("@supabase/supabase-js");
-const authUser = require("./_auth_user");
+const { authUser } = require("./_auth_user");
 
-function json(statusCode, body) {
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+function json(statusCode, bodyObj) {
     return {
         statusCode,
         headers: {
-            "Content-Type": "application/json; charset=utf-8",
+            "Content-Type": "application/json",
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(bodyObj),
     };
 }
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+function getBearer(event) {
+    const h = event.headers.authorization || event.headers.Authorization || "";
+    return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
+}
 
 exports.handler = async (event) => {
-    if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-    if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method not allowed" });
-
     try {
-        const { userId } = await authUser(event);
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+        if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        let body = {};
-        try { body = JSON.parse(event.body || "{}"); } catch {}
-        const post_id = body.post_id || body.postId;
-        if (!post_id) return json(400, { ok: false, error: "post_id missing" });
+        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
 
-        // exists?
-        const sel = await supabase
+        const jwt = getBearer(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
+
+        const user = await authUser(jwt);
+
+        const body = JSON.parse(event.body || "{}");
+        const post_id = String(body.post_id || "").trim();
+        if (!post_id) return json(400, { error: "Missing post_id" });
+
+        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+        // ✅ Senin DB’de tablo adı interactions ise, burayı ona göre değiştiririz.
+        // Şimdilik post_likes bekliyor:
+        const { data: existing, error: e1 } = await sb
             .from("post_likes")
-            .select("post_id", { head: true })
+            .select("id")
             .eq("post_id", post_id)
-            .eq("user_id", userId)
+            .eq("user_id", user.uid)
             .maybeSingle();
 
-        if (sel.error && sel.status !== 406) {
-            return json(500, { ok: false, error: "Supabase select failed", detail: sel.error });
-        }
+        if (e1) throw e1;
 
-        let liked;
-        if (sel.data) {
-            const del = await supabase
-                .from("post_likes")
-                .delete()
-                .eq("post_id", post_id)
-                .eq("user_id", userId);
-
-            if (del.error) return json(500, { ok: false, error: "Supabase delete failed", detail: del.error });
-            liked = false;
+        if (existing?.id) {
+            const { error: delErr } = await sb.from("post_likes").delete().eq("id", existing.id);
+            if (delErr) throw delErr;
+            return json(200, { ok: true, liked: false });
         } else {
-            const ins = await supabase
+            const { error: insErr } = await sb
                 .from("post_likes")
-                .insert({ post_id, user_id: userId });
-
-            if (ins.error) return json(500, { ok: false, error: "Supabase insert failed", detail: ins.error });
-            liked = true;
+                .insert([{ post_id, user_id: user.uid }]);
+            if (insErr) throw insErr;
+            return json(200, { ok: true, liked: true });
         }
-
-        // count
-        const cnt = await supabase
-            .from("post_likes")
-            .select("*", { count: "exact", head: true })
-            .eq("post_id", post_id);
-
-        if (cnt.error) return json(500, { ok: false, error: "Supabase count failed", detail: cnt.error });
-
-        return json(200, { ok: true, liked, count: cnt.count || 0 });
     } catch (e) {
-        return json(401, { ok: false, error: e?.message || "Unauthorized" });
+        console.error("toggle_like error:", e);
+        return json(500, { error: e.message || "Server error" });
     }
 };
