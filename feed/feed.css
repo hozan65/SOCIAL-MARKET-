@@ -71,6 +71,64 @@
     .coinName{ max-width:220px; }
 }
 
+/* =========================
+   DASH2: iki kutu aynı yükseklik
+========================= */
+.dash2{
+    display:grid;
+    grid-template-columns: 1.35fr 0.85fr;  /* sol daha geniş, sağ daha dar */
+    gap:18px;
+    align-items: stretch;                 /* ✅ aynı yükseklik */
+}
+
+/* dashBox zaten varsa bozma; yoksa */
+.dashBox{
+    display:flex;
+    flex-direction:column;
+    min-height: 0;                        /* ✅ iç scroll için kritik */
+}
+
+/* ✅ kutunun içi (dashBody) alanı esnesin */
+.dashBox .dashBody{
+    flex:1;
+    min-height:0;                         /* ✅ iç scroll için kritik */
+}
+
+/* =========================
+   TOP CRYPTO: kutu içi scroll
+========================= */
+.coinGrid{
+    /* grid kalsın */
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px;
+
+    /* ✅ scroll alanı */
+    max-height: 360px;                    /* News ile aynı seviyede kalması için */
+    overflow:auto;
+    padding-right: 6px;                   /* scroll bar içeride kalsın */
+    -webkit-overflow-scrolling: touch;
+}
+
+/* İstersen scroll daha güzel */
+.coinGrid::-webkit-scrollbar{ width: 8px; }
+.coinGrid::-webkit-scrollbar-thumb{
+    background: rgba(0,0,0,.18);
+    border-radius: 999px;
+}
+.coinGrid::-webkit-scrollbar-track{
+    background: rgba(0,0,0,.06);
+    border-radius: 999px;
+}
+
+/* Mobilde tek sütun + scroll daha uzun */
+@media(max-width:900px){
+    .dash2{ grid-template-columns: 1fr; } /* mobilde alt alta */
+    .coinGrid{
+        grid-template-columns:1fr;
+        max-height: 420px;
+    }
+}
 
 /* ========== FEED HEADER ========== */
 .feed-header{
