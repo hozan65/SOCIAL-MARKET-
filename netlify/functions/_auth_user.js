@@ -1,68 +1,38 @@
-// netlify/functions/sync_user.js
-// ✅ Server-side: verifies Appwrite JWT, then upserts into Supabase with SERVICE_ROLE
-// Requires ENV:
-//   APPWRITE_ENDPOINT
-//   APPWRITE_PROJECT_ID
-//   SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY
+// netlify/functions/_auth_user.js
+// CommonJS helper: verifies Appwrite JWT and returns { uid, email }
 
-const { createClient } = require("@supabase/supabase-js");
-const authUser = require("./_auth_user");
+const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "").trim();     // e.g. https://cloud.appwrite.io/v1
+const APPWRITE_PROJECT_ID = (process.env.APPWRITE_PROJECT_ID || "").trim(); // Appwrite Project ID
 
-function json(statusCode, body) {
-    return {
-        statusCode,
+async function authUser(jwt) {
+    if (!jwt) throw new Error("Missing JWT");
+
+    if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID) {
+        throw new Error("Missing APPWRITE_ENDPOINT / APPWRITE_PROJECT_ID in Netlify env");
+    }
+
+    const url = `${APPWRITE_ENDPOINT.replace(/\/$/, "")}/account`;
+
+    const r = await fetch(url, {
+        method: "GET",
         headers: {
-            "Content-Type": "application/json; charset=utf-8",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+            "X-Appwrite-JWT": jwt,
         },
-        body: JSON.stringify(body),
-    };
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok) {
+        const msg = j?.message || `Appwrite auth failed (${r.status})`;
+        throw new Error(msg);
+    }
+
+    const uid = j?.$id || j?.id || null;
+    const email = j?.email || null;
+
+    if (!uid) throw new Error("Appwrite user id not found");
+    return { uid, email };
 }
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-exports.handler = async (event) => {
-    if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-    if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method not allowed" });
-
-    try {
-        const { userId } = await authUser(event);
-
-        // Check existing by appwrite_user_id
-        const existing = await supabase
-            .from("users")
-            .select("id")
-            .eq("appwrite_user_id", userId)
-            .maybeSingle();
-
-        if (existing.error && existing.status !== 406) {
-            return json(500, { ok: false, error: "Supabase select failed", detail: existing.error });
-        }
-
-        if (existing.data?.id) {
-            return json(200, { ok: true, user_id: userId, created: false });
-        }
-
-        // Insert minimal row
-        const ins = await supabase
-            .from("users")
-            .insert({ appwrite_user_id: userId })
-            .select("id")
-            .single();
-
-        if (ins.error) {
-            return json(500, { ok: false, error: "Supabase insert failed", detail: ins.error });
-        }
-
-        return json(200, { ok: true, user_id: userId, created: true, id: ins.data.id });
-    } catch (e) {
-        return json(401, { ok: false, error: e?.message || "Unauthorized" });
-    }
-};
+module.exports = { authUser };
