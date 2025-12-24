@@ -444,89 +444,52 @@
 }
 
 
-/* ===== ECON CALENDAR + BROKER CTA ===== */
-.econWrap { margin-top: 16px; }
 
-.econAd{
+/* ===== GO TO BROKER BAR ===== */
+.goBrokerBar{
     display:flex;
     align-items:center;
     justify-content:space-between;
     gap:12px;
-    padding:14px;
+    padding:14px 16px;
     border-radius:14px;
-    border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.75);
-    margin-bottom: 10px;
+    margin-bottom:12px;
+    background: linear-gradient(135deg,#eef2ff,#f8fafc);
+    border:1px solid rgba(0,0,0,.08);
+    font-weight:900;
 }
-.econAdTitle{ font-weight: 900; font-size: 15px; }
-.econAdText{ opacity:.8; margin-top:4px; }
-.econAdBtn{
-    display:inline-block;
-    padding:10px 14px;
+.goBrokerBtn{
+    padding:8px 16px;
     border-radius:999px;
-    background: rgba(0,0,0,.10);
-    font-weight: 900;
+    background:#4f46e5;
+    color:#fff;
     text-decoration:none;
-    color: inherit;
     white-space:nowrap;
 }
 
-.econMsg{ margin: 6px 0 10px; opacity:.8; font-weight: 800; }
-
-.econTableWrap{ overflow:auto; border-radius: 12px; }
-.econTable{
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 14px;
-    min-width: 900px;
-}
-.econTable th{
-    position: sticky;
-    top: 0;
-    background: rgba(0,0,0,.06);
-    text-align:left;
-    padding: 10px;
-    font-weight: 900;
-}
-.econTable td{
-    padding: 10px;
-    border-bottom: 1px solid rgba(0,0,0,.10);
-    vertical-align: top;
-}
-.econTable td:nth-child(3){ min-width: 380px; }
-
-.impactBadge{
-    display:inline-block;
-    padding: 3px 8px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 900;
-    background: rgba(0,0,0,.08);
-}
-.impactHigh{ background: rgba(255,0,0,.14); }
-.impactMed{ background: rgba(255,165,0,.18); }
-.impactLow{ background: rgba(0,128,0,.16); }
-
-.brokerRow{
-    display:flex;
-    flex-wrap:wrap;
-    gap:10px;
-    margin-top: 12px;
-}
-.brokerBtn{
-    padding:10px 14px;
-    border-radius: 999px;
+/* ===== ECON CALENDAR IFRAME ===== */
+.econIframeWrap{
+    width:100%;
+    overflow:auto;
+    border-radius:14px;
     border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.85);
-    text-decoration:none;
-    font-weight: 900;
-    color: inherit;
+    background:rgba(255,255,255,.85);
 }
-.brokerNote{ opacity:.75; margin-top: 8px; }
+.econIframe{
+    width:100%;
+    min-width:980px; /* calendar geniş */
+    height:540px;
+    border:0;
+}
 
 /* Mobil */
-@media (max-width: 900px){
-    .econAd{ flex-direction:column; align-items:flex-start; }
-    .econTable{ min-width: 760px; }
+@media(max-width:900px){
+    .goBrokerBar{
+        flex-direction:column;
+        align-items:flex-start;
+    }
+    .econIframe{
+        min-width:900px;
+        height:580px;
+    }
 }
-
