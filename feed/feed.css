@@ -444,12 +444,46 @@
 }
 
 
-.econTable{ width:100%; border-collapse:collapse; font-size:14px; }
-.econTable th{ text-align:left; padding:10px; background:rgba(0,0,0,.05); position:sticky; top:0; }
-.econTable td{ padding:10px; border-bottom:1px solid rgba(0,0,0,.08); vertical-align:top; }
-.econTable .eventCell{ min-width:380px; }
-.impact{ padding:3px 8px; border-radius:999px; font-weight:800; font-size:12px; background:rgba(0,0,0,.06); }
-.impact.high{ background:rgba(255,0,0,.12); }
-.impact.medium{ background:rgba(255,165,0,.16); }
-.impact.low{ background:rgba(0,128,0,.14); }
+/* ===== ECON CALENDAR UI ===== */
+.econBox { margin-top: 16px; }
+
+.econMsg { margin: 6px 0 10px; opacity: .8; font-weight: 700; }
+
+.econTableWrap { overflow: auto; border-radius: 12px; }
+
+.econTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    min-width: 900px; /* masaüstünde düzgün, mobilde yatay kaydır */
+}
+
+.econTable th {
+    position: sticky;
+    top: 0;
+    background: rgba(0,0,0,.06);
+    text-align: left;
+    padding: 10px;
+    font-weight: 900;
+}
+
+.econTable td {
+    padding: 10px;
+    border-bottom: 1px solid rgba(0,0,0,.10);
+    vertical-align: top;
+}
+
+.econTable td:nth-child(3) { min-width: 380px; } /* Event kolonunu geniş tut */
+
+.impactBadge{
+    display:inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 900;
+    background: rgba(0,0,0,.08);
+}
+.impactHigh{ background: rgba(255,0,0,.14); }
+.impactMed{ background: rgba(255,165,0,.18); }
+.impactLow{ background: rgba(0,128,0,.16); }
 

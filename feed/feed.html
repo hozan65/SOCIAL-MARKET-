@@ -45,15 +45,26 @@
     <section class="posts" id="postsGrid"></section>
     <p class="feedMsg" id="feedMsg"></p>
 
-    <section class="dashBox fullRow">
-        <div class="dashHead"><h3>Economic Calendar</h3></div>
+    <!-- ================= ECONOMIC CALENDAR ================= -->
+    <section class="dashBox fullRow econBox">
+        <div class="dashHead">
+            <h3>Economic Calendar</h3>
+        </div>
+
         <div class="dashBody">
-            <div id="econMsg" style="margin:8px 0; opacity:.8;"></div>
-            <div style="overflow:auto;">
+            <div id="econMsg" class="econMsg">Loading calendar...</div>
+
+            <div class="econTableWrap">
                 <table class="econTable">
                     <thead>
                     <tr>
-                        <th>Date</th><th>Cur</th><th>Event</th><th>Impact</th><th>Actual</th><th>Forecast</th><th>Prev</th>
+                        <th>Date</th>
+                        <th>Cur</th>
+                        <th>Event</th>
+                        <th>Impact</th>
+                        <th>Actual</th>
+                        <th>Forecast</th>
+                        <th>Prev</th>
                     </tr>
                     </thead>
                     <tbody id="econBody"></tbody>
