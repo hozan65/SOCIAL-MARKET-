@@ -1,14 +1,14 @@
 // netlify/functions/create_post.js
-// Appwrite JWT -> Appwrite /account doğrula -> Supabase (service_role) insert
-// DEBUG: Supabase key role log (only "anon" / "service_role")
+// FINAL: Appwrite JWT -> Appwrite /account verify -> Supabase (sb_secret) insert
+// Includes CORS + OPTIONS to avoid "Failed to fetch"
 
 const { createClient } = require("@supabase/supabase-js");
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
-const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT;      // örn: https://cloud.appwrite.io/v1
-const APPWRITE_PROJECT_ID = process.env.APPWRITE_PROJECT_ID;  // Appwrite Project ID
+const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "").trim();     // e.g. https://cloud.appwrite.io/v1
+const APPWRITE_PROJECT_ID = (process.env.APPWRITE_PROJECT_ID || "").trim(); // Appwrite Project ID
 
 function json(statusCode, bodyObj) {
     return {
@@ -16,27 +16,13 @@ function json(statusCode, bodyObj) {
         headers: {
             "Content-Type": "application/json",
             "Cache-Control": "no-store",
+            // ✅ CORS
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
         body: JSON.stringify(bodyObj),
     };
-}
-
-function jwtRole(token) {
-    try {
-        if (!token || typeof token !== "string") return null;
-        const parts = token.split(".");
-        if (parts.length < 2) return null;
-        const payload = parts[1];
-
-        // base64url -> base64
-        const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-        const pad = b64.length % 4 ? "=".repeat(4 - (b64.length % 4)) : "";
-        const buf = Buffer.from(b64 + pad, "base64");
-        const obj = JSON.parse(buf.toString("utf8"));
-        return obj?.role || null;
-    } catch {
-        return null;
-    }
 }
 
 function getBearerToken(event) {
@@ -74,16 +60,31 @@ async function getAppwriteUser(jwt) {
     return { uid, email };
 }
 
+function normalizePairs(pairs) {
+    // accepts:
+    // - array: ["BTCUSDT","ETHUSDT"]
+    // - string: "BTCUSDT, ETHUSDT"
+    // returns string: "BTCUSDT,ETHUSDT"  (since your table currently expects text)
+    if (Array.isArray(pairs)) {
+        return pairs.map((x) => String(x || "").trim()).filter(Boolean).join(",");
+    }
+    return String(pairs || "")
+        .split(",")
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .join(",");
+}
+
 exports.handler = async (event) => {
     try {
+        // ✅ Preflight
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
         if (!SUPABASE_URL || !SERVICE_KEY) {
             return json(500, { error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY" });
         }
-
-        // ✅ DEBUG: log only role (no secrets)
-        console.log("SUPABASE_SERVICE_ROLE_KEY role =", jwtRole(SERVICE_KEY));
 
         const jwt = getBearerToken(event);
         if (!jwt) return json(401, { error: "Missing JWT" });
@@ -96,13 +97,14 @@ exports.handler = async (event) => {
         const category = String(body.category || "").trim() || null;
         const timeframe = String(body.timeframe || "").trim();
         const content = String(body.content || "").trim();
-        const pairs = String(body.pairs || "").trim(); // text
+        const pairs = normalizePairs(body.pairs);
         const image_path = body.image_path ? String(body.image_path).trim() : null;
 
         if (!market || !timeframe || !content || !pairs) {
             return json(400, { error: "Missing fields (market/timeframe/content/pairs)" });
         }
 
+        // ✅ Service key (sb_secret_) bypasses RLS
         const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
         const { data, error } = await sb
@@ -114,7 +116,7 @@ exports.handler = async (event) => {
                     category,
                     timeframe,
                     content,
-                    pairs,
+                    pairs,       // text
                     image_path,
                 },
             ])
