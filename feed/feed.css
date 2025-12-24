@@ -1,13 +1,15 @@
 /* =========================
-   FEED.CSS (Clean + Fast)
+   FEED.CSS (FULL - FINAL)
    - News slider
-   - Top gainers
+   - Top Crypto (tabs + cards)
+   - Equal height (News = Crypto)
    - Posts grid
-   - Comments drawer (no layout bug)
+   - Comments drawer
    - Show more
+   - Economic calendar
 ========================= */
 
-/* ========== TOP GAINERS TABS ========== */
+/* ========== TOP TABS (CRYPTO) ========== */
 .gTabs{
     display:flex;
     gap:8px;
@@ -34,229 +36,51 @@
     background: rgba(37,99,235,.10);
     border-color: rgba(37,99,235,.22);
 }
-/* ===== TOP CRYPTO CARDS ===== */
-.coinGrid{
-    display:grid;
-    grid-template-columns:repeat(2, minmax(0, 1fr));
-    gap:10px;
-}
 
-.coinCard{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    padding:12px;
-    border-radius:14px;
-    border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.80);
-    box-shadow: 0 8px 24px rgba(0,0,0,.05);
-}
-
-.coinLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
-.coinIcon{ width:28px; height:28px; border-radius:999px; background: rgba(0,0,0,.06); flex:0 0 auto; }
-.coinName{ font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
-.coinSym{ opacity:.75; font-weight:800; margin-left:6px; }
-
-.coinRight{ text-align:right; flex:0 0 auto; }
-.coinPrice{ font-weight:900; }
-.coinChg{ font-weight:900; margin-top:4px; display:inline-block; padding:3px 8px; border-radius:999px; }
-.chgUp{ background: rgba(0,128,0,.14); }
-.chgDown{ background: rgba(255,0,0,.14); }
-
-.miniMsg{ opacity:.75; margin-top:8px; font-weight:800; }
-
-@media(max-width:900px){
-    .coinGrid{ grid-template-columns:1fr; }
-    .coinName{ max-width:220px; }
-}
-
-/* =========================
-   DASH2: iki kutu aynı yükseklik
-========================= */
+/* ========== DASH2 LAYOUT (NEWS + TOP CRYPTO) ========== */
 .dash2{
     display:grid;
-    grid-template-columns: 1.35fr 0.85fr;  /* sol daha geniş, sağ daha dar */
+    grid-template-columns: 1.35fr 0.85fr;
     gap:18px;
-    align-items: stretch;                 /* ✅ aynı yükseklik */
-}
-
-/* dashBox zaten varsa bozma; yoksa */
-.dashBox{
-    display:flex;
-    flex-direction:column;
-    min-height: 0;                        /* ✅ iç scroll için kritik */
-}
-
-/* ✅ kutunun içi (dashBody) alanı esnesin */
-.dashBox .dashBody{
-    flex:1;
-    min-height:0;                         /* ✅ iç scroll için kritik */
-}
-
-/* =========================
-   TOP CRYPTO: kutu içi scroll
-========================= */
-.coinGrid{
-    /* grid kalsın */
-    display:grid;
-    grid-template-columns:repeat(2, minmax(0, 1fr));
-    gap:10px;
-
-    /* ✅ scroll alanı */
-    max-height: 360px;                    /* News ile aynı seviyede kalması için */
-    overflow:auto;
-    padding-right: 6px;                   /* scroll bar içeride kalsın */
-    -webkit-overflow-scrolling: touch;
-}
-
-/* İstersen scroll daha güzel */
-.coinGrid::-webkit-scrollbar{ width: 8px; }
-.coinGrid::-webkit-scrollbar-thumb{
-    background: rgba(0,0,0,.18);
-    border-radius: 999px;
-}
-.coinGrid::-webkit-scrollbar-track{
-    background: rgba(0,0,0,.06);
-    border-radius: 999px;
-}
-
-/* Mobilde tek sütun + scroll daha uzun */
-@media(max-width:900px){
-    .dash2{ grid-template-columns: 1fr; } /* mobilde alt alta */
-    .coinGrid{
-        grid-template-columns:1fr;
-        max-height: 420px;
-    }
-}
-
-/* ========== FEED HEADER ========== */
-.feed-header{
-    margin: 12px 0 14px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-}
-.feed-header h2{
-    margin:0;
-    font-size:30px;
-    font-weight:900;
-    letter-spacing:-.02em;
-}
-
-/* ========== POSTS GRID ========== */
-.posts{
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap:18px;
-    padding-bottom: 40px;
-
-    /* ✅ IMPORTANT: prevents “neighbor card stretches” bug */
-    align-items: start;
-    grid-auto-rows: min-content;
-}
-
-.post-card{
-    padding:14px;
-    border-radius:18px;
-    background: rgba(255,255,255,.90);
-    border:1px solid rgba(0,0,0,.08);
-    box-shadow: 0 18px 40px rgba(15,23,42,.08);
-    align-self: start; /* extra safety */
-}
-
-.tags{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-}
-.tags span{
-    font-size:12px;
-    padding:6px 10px;
-    border-radius:999px;
-    background: rgba(37,99,235,.10);
-    border: 1px solid rgba(37,99,235,.18);
-    color: rgba(15,23,42,.88);
-    font-weight:800;
-}
-
-.chart-placeholder{
-    height:180px;
-    border-radius:14px;
-    background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(15,23,42,.02));
-    border: 1px dashed rgba(37,99,235,.32);
-    display:grid;
-    place-items:center;
-    margin:12px 0;
-    color: rgba(15,23,42,.55);
-    font-weight:800;
-}
-
-.post-img{
-    width:100%;
-    height: 220px;
-    object-fit: cover;
-    border-radius: 14px;
-    border: 1px solid rgba(37,99,235,.18);
-    background: rgba(37,99,235,.06);
-    display:block;
-    margin: 12px 0;
-}
-
-.post-card h3{ margin:0; font-size:18px; font-weight:900; }
-.post-card p{ margin:8px 0 0; color: rgba(15,23,42,.65); font-size:13px; }
-
-/* Actions */
-.post-actions{
-    margin-top:12px;
-    display:flex;
-    gap:10px;
-    align-items: stretch;
-}
-.post-actions button{
-    flex:1;
-    padding:10px 10px;
-    border-radius:12px;
-    border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.95);
-    color: rgba(15,23,42,.92);
-    cursor:pointer;
-    font-weight:900;
-    transition: transform .12s ease, background .12s ease, border-color .12s ease;
-}
-.post-actions button:hover{
-    background: rgba(37,99,235,.08);
-    border-color: rgba(37,99,235,.25);
-    transform: translateY(-1px);
-}
-
-/* Feed msg */
-.feedMsg{
-    margin: 10px 0 40px;
-    color: rgba(15,23,42,.60);
-    font-weight: 800;
-}
-
-/* ========== TOP DASH LAYOUT ========== */
-.dash2{
-    display:grid;
-    grid-template-columns: 1.4fr .6fr;
-    gap:18px;
+    align-items: stretch; /* ✅ equal height */
     margin-top:18px;
     margin-bottom:18px;
 }
 
-@media (max-width: 980px){
-    .dash2{ grid-template-columns: 1fr; }
-    .menu{ display:none; }
+/* cards */
+.dashBox{
+    display:flex;
+    flex-direction:column;
+    min-height:0; /* ✅ required for inner scroll */
+}
+
+/* header area stays, body flexes */
+.dashHead{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+}
+.dashHead h3{
+    margin:0;
+    font-weight:900;
+    letter-spacing:-.01em;
+}
+
+/* body takes remaining height */
+.dashBody{
+    flex:1;
+    min-height:0;  /* ✅ required for inner scroll */
+    display:flex;
+    flex-direction:column;
 }
 
 /* ========== NEWS SLIDER ========== */
 .newsSlider{
     position:relative;
     width:100%;
-    height: 260px;
+    height:100%;
+    min-height:260px;
     border-radius:16px;
     overflow:hidden;
     border:1px solid rgba(37,99,235,.18);
@@ -265,7 +89,7 @@
 }
 
 @media (min-width: 980px){
-    .newsSlider{ height: 340px; }
+    .newsSlider{ min-height:340px; }
 }
 
 .newsSlide{
@@ -280,7 +104,6 @@
     opacity:1;
     transform: scale(1);
 }
-
 .newsSlide.active:hover .newsSlideImg{ transform: scale(1.03); }
 
 .newsSlideImg{
@@ -344,6 +167,183 @@
     color: rgba(15,23,42,.75);
 }
 
+/* ========== TOP CRYPTO (cards + inner scroll) ========== */
+.coinGrid{
+    flex:1;               /* ✅ fill remaining height in dashBody */
+    min-height:0;         /* ✅ allow scroll */
+    overflow:auto;        /* ✅ inner scroll */
+    padding-right:6px;
+    -webkit-overflow-scrolling: touch;
+
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px;
+}
+
+.coinGrid::-webkit-scrollbar{ width:8px; }
+.coinGrid::-webkit-scrollbar-thumb{
+    background: rgba(0,0,0,.18);
+    border-radius: 999px;
+}
+.coinGrid::-webkit-scrollbar-track{
+    background: rgba(0,0,0,.06);
+    border-radius: 999px;
+}
+
+.coinCard{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    padding:12px;
+    border-radius:14px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.86);
+    box-shadow: 0 8px 24px rgba(0,0,0,.05);
+}
+
+.coinLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
+.coinIcon{
+    width:28px;
+    height:28px;
+    border-radius:999px;
+    background: rgba(0,0,0,.06);
+    flex:0 0 auto;
+}
+.coinName{
+    font-weight:900;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:150px;
+}
+.coinSym{ opacity:.75; font-weight:800; margin-left:6px; }
+
+.coinRight{ text-align:right; flex:0 0 auto; }
+.coinPrice{ font-weight:900; }
+.coinChg{
+    font-weight:900;
+    margin-top:4px;
+    display:inline-block;
+    padding:3px 8px;
+    border-radius:999px;
+}
+.chgUp{ background: rgba(0,128,0,.14); }
+.chgDown{ background: rgba(255,0,0,.14); }
+
+.miniMsg{
+    opacity:.75;
+    margin-top:8px;
+    font-weight:800;
+}
+
+/* ========== FEED HEADER ========== */
+.feed-header{
+    margin: 12px 0 14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+}
+.feed-header h2{
+    margin:0;
+    font-size:30px;
+    font-weight:900;
+    letter-spacing:-.02em;
+}
+
+/* ========== POSTS GRID ========== */
+.posts{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap:18px;
+    padding-bottom: 40px;
+
+    /* ✅ prevents neighbor stretch bug */
+    align-items: start;
+    grid-auto-rows: min-content;
+}
+
+.post-card{
+    padding:14px;
+    border-radius:18px;
+    background: rgba(255,255,255,.90);
+    border:1px solid rgba(0,0,0,.08);
+    box-shadow: 0 18px 40px rgba(15,23,42,.08);
+    align-self: start;
+}
+
+.tags{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+}
+.tags span{
+    font-size:12px;
+    padding:6px 10px;
+    border-radius:999px;
+    background: rgba(37,99,235,.10);
+    border: 1px solid rgba(37,99,235,.18);
+    color: rgba(15,23,42,.88);
+    font-weight:800;
+}
+
+.chart-placeholder{
+    height:180px;
+    border-radius:14px;
+    background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(15,23,42,.02));
+    border: 1px dashed rgba(37,99,235,.32);
+    display:grid;
+    place-items:center;
+    margin:12px 0;
+    color: rgba(15,23,42,.55);
+    font-weight:800;
+}
+
+.post-img{
+    width:100%;
+    height: 220px;
+    object-fit: cover;
+    border-radius: 14px;
+    border: 1px solid rgba(37,99,235,.18);
+    background: rgba(37,99,235,.06);
+    display:block;
+    margin: 12px 0;
+}
+
+.post-card h3{ margin:0; font-size:18px; font-weight:900; }
+.post-card p{ margin:8px 0 0; color: rgba(15,23,42,.65); font-size:13px; }
+
+/* ========== ACTIONS ========== */
+.post-actions{
+    margin-top:12px;
+    display:flex;
+    gap:10px;
+    align-items: stretch;
+}
+.post-actions button{
+    flex:1;
+    padding:10px 10px;
+    border-radius:12px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.95);
+    color: rgba(15,23,42,.92);
+    cursor:pointer;
+    font-weight:900;
+    transition: transform .12s ease, background .12s ease, border-color .12s ease;
+}
+.post-actions button:hover{
+    background: rgba(37,99,235,.08);
+    border-color: rgba(37,99,235,.25);
+    transform: translateY(-1px);
+}
+
+/* Feed msg */
+.feedMsg{
+    margin: 10px 0 40px;
+    color: rgba(15,23,42,.60);
+    font-weight: 800;
+}
 
 /* ========== SHOW MORE ========== */
 .postsMoreWrap{
@@ -383,7 +383,6 @@
     padding:12px;
     box-shadow: 0 14px 30px rgba(15,23,42,.08);
 }
-
 .post-card.isCommentsOpen .commentsWrap{ display:block; }
 
 .cHead{
@@ -417,7 +416,6 @@
     padding-right:4px;
     margin-bottom:10px;
 }
-
 .commentsList::-webkit-scrollbar{ width:8px; }
 .commentsList::-webkit-scrollbar-thumb{
     background: rgba(15,23,42,.12);
@@ -471,33 +469,36 @@
     border-color: rgba(37,99,235,.25);
 }
 
-/* ========== SMALL SCREEN TWEAKS ========== */
-@media (max-width: 420px){
-    .post-actions{ flex-direction:column; }
-    .post-img{ height: 200px; }
-    .feed-header h2{ font-size:24px; }
-}
-
-
-
+/* ========== ECONOMIC CALENDAR ========== */
 .econIframeWrap{
     width:100%;
-    overflow:hidden; /* dış yatay scroll yok */
+    overflow:hidden;
     border-radius:14px;
     border:1px solid rgba(0,0,0,.10);
     background:rgba(255,255,255,.85);
 }
-
 .econIframe{
     width:100%;
     height:620px;
     border:0;
 }
-
 .econMobile{ display:none; }
 
-@media (max-width: 900px){
+/* ========== RESPONSIVE ========== */
+@media (max-width: 980px){
+    .dash2{ grid-template-columns: 1fr; }
+}
+
+@media(max-width:900px){
+    .coinGrid{ grid-template-columns:1fr; }
     .econDesktop{ display:none; }
     .econMobile{ display:block; }
-    .econIframe{ height:720px; } /* telefon ekranında daha çok satır */
+    .econIframe{ height:720px; }
+}
+
+@media (max-width: 420px){
+    .post-actions{ flex-direction:column; }
+    .post-img{ height: 200px; }
+    .feed-header h2{ font-size:24px; }
+    .newsSlider{ min-height: 300px; }
 }
