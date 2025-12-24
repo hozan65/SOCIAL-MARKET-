@@ -16,20 +16,19 @@
 
 <main class="container">
     <section class="dash2">
-        <div class="dashBox">
+        <div class="dashBox dashNoBox">
             <div class="dashHead"><h3>News</h3></div>
             <div class="dashBody">
                 <div id="feed-news-slider" class="newsSlider"></div>
             </div>
         </div>
 
-        <div class="dashBox topCryptoBox">
+        <div class="dashBox dashNoBox topCryptoBox">
             <div class="dashHead">
                 <h3>Top Crypto</h3>
             </div>
 
             <div class="dashBody">
-                <!-- TABS -->
                 <div class="gTabs">
                     <button class="gTab active" data-tab="trending" type="button">TRENDING</button>
                     <button class="gTab" data-tab="gainers" type="button">TOP GAINERS</button>
@@ -37,18 +36,14 @@
                     <button class="gTab" data-tab="volume" type="button">TOP VOLUME</button>
                 </div>
 
-                <!-- ✅ COIN LIST (scroll burası) -->
                 <div id="cryptoGrid" class="coinGrid"></div>
 
-                <!-- ✅ SEARCH (kutunun en altına sabit) -->
                 <div class="cryptoFooter">
                     <input id="cryptoSearch" class="cryptoSearch" placeholder="Search coin (BTC, ETH, SOL...)" />
                     <div id="cryptoMsg" class="miniMsg"></div>
                 </div>
             </div>
         </div>
-
-
     </section>
 
     <div class="feed-header">
@@ -59,14 +54,12 @@
     <section class="posts" id="postsGrid"></section>
     <p class="feedMsg" id="feedMsg"></p>
 
-
-    <section class="dashBox fullRow econWrap">
+    <section class="dashBox dashNoBox fullRow econWrap">
         <div class="dashHead">
             <h3>Economic Calendar</h3>
         </div>
 
         <div class="econIframeWrap">
-            <!-- DESKTOP -->
             <iframe
                     class="econIframe econDesktop"
                     src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone&calType=week&timeZone=8&lang=1"
@@ -77,7 +70,6 @@
                     allowtransparency="true"
             ></iframe>
 
-            <!-- MOBILE (daha sade, daha dar) -->
             <iframe
                     class="econIframe econMobile"
                     src="https://sslecal2.investing.com?columns=exc_currency,exc_importance,exc_actual&features=timezone&calType=week&timeZone=8&lang=1"
@@ -89,27 +81,14 @@
             ></iframe>
         </div>
     </section>
-
-
-
-
-
 </main>
 
-<!-- ✅ 1) Supabase CDN (EN ÜSTE) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- 2) Header -->
 <script src="/assets1/header.js"></script>
-
-<!-- 3) Auth + JWT (module) -->
-
 <script type="module" src="/assets/jwt.js"></script>
 
-<!-- 4) Feed (legacy → CDN kullanıyor, O YÜZDEN module YAPMA) -->
 <script src="/feed/feed.js"></script>
-<script src="/assets1/crypto-tabs.js"></script>
 
-
+<!-- ❌ BUNU KALDIR: <script src="/assets1/crypto-tabs.js"></script> -->
 </body>
 </html>

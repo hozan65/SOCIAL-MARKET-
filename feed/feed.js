@@ -32,9 +32,9 @@ const grid = document.getElementById("postsGrid");
 const msg = document.getElementById("feedMsg");
 const newsSlider = document.getElementById("feed-news-slider");
 
-// TOP CRYPTO DOM (varsayım)
-const cryptoGrid = document.getElementById("cryptoGrid");     // (HTML'de olmalı)
-const cryptoMsg = document.getElementById("cryptoMsg");       // (opsiyonel)
+const cryptoGrid = document.getElementById("cryptoGrid");
+const cryptoMsg = document.getElementById("cryptoMsg");
+const cryptoSearch = document.getElementById("cryptoSearch");
 const cryptoTabs = document.querySelectorAll(".gTab[data-tab]");
 
 // =========================
@@ -82,51 +82,11 @@ function fmtUsd(n) {
     });
 }
 
-// =========================
-// COMMENTS UI CSS (inject)
-// =========================
-(function injectCommentsCSS() {
-    const css = `
-  .commentsWrap{
-    display:none;
-    margin-top:12px;
-    border:1px solid rgba(15,23,42,.10);
-    background: rgba(255,255,255,.95);
-    border-radius:16px;
-    padding:12px;
-    box-shadow: 0 14px 30px rgba(15,23,42,.08);
-  }
-  .post-card.isCommentsOpen .commentsWrap{ display:block; }
-  .cHead{ display:flex;align-items:center;justify-content:space-between; gap:10px;margin-bottom:10px; }
-  .cTitle{ font-weight:900;font-size:13px;color:rgba(15,23,42,.85); }
-  .cClose{ width:34px;height:34px;border-radius:12px;border:1px solid rgba(15,23,42,.10);background:#fff;font-weight:900;cursor:pointer; }
-
-  .commentsList{
-    max-height:220px;
-    overflow:auto;
-    display:flex;flex-direction:column;gap:8px;
-    padding-right:4px;margin-bottom:10px;
-  }
-  .commentItem{ border:1px solid rgba(15,23,42,.08);background:#fff;border-radius:14px;padding:10px; }
-  .commentText{ font-size:13px;font-weight:800;color:rgba(15,23,42,.86);line-height:1.25; }
-  .commentMeta{ margin-top:6px;font-size:11px;font-weight:800;color:rgba(15,23,42,.50); }
-
-  .commentForm{ display:flex;gap:8px;align-items:center; }
-  .commentInput{
-    flex:1;height:40px;padding:0 12px;border-radius:14px;
-    border:1px solid rgba(15,23,42,.12);
-    outline:none;font-weight:800;
-  }
-  .commentSend{
-    height:40px;padding:0 14px;border-radius:14px;
-    border:1px solid rgba(15,23,42,.12);
-    background:#fff;font-weight:900;cursor:pointer;
-  }
-  `;
-    const style = document.createElement("style");
-    style.textContent = css;
-    document.head.appendChild(style);
-})();
+function shortText(s, max = 140) {
+    const t = String(s ?? "").trim();
+    if (t.length <= max) return t;
+    return t.slice(0, max).trim() + "…";
+}
 
 // =========================
 // AUTH (Appwrite JWT from /assets/jwt.js)
@@ -153,19 +113,14 @@ async function fnPost(url, body) {
     return j;
 }
 
-// =========================
-// ✅ FUNCTIONS (correct payload keys)
-// =========================
 async function toggleLike(postId) {
     return fnPost(FN_TOGGLE_LIKE, { post_id: String(postId) });
 }
-
 async function addComment(postId, text) {
     const content = String(text || "").trim();
     if (!content) throw new Error("Empty comment");
     return fnPost(FN_ADD_COMMENT, { post_id: String(postId), content });
 }
-
 async function toggleFollow(targetUserId) {
     if (!targetUserId) throw new Error("Author id missing");
     return fnPost(FN_TOGGLE_FOLLOW, { following_id: String(targetUserId) });
@@ -199,70 +154,86 @@ async function loadComments(postId, limit = 30) {
 }
 
 // =========================
-// RENDER POST
+// RENDER POST (NEW LAYOUT)
 // =========================
 function renderPost(row) {
     const market = esc(row.market);
     const category = esc(row.category);
     const timeframe = esc(row.timeframe);
     const pairsText = esc(formatPairs(row.pairs));
-    const content = esc(row.content);
+    const contentRaw = String(row.content ?? "");
+    const content = esc(shortText(contentRaw, 170));
     const image = row.image_path || "";
-    const created = formatTime(row.created_at);
+    const created = esc(formatTime(row.created_at));
 
     const postId = esc(row.id);
     const authorId = esc(row.author_id || "");
 
+    const cover = image
+        ? `<a class="post-cover" href="#" data-open-post="${postId}">
+         <img class="post-img" src="${esc(image)}" alt="chart" loading="lazy">
+       </a>`
+        : `<div class="post-cover noimg">
+         <div class="chart-placeholder">NO IMAGE</div>
+       </div>`;
+
     return `
-  <article class="post-card" data-post-id="${postId}">
+  <article class="post-card v2" data-post-id="${postId}">
     <div class="tags">
       <span>${market || "MARKET"}</span>
       <span>${category || "Category"}</span>
       <span>${timeframe || "TF"}</span>
     </div>
 
-    ${
-        image
-            ? `<img class="post-img" src="${esc(image)}" alt="chart" loading="lazy">`
-            : `<div class="chart-placeholder">NO IMAGE</div>`
-    }
+    ${cover}
 
-    <h3>${pairsText || "PAIR"}</h3>
-    <p>${content || ""}</p>
+    <div class="post-body">
+      <h3 class="post-title">${pairsText || "PAIR"}</h3>
+      <p class="post-excerpt">${content}</p>
 
-    <div class="post-meta" style="margin-top:10px;color:rgba(15,23,42,.55);font-weight:800;font-size:12px">
-      ${created}
-    </div>
+      <div class="post-bottom">
+        <div class="post-meta">
+          <span class="metaDot"></span>
+          <span class="metaText">${created}</span>
+        </div>
 
-    <div class="post-actions">
-      <button class="likeBtn" data-post-id="${postId}">
-        ❤️ <span class="likeCount">0</span>
-      </button>
-
-      <button class="commentToggleBtn" data-post-id="${postId}">
-        💬 Comment
-      </button>
-
-      <button class="followBtn" data-user-id="${authorId}">
-        ➕ Follow
-      </button>
-    </div>
-
-    <div class="commentsWrap" data-post-id="${postId}">
-      <div class="cHead">
-        <div class="cTitle">Comments</div>
-        <button class="cClose" type="button" data-post-id="${postId}">✕</button>
+        <div class="post-cta">
+          <button class="likeBtn" data-post-id="${postId}" title="Like">
+            ❤️ <span class="likeCount">0</span>
+          </button>
+          <button class="commentToggleBtn" data-post-id="${postId}" title="Comment">
+            💬
+          </button>
+          <button class="followBtn" data-user-id="${authorId}" title="Follow">
+            ➕
+          </button>
+        </div>
       </div>
 
-      <div class="commentsList"></div>
+      <div class="commentsWrap" data-post-id="${postId}">
+        <div class="cHead">
+          <div class="cTitle">Comments</div>
+          <button class="cClose" type="button" data-post-id="${postId}">✕</button>
+        </div>
 
-      <form class="commentForm" data-post-id="${postId}">
-        <input class="commentInput" placeholder="..." maxlength="280" />
-        <button class="commentSend" type="submit">Send</button>
-      </form>
+        <div class="commentsList"></div>
+
+        <form class="commentForm" data-post-id="${postId}">
+          <input class="commentInput" placeholder="..." maxlength="280" />
+          <button class="commentSend" type="submit">Send</button>
+        </form>
+      </div>
     </div>
   </article>`;
 }
+
+// open post click (şimdilik kapalı link; istersen /post/detail.html'e yönlendiririz)
+document.addEventListener("click", (e) => {
+    const a = e.target.closest("[data-open-post]");
+    if (!a) return;
+    e.preventDefault();
+    // location.href = `/post/post.html?id=${encodeURIComponent(a.dataset.openPost)}`
+});
 
 // =========================
 // HYDRATE LIKE COUNTS
@@ -273,7 +244,7 @@ async function hydrateNewPosts(justAddedRows) {
         try {
             const postId = String(r.id);
             const c = await getLikeCount(postId);
-            const btn = grid.querySelector(`.likeBtn[data-post-id="${postId}"]`);
+            const btn = grid.querySelector(`.likeBtn[data-post-id="${CSS.escape(postId)}"]`);
             const span = btn?.querySelector(".likeCount");
             if (span) span.textContent = String(c);
         } catch {}
@@ -283,7 +254,7 @@ async function hydrateNewPosts(justAddedRows) {
 // =========================
 // POSTS SHOW MORE (5 by 5)
 // =========================
-const POSTS_STEP = 5;
+const POSTS_STEP = 6; // 2 tık daha dolu görünsün
 let postsPage = 0;
 let postsBusy = false;
 let postsHasMore = true;
@@ -384,7 +355,6 @@ async function loadFeedMore() {
 async function fetchNews(limit = 6) {
     if (!sb) throw new Error("Supabase CDN not loaded");
 
-    // ✅ Tablo/kolon farklıysa burayı değiştir
     const { data, error } = await sb
         .from("news")
         .select("id, title, image_url, url, source, created_at")
@@ -400,7 +370,7 @@ function renderNewsSlide(n, active = false) {
     const img = esc(n.image_url || "");
     const url = esc(n.url || "#");
     const source = esc(n.source || "");
-    const time = formatTime(n.created_at);
+    const time = esc(formatTime(n.created_at));
 
     return `
     <div class="newsSlide ${active ? "active" : ""}" data-url="${url}">
@@ -430,7 +400,7 @@ function startNewsAutoRotate() {
         slides[idx]?.classList.remove("active");
         idx = (idx + 1) % slides.length;
         slides[idx]?.classList.add("active");
-    }, 4500);
+    }, 4200);
 }
 
 async function loadNews() {
@@ -453,7 +423,6 @@ async function loadNews() {
     }
 }
 
-// Click slide -> open URL
 document.addEventListener("click", (e) => {
     const slide = e.target.closest(".newsSlide");
     if (!slide) return;
@@ -467,11 +436,19 @@ document.addEventListener("click", (e) => {
 const CG = "https://api.coingecko.com/api/v3";
 const MEME_IDS = ["dogecoin","shiba-inu","pepe","dogwifcoin","bonk","floki"].join(",");
 
+let cryptoActiveTab = "trending";
+let cryptoLastList = []; // search filter için cache
+
 function setCryptoMsg(t){
     if (cryptoMsg) cryptoMsg.textContent = t || "";
 }
 
 function renderCoinCards(list){
+    cryptoLastList = Array.isArray(list) ? list : [];
+    applyCryptoFilter(); // search uygula
+}
+
+function drawCoins(list){
     if (!cryptoGrid) return;
     cryptoGrid.innerHTML = (list || []).map((c) => {
         const name = esc(c.name || "-");
@@ -486,8 +463,9 @@ function renderCoinCards(list){
       <div class="coinCard">
         <div class="coinLeft">
           ${img ? `<img class="coinIcon" src="${img}" alt="">` : `<div class="coinIcon"></div>`}
-          <div style="min-width:0">
-            <div class="coinName">${name}<span class="coinSym"> ${sym}</span></div>
+          <div class="coinTxt">
+            <div class="coinName">${name}</div>
+            <div class="coinSym">${sym}</div>
           </div>
         </div>
         <div class="coinRight">
@@ -497,6 +475,18 @@ function renderCoinCards(list){
       </div>
     `;
     }).join("");
+}
+
+function applyCryptoFilter(){
+    const q = String(cryptoSearch?.value || "").trim().toLowerCase();
+    if (!q) return drawCoins(cryptoLastList);
+
+    const filtered = cryptoLastList.filter(x => {
+        const n = String(x?.name || "").toLowerCase();
+        const s = String(x?.symbol || "").toLowerCase();
+        return n.includes(q) || s.includes(q);
+    });
+    drawCoins(filtered);
 }
 
 async function cgJson(url){
@@ -537,10 +527,24 @@ async function loadGainers(){
     if (!cryptoGrid) return;
     setCryptoMsg("Loading gainers...");
 
-    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h`);
+    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=150&page=1&sparkline=false&price_change_percentage=24h`);
     const sorted = (j || [])
         .filter(x => typeof x.price_change_percentage_24h === "number")
         .sort((a,b) => b.price_change_percentage_24h - a.price_change_percentage_24h)
+        .slice(0, 10);
+
+    renderCoinCards(sorted);
+    setCryptoMsg("");
+}
+
+async function loadLosers(){
+    if (!cryptoGrid) return;
+    setCryptoMsg("Loading losers...");
+
+    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=150&page=1&sparkline=false&price_change_percentage=24h`);
+    const sorted = (j || [])
+        .filter(x => typeof x.price_change_percentage_24h === "number")
+        .sort((a,b) => a.price_change_percentage_24h - b.price_change_percentage_24h)
         .slice(0, 10);
 
     renderCoinCards(sorted);
@@ -566,11 +570,14 @@ async function loadVolume(){
 }
 
 async function loadCryptoTab(tab){
+    cryptoActiveTab = tab;
+
     try{
         if (tab === "trending") return await loadTrending();
         if (tab === "gainers") return await loadGainers();
-        if (tab === "meme") return await loadMeme();
+        if (tab === "losers") return await loadLosers();
         if (tab === "volume") return await loadVolume();
+        if (tab === "meme") return await loadMeme();
     } catch(e){
         console.error("❌ crypto error:", e);
         setCryptoMsg("Crypto unavailable");
@@ -578,9 +585,9 @@ async function loadCryptoTab(tab){
     }
 }
 
-// tabs click
 function initCryptoTabs(){
     if (!cryptoTabs?.length) return;
+
     cryptoTabs.forEach(btn => {
         btn.addEventListener("click", () => {
             cryptoTabs.forEach(b => b.classList.remove("active"));
@@ -589,24 +596,25 @@ function initCryptoTabs(){
         });
     });
 
-    // default
     const active = document.querySelector('.gTab[data-tab].active') || cryptoTabs[0];
     if (active) loadCryptoTab(active.dataset.tab);
+
+    if (cryptoSearch) {
+        cryptoSearch.addEventListener("input", applyCryptoFilter);
+    }
 }
 
 // =========================
 // EVENTS (Like/Comment/Follow)
 // =========================
 document.addEventListener("click", async (e) => {
-    // COMMENTS CLOSE
     const closeBtn = e.target.closest(".cClose");
     if (closeBtn) {
         const postId = closeBtn.dataset.postId;
-        document.querySelector(`.post-card[data-post-id="${postId}"]`)?.classList.remove("isCommentsOpen");
+        document.querySelector(`.post-card[data-post-id="${CSS.escape(postId)}"]`)?.classList.remove("isCommentsOpen");
         return;
     }
 
-    // LIKE
     const likeBtn = e.target.closest(".likeBtn");
     if (likeBtn) {
         const postId = likeBtn.dataset.postId;
@@ -623,11 +631,10 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
-    // COMMENT TOGGLE
     const tgl = e.target.closest(".commentToggleBtn");
     if (tgl) {
         const postId = tgl.dataset.postId;
-        const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
+        const card = document.querySelector(`.post-card[data-post-id="${CSS.escape(postId)}"]`);
         if (!card) return;
 
         const isOpen = card.classList.contains("isCommentsOpen");
@@ -637,12 +644,12 @@ document.addEventListener("click", async (e) => {
             card.classList.add("isCommentsOpen");
             try {
                 const list = await loadComments(postId);
-                const box = card.querySelector(`.commentsWrap[data-post-id="${postId}"] .commentsList`);
+                const box = card.querySelector(`.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentsList`);
                 if (box) {
                     box.innerHTML = list.map(c => `
             <div class="commentItem">
               <div class="commentText">${esc(c.content)}</div>
-              <div class="commentMeta">${formatTime(c.created_at)}</div>
+              <div class="commentMeta">${esc(formatTime(c.created_at))}</div>
             </div>
           `).join("");
                     box.scrollTop = box.scrollHeight;
@@ -654,14 +661,13 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
-    // FOLLOW
     const followBtn = e.target.closest(".followBtn");
     if (followBtn) {
         const targetUserId = followBtn.dataset.userId;
         followBtn.disabled = true;
         try {
             const r = await toggleFollow(targetUserId);
-            followBtn.textContent = r?.following ? "Following" : "➕ Follow";
+            followBtn.textContent = r?.following ? "✓" : "➕";
         } catch (err) {
             alert("❌ " + (err?.message || err));
         } finally {
@@ -678,8 +684,8 @@ document.addEventListener("submit", async (e) => {
     e.preventDefault();
     const postId = f.dataset.postId;
 
-    const card = document.querySelector(`.post-card[data-post-id="${postId}"]`);
-    const input = card?.querySelector(`.commentsWrap[data-post-id="${postId}"] .commentInput`);
+    const card = document.querySelector(`.post-card[data-post-id="${CSS.escape(postId)}"]`);
+    const input = card?.querySelector(`.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentInput`);
     const text = input?.value || "";
 
     const btn = f.querySelector('button[type="submit"]');
@@ -690,12 +696,12 @@ document.addEventListener("submit", async (e) => {
         if (input) input.value = "";
 
         const list = await loadComments(postId);
-        const box = card?.querySelector(`.commentsWrap[data-post-id="${postId}"] .commentsList`);
+        const box = card?.querySelector(`.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentsList`);
         if (box) {
             box.innerHTML = list.map(c => `
         <div class="commentItem">
           <div class="commentText">${esc(c.content)}</div>
-          <div class="commentMeta">${formatTime(c.created_at)}</div>
+          <div class="commentMeta">${esc(formatTime(c.created_at))}</div>
         </div>
       `).join("");
             box.scrollTop = box.scrollHeight;
@@ -711,7 +717,7 @@ document.addEventListener("submit", async (e) => {
 // INIT
 // =========================
 document.addEventListener("DOMContentLoaded", () => {
-    loadNews();       // ✅ NEWS
-    initCryptoTabs(); // ✅ TOP CRYPTO
-    loadFeed(true);   // ✅ POSTS
+    loadNews();
+    initCryptoTabs();
+    loadFeed(true);
 });

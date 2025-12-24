@@ -1,49 +1,31 @@
 /* =========================
-   FEED.CSS (FULL / CLEAN)
-   - News + Top Crypto same height
-   - Coin list scroll
-   - NO extra "background box" behind News/Crypto/Calendar
-   - PC a bit smaller
+   FEED.CSS (FULL)
 ========================= */
 
-/* Container */
-.container{
-    max-width: 1120px;
-    margin: 0 auto;
-    padding: 0 24px 44px;
-}
-
-/* PC görünüm biraz küçük */
-@media (min-width: 1100px){
-    body{ zoom: .93; }
-}
-
-/* =========================
-   DASH (News + Top Crypto)
-========================= */
+/* ---- DASH (News + Crypto) ---- */
 .dash2{
     display:grid;
     grid-template-columns: 1.35fr 0.85fr;
-    gap:18px;
+    gap:16px;
     align-items: stretch;
-    margin-top:18px;
-    margin-bottom:18px;
-
-    /* ✅ arkada panel yok */
-    background: transparent;
-    border: none;
-    box-shadow: none;
+    margin-top:16px;
+    margin-bottom:16px;
 }
 
-/* Her kutu sadece layout kapsayıcı (arka kart yok) */
+/* dış kutu görünmesin (senin istediğin) */
+.dashNoBox{
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+.dashNoBox .dashHead{ padding: 0 2px 10px; }
+.dashNoBox .dashBody{ padding: 0; }
+
 .dashBox{
     display:flex;
     flex-direction:column;
     min-height:0;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    padding:0;
 }
 
 .dashHead{
@@ -51,32 +33,23 @@
     align-items:center;
     justify-content:space-between;
     gap:10px;
-    padding: 0 2px 8px;
 }
 .dashHead h3{
     margin:0;
-    font-weight: 1000;
-    letter-spacing: -.01em;
+    font-weight:950;
+    letter-spacing:-.01em;
+    font-size: 14px; /* 2 tık küçük */
 }
 
-.dashBody{
-    flex:1;
-    min-height:0;
-    display:flex;
-    flex-direction:column;
-}
-
-/* =========================
-   NEWS SLIDER (real card)
-========================= */
+/* ---- News Slider (kendi kartı var, dış box yok) ---- */
 .newsSlider{
     position:relative;
     width:100%;
-    height:340px;               /* eşit yükseklik */
+    height:340px;
     border-radius:16px;
     overflow:hidden;
-    border: 1px solid var(--border);
-    background: var(--card);
+    border:1px solid rgba(37,99,235,.18);
+    background: rgba(37,99,235,.06);
     box-shadow: var(--softShadow);
 }
 
@@ -92,8 +65,6 @@
     opacity:1;
     transform: scale(1);
 }
-.newsSlide.active:hover .newsSlideImg{ transform: scale(1.03); }
-
 .newsSlideImg{
     width:100%;
     height:100%;
@@ -103,65 +74,46 @@
     transform: scale(1);
     transition: transform .35s ease;
 }
-
 .newsOverlay{
     position:absolute;
     inset:auto 0 0 0;
-    padding:16px 16px 14px;
+    padding:14px 14px 12px;
     background: linear-gradient(
             180deg,
             rgba(0,0,0,0) 0%,
             rgba(0,0,0,.30) 35%,
-            rgba(0,0,0,.78) 100%
+            rgba(0,0,0,.80) 100%
     );
 }
 .newsTitle{
     margin:0;
     color:#fff;
-    font-weight: 1000;
-    font-size:18px;
+    font-weight:950;
+    font-size:16px;
     line-height:1.22;
     text-shadow: 0 10px 30px rgba(0,0,0,.60);
     display:-webkit-box;
-    -webkit-line-clamp:2;
-    -webkit-box-orient:vertical;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow:hidden;
 }
 .newsMeta{
     margin-top:6px;
-    font-size:12px;
-    font-weight:900;
+    font-size:11px;
+    font-weight:800;
     color: rgba(255,255,255,.88);
 }
-
 .newsSlideSkeleton{
     height:100%;
     display:grid;
     place-items:center;
-    font-weight:1000;
+    font-weight:900;
     opacity:.75;
     color: var(--muted);
 }
-html[data-theme="dark"] .newsSlideSkeleton{
-    color: rgba(255,255,255,.75);
-}
+html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
 
-/* =========================
-   TOP CRYPTO (real card)
-========================= */
-.topCryptoCard{
-    display:flex;
-    flex-direction:column;
-    min-height:0;
-
-    border-radius:16px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    box-shadow: var(--softShadow);
-    padding: 12px;
-}
-
-/* Tabs */
+/* ---- Top Crypto ---- */
 .gTabs{
     display:flex;
     gap:8px;
@@ -169,27 +121,27 @@ html[data-theme="dark"] .newsSlideSkeleton{
     margin-bottom:10px;
 }
 .gTab{
-    padding:8px 12px;
+    padding:7px 10px;
     border-radius:999px;
-    border: 1px solid var(--border);
+    border:1px solid var(--border);
     background: var(--card);
-    color: var(--text);
-    font-weight:1000;
-    font-size:11px;
+    font-weight:900;
+    font-size:10px;
     letter-spacing:.08em;
     cursor:pointer;
-    opacity:.75;
+    opacity:.78;
     transition: transform .12s ease, opacity .12s ease, background .12s ease;
+    color: var(--text);
 }
-.gTab:hover{ transform: translateY(-1px); opacity:.9; }
+.gTab:hover{ transform: translateY(-1px); opacity:.92; }
 .gTab.active{
     opacity:1;
     color: var(--brand);
-    background: rgba(37,99,235,.10);
-    border-color: rgba(37,99,235,.22);
+    background: rgba(37,99,235,.12);
+    border-color: rgba(37,99,235,.25);
 }
 
-/* Coin list scroll only here */
+/* coin list alanı - scroll sadece burada */
 .coinGrid{
     flex:1;
     min-height:0;
@@ -197,78 +149,76 @@ html[data-theme="dark"] .newsSlideSkeleton{
     padding-right:6px;
 
     display:grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:10px;
-
-    background: transparent;
-    border: none;
-    box-shadow: none;
-}
-.coinGrid::-webkit-scrollbar{ width:8px; }
-.coinGrid::-webkit-scrollbar-thumb{
-    background: rgba(15,23,42,.12);
-    border-radius:999px;
-}
-html[data-theme="dark"] .coinGrid::-webkit-scrollbar-thumb{
-    background: rgba(255,255,255,.14);
 }
 
-/* Coin card */
+/* coin card */
 .coinCard{
     display:flex;
     align-items:center;
     justify-content:space-between;
     gap:10px;
-
-    padding:12px;
+    padding:11px;
     border-radius:14px;
-    border: 1px solid var(--border);
-    background: var(--panel);
-    box-shadow: none;
+    border:1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--softShadow);
 }
 .coinLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
-.coinIcon{ width:28px; height:28px; border-radius:999px; background: rgba(0,0,0,.06); flex:0 0 auto; }
-.coinName{ font-weight:1000; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
-.coinSym{ opacity:.65; font-weight:900; margin-left:6px; }
+.coinIcon{
+    width:28px; height:28px; border-radius:999px;
+    background: rgba(0,0,0,.06);
+    flex:0 0 auto;
+}
+.coinTxt{ min-width:0; }
+.coinName{
+    font-weight:950;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    max-width:160px;
+    font-size: 12px;
+}
+.coinSym{ opacity:.65; font-weight:850; font-size: 11px; margin-top:2px; }
 .coinRight{ text-align:right; flex:0 0 auto; }
-.coinPrice{ font-weight:1000; }
+.coinPrice{ font-weight:950; font-size: 12px; }
 .coinChg{
-    font-weight:1000;
-    margin-top:4px;
+    font-weight:950;
+    margin-top:5px;
     display:inline-block;
     padding:3px 8px;
     border-radius:999px;
+    font-size: 11px;
 }
-.chgUp{ background: rgba(22,163,74,.16); }
-.chgDown{ background: rgba(239,68,68,.16); }
+.chgUp{ background: rgba(0,128,0,.14); }
+.chgDown{ background: rgba(255,0,0,.14); }
 
-/* Footer (search at bottom) */
+/* search footer en altta */
 .cryptoFooter{
     margin-top:auto;
     padding-top:10px;
 }
 .cryptoSearch{
     width:100%;
-    height:40px;
+    height:38px;
     border-radius:14px;
-    border: 1px solid var(--border);
-    background: var(--panel);
+    border:1px solid var(--border);
+    background: var(--card);
     padding:0 12px;
-    font-weight:1000;
+    font-weight:900;
     outline:none;
+    color: var(--text);
 }
 .miniMsg{
     opacity:.75;
     margin-top:6px;
-    font-weight:900;
+    font-weight:800;
+    font-size: 12px;
     color: var(--muted);
 }
 
-/* =========================
-   FEED HEADER + POSTS
-========================= */
+/* ---- Feed header ---- */
 .feed-header{
-    margin: 12px 0 14px;
+    margin: 10px 0 12px;
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -276,99 +226,147 @@ html[data-theme="dark"] .coinGrid::-webkit-scrollbar-thumb{
 }
 .feed-header h2{
     margin:0;
-    font-size:30px;
-    font-weight:1000;
+    font-size:22px; /* küçüldü */
+    font-weight:950;
     letter-spacing:-.02em;
 }
 
+/* ---- Posts Grid ---- */
 .posts{
     display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap:18px;
-    padding-bottom:40px;
-    align-items:start;
-    grid-auto-rows:min-content;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap:14px;
+    padding-bottom: 28px;
+    align-items: start;
+    grid-auto-rows: min-content;
 }
 
-.post-card{
-    padding:14px;
+/* ---- POST CARD (NEW LOOK) ---- */
+.post-card.v2{
     border-radius:18px;
-    background: var(--panel);
-    border: 1px solid var(--border);
+    border:1px solid var(--border);
+    background: var(--card);
     box-shadow: var(--softShadow);
-    align-self:start;
+    overflow:hidden;
 }
 
-.tags{
+.post-card.v2 .tags{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
+    padding:12px 12px 0;
 }
-.tags span{
-    font-size:12px;
+.post-card.v2 .tags span{
+    font-size:11px;
     padding:6px 10px;
     border-radius:999px;
-    background: rgba(37,99,235,.10);
+    background: rgba(37,99,235,.12);
     border: 1px solid rgba(37,99,235,.18);
     color: var(--text);
-    font-weight:900;
+    font-weight:850;
+}
+
+.post-cover{
+    display:block;
+    padding:12px;
+}
+.post-cover.noimg{ padding:12px; }
+
+.post-img{
+    width:100%;
+    height: 210px;
+    object-fit: cover;
+    border-radius: 14px;
+    border: 1px solid rgba(37,99,235,.18);
+    background: rgba(37,99,235,.06);
+    display:block;
 }
 
 .chart-placeholder{
-    height:180px;
+    height:210px;
     border-radius:14px;
     background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(15,23,42,.02));
     border: 1px dashed rgba(37,99,235,.32);
     display:grid;
     place-items:center;
-    margin:12px 0;
     color: var(--muted);
     font-weight:900;
 }
 
-.post-img{
-    width:100%;
-    height:220px;
-    object-fit:cover;
-    border-radius:14px;
-    border: 1px solid rgba(37,99,235,.18);
-    background: rgba(37,99,235,.06);
-    display:block;
-    margin:12px 0;
+.post-body{
+    padding: 0 12px 12px;
 }
 
-.post-card h3{ margin:0; font-size:18px; font-weight:1000; }
-.post-card p{ margin:8px 0 0; color: var(--muted); font-size:13px; font-weight:800; }
+.post-title{
+    margin: 2px 0 6px;
+    font-size: 15px;
+    font-weight: 950;
+    letter-spacing:-.01em;
+    color: var(--text);
+}
+.post-excerpt{
+    margin:0;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.35;
+}
 
-/* Actions */
-.post-actions{
-    margin-top:12px;
+/* bottom row (meta left / actions right) */
+.post-bottom{
+    margin-top:10px;
     display:flex;
+    align-items:center;
+    justify-content:space-between;
     gap:10px;
-    align-items:stretch;
 }
-.post-actions button{
-    flex:1;
-    padding:10px 10px;
+.post-meta{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width:0;
+}
+.metaDot{
+    width:8px; height:8px;
+    border-radius:999px;
+    background: rgba(37,99,235,.70);
+    box-shadow: 0 8px 18px rgba(37,99,235,.25);
+}
+.metaText{
+    font-size: 11px;
+    font-weight: 850;
+    color: var(--muted);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width: 220px;
+}
+
+.post-cta{
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+.post-cta button{
+    height:34px;
+    padding:0 10px;
     border-radius:12px;
-    border: 1px solid var(--border);
+    border:1px solid var(--border);
     background: var(--card);
     color: var(--text);
     cursor:pointer;
-    font-weight:1000;
-    transition: transform .12s ease, background .12s ease, border-color .12s ease;
+    font-weight:950;
+    transition: transform .12s ease, background .12s ease;
 }
-.post-actions button:hover{
-    background: rgba(37,99,235,.08);
-    border-color: rgba(37,99,235,.25);
-    transform: translateY(-1px);
-}
+.post-cta button:hover{ transform: translateY(-1px); background: rgba(255,255,255,.06); }
+.post-cta .commentToggleBtn{ width:40px; padding:0; }
+.post-cta .followBtn{ width:40px; padding:0; }
 
 /* Feed msg */
 .feedMsg{
-    margin: 10px 0 40px;
+    margin: 10px 0 30px;
     color: var(--muted);
-    font-weight: 900;
+    font-weight: 800;
+    font-size: 12px;
 }
 
 /* Show more */
@@ -376,38 +374,30 @@ html[data-theme="dark"] .coinGrid::-webkit-scrollbar-thumb{
     width:100%;
     display:flex;
     justify-content:center;
-    margin: 8px 0 26px;
+    margin: 6px 0 20px;
 }
 .postsMoreBtn{
     border: 1px solid var(--border);
     background: var(--card);
     color: var(--text);
-    font-weight:1000;
+    font-weight:950;
     border-radius: 12px;
-    padding: 12px 18px;
+    padding: 11px 16px;
     cursor:pointer;
     box-shadow: var(--softShadow);
-    transition: transform .12s ease, background .12s ease;
-}
-.postsMoreBtn:hover{
-    transform: translateY(-1px);
-    background: rgba(0,0,0,.03);
-}
-html[data-theme="dark"] .postsMoreBtn:hover{
-    background: rgba(255,255,255,.08);
 }
 .postsMoreEnd{
-    font-weight:1000;
+    font-weight:900;
     opacity:.7;
     color: var(--muted);
 }
 
-/* Comments */
+/* Comments drawer */
 .commentsWrap{
     display:none;
     margin-top:12px;
-    border: 1px solid var(--border);
-    background: var(--card);
+    border:1px solid var(--border);
+    background: var(--panel);
     border-radius:16px;
     padding:12px;
     box-shadow: var(--softShadow);
@@ -415,75 +405,64 @@ html[data-theme="dark"] .postsMoreBtn:hover{
 .post-card.isCommentsOpen .commentsWrap{ display:block; }
 
 .cHead{ display:flex;align-items:center;justify-content:space-between; gap:10px;margin-bottom:10px; }
-.cTitle{ font-weight:1000;font-size:13px;color: var(--text); }
-.cClose{
-    width:34px;height:34px;border-radius:12px;
-    border: 1px solid var(--border);
-    background: var(--panel);
-    font-weight:1000;
-    cursor:pointer;
-}
+.cTitle{ font-weight:950;font-size:12px;color:var(--text); }
+.cClose{ width:34px;height:34px;border-radius:12px;border:1px solid var(--border);background:var(--card);font-weight:950;cursor:pointer;color:var(--text); }
 
 .commentsList{
     max-height:220px;
     overflow:auto;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    padding-right:4px;
-    margin-bottom:10px;
+    display:flex;flex-direction:column;gap:8px;
+    padding-right:4px;margin-bottom:10px;
 }
-.commentItem{
-    border: 1px solid var(--border);
-    background: var(--panel);
-    border-radius:14px;
-    padding:10px;
-}
-.commentText{ font-size:13px;font-weight:900;color: var(--text);line-height:1.25; }
-.commentMeta{ margin-top:6px;font-size:11px;font-weight:900;color: var(--muted); }
+.commentItem{ border:1px solid var(--border);background:var(--card);border-radius:14px;padding:10px; }
+.commentText{ font-size:12.5px;font-weight:850;color:var(--text);line-height:1.25; }
+.commentMeta{ margin-top:6px;font-size:11px;font-weight:850;color:var(--muted); }
 
 .commentForm{ display:flex;gap:8px;align-items:center; }
 .commentInput{
-    flex:1;height:40px;padding:0 12px;border-radius:14px;
-    border: 1px solid var(--border);
-    background: var(--panel);
-    outline:none;font-weight:900;
+    flex:1;height:38px;padding:0 12px;border-radius:14px;
+    border:1px solid var(--border);
+    outline:none;font-weight:850;
+    background: var(--card);
+    color: var(--text);
 }
 .commentSend{
-    height:40px;padding:0 14px;border-radius:14px;
-    border: 1px solid var(--border);
+    height:38px;padding:0 14px;border-radius:14px;
+    border:1px solid var(--border);
     background: var(--card);
-    font-weight:1000;cursor:pointer;
-}
-.commentSend:hover{
-    background: rgba(37,99,235,.08);
-    border-color: rgba(37,99,235,.25);
+    font-weight:950;cursor:pointer;
+    color: var(--text);
 }
 
-/* =========================
-   ECONOMIC CALENDAR (NO BOX BEHIND)
-========================= */
+/* ---- Economic calendar (dış kutu yok; sadece iframe wrap görünsün) ---- */
+.econWrap{ margin-top: 16px; }
 .econIframeWrap{
     width:100%;
-    overflow: visible;
-    border-radius: 0;
-    border: none;
-    background: transparent;
-    box-shadow: none;
+    overflow:hidden;
+    border-radius:16px;
+    border:1px solid rgba(37,99,235,.18);
+    background: rgba(37,99,235,.06);
+    box-shadow: var(--softShadow);
 }
 .econIframe{
     width:100%;
     height:620px;
     border:0;
-    background: transparent;
 }
 
-/* =========================
-   MOBILE
-========================= */
+/* mobile econ */
+.econMobile{ display:none; }
 @media(max-width:900px){
-    .container{ padding: 0 14px 44px; }
     .dash2{ grid-template-columns:1fr; }
-    .newsSlider{ height:260px; }
     .coinGrid{ grid-template-columns:1fr; }
+    .newsSlider{ height:260px; }
+
+    .econDesktop{ display:none; }
+    .econMobile{ display:block; }
+}
+
+/* smaller desktop preview */
+@media(min-width:1200px){
+    .posts{ grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); }
+    .post-img, .chart-placeholder{ height: 220px; }
 }
