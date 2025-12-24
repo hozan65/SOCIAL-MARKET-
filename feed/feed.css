@@ -1,79 +1,83 @@
 /* =========================
-   FEED.CSS (CLEAN)
-   - Only FEED page styles
-   - No :root, no body, no container, no topbar
+   FEED.CSS (FULL / CLEAN)
+   - News + Top Crypto same height
+   - Coin list scroll
+   - NO extra "background box" behind News/Crypto/Calendar
+   - PC a bit smaller
 ========================= */
 
+/* Container */
+.container{
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 24px 44px;
+}
+
+/* PC görünüm biraz küçük */
+@media (min-width: 1100px){
+    body{ zoom: .93; }
+}
+
 /* =========================
-   TOP AREA: News + Crypto
+   DASH (News + Top Crypto)
 ========================= */
 .dash2{
     display:grid;
     grid-template-columns: 1.35fr 0.85fr;
     gap:18px;
-    align-items:stretch;
+    align-items: stretch;
     margin-top:18px;
     margin-bottom:18px;
 
-    /* ❌ Arkada ekstra kare olmasın */
+    /* ✅ arkada panel yok */
     background: transparent;
-    border: 0;
+    border: none;
     box-shadow: none;
 }
-@media (max-width: 900px){
-    .dash2{ grid-template-columns:1fr; }
-}
 
-/* box */
+/* Her kutu sadece layout kapsayıcı (arka kart yok) */
 .dashBox{
     display:flex;
     flex-direction:column;
     min-height:0;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--softShadow);
-    backdrop-filter: blur(var(--blur));
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding:0;
 }
 
-/* header */
 .dashHead{
     display:flex;
     align-items:center;
     justify-content:space-between;
     gap:10px;
-    padding:12px 14px 0;
+    padding: 0 2px 8px;
 }
 .dashHead h3{
     margin:0;
-    font-weight:1000;
-    letter-spacing:-.01em;
-    color: var(--text);
+    font-weight: 1000;
+    letter-spacing: -.01em;
 }
 
-/* body */
 .dashBody{
     flex:1;
     min-height:0;
     display:flex;
     flex-direction:column;
-    padding:12px 14px 14px;
 }
 
 /* =========================
-   NEWS SLIDER
+   NEWS SLIDER (real card)
 ========================= */
 .newsSlider{
     position:relative;
     width:100%;
-    height:340px;            /* ✅ sabit ve temiz */
+    height:340px;               /* eşit yükseklik */
     border-radius:16px;
     overflow:hidden;
-    border:1px solid rgba(37,99,235,.18);
-    background: rgba(37,99,235,.06);
-}
-@media (max-width: 900px){
-    .newsSlider{ height:260px; }
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--softShadow);
 }
 
 .newsSlide{
@@ -88,6 +92,8 @@
     opacity:1;
     transform: scale(1);
 }
+.newsSlide.active:hover .newsSlideImg{ transform: scale(1.03); }
+
 .newsSlideImg{
     width:100%;
     height:100%;
@@ -97,7 +103,6 @@
     transform: scale(1);
     transition: transform .35s ease;
 }
-.newsSlide.active:hover .newsSlideImg{ transform: scale(1.03); }
 
 .newsOverlay{
     position:absolute;
@@ -113,13 +118,13 @@
 .newsTitle{
     margin:0;
     color:#fff;
-    font-weight:1000;
-    font-size:16px;
+    font-weight: 1000;
+    font-size:18px;
     line-height:1.22;
     text-shadow: 0 10px 30px rgba(0,0,0,.60);
     display:-webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
     overflow:hidden;
 }
 .newsMeta{
@@ -128,20 +133,33 @@
     font-weight:900;
     color: rgba(255,255,255,.88);
 }
+
 .newsSlideSkeleton{
     height:100%;
     display:grid;
     place-items:center;
     font-weight:1000;
+    opacity:.75;
     color: var(--muted);
 }
 html[data-theme="dark"] .newsSlideSkeleton{
-    color: rgba(255,255,255,.72);
+    color: rgba(255,255,255,.75);
 }
 
 /* =========================
-   TOP CRYPTO
+   TOP CRYPTO (real card)
 ========================= */
+.topCryptoCard{
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+
+    border-radius:16px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--softShadow);
+    padding: 12px;
+}
 
 /* Tabs */
 .gTabs{
@@ -153,7 +171,7 @@ html[data-theme="dark"] .newsSlideSkeleton{
 .gTab{
     padding:8px 12px;
     border-radius:999px;
-    border:1px solid var(--border);
+    border: 1px solid var(--border);
     background: var(--card);
     color: var(--text);
     font-weight:1000;
@@ -171,8 +189,7 @@ html[data-theme="dark"] .newsSlideSkeleton{
     border-color: rgba(37,99,235,.22);
 }
 
-/* Coin list: sadece burası scroll */
-#cryptoGrid,
+/* Coin list scroll only here */
 .coinGrid{
     flex:1;
     min-height:0;
@@ -180,14 +197,52 @@ html[data-theme="dark"] .newsSlideSkeleton{
     padding-right:6px;
 
     display:grid;
-    grid-template-columns:repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap:10px;
+
+    background: transparent;
+    border: none;
+    box-shadow: none;
 }
-@media (max-width: 900px){
-    #cryptoGrid, .coinGrid{ grid-template-columns:1fr; }
+.coinGrid::-webkit-scrollbar{ width:8px; }
+.coinGrid::-webkit-scrollbar-thumb{
+    background: rgba(15,23,42,.12);
+    border-radius:999px;
+}
+html[data-theme="dark"] .coinGrid::-webkit-scrollbar-thumb{
+    background: rgba(255,255,255,.14);
 }
 
-/* Footer: search en alta */
+/* Coin card */
+.coinCard{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+
+    padding:12px;
+    border-radius:14px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    box-shadow: none;
+}
+.coinLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
+.coinIcon{ width:28px; height:28px; border-radius:999px; background: rgba(0,0,0,.06); flex:0 0 auto; }
+.coinName{ font-weight:1000; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+.coinSym{ opacity:.65; font-weight:900; margin-left:6px; }
+.coinRight{ text-align:right; flex:0 0 auto; }
+.coinPrice{ font-weight:1000; }
+.coinChg{
+    font-weight:1000;
+    margin-top:4px;
+    display:inline-block;
+    padding:3px 8px;
+    border-radius:999px;
+}
+.chgUp{ background: rgba(22,163,74,.16); }
+.chgDown{ background: rgba(239,68,68,.16); }
+
+/* Footer (search at bottom) */
 .cryptoFooter{
     margin-top:auto;
     padding-top:10px;
@@ -196,9 +251,8 @@ html[data-theme="dark"] .newsSlideSkeleton{
     width:100%;
     height:40px;
     border-radius:14px;
-    border:1px solid var(--border);
-    background: var(--card);
-    color: var(--text);
+    border: 1px solid var(--border);
+    background: var(--panel);
     padding:0 12px;
     font-weight:1000;
     outline:none;
@@ -210,45 +264,8 @@ html[data-theme="dark"] .newsSlideSkeleton{
     color: var(--muted);
 }
 
-/* coin card */
-.coinCard{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    padding:12px;
-    border-radius:14px;
-    border:1px solid var(--border);
-    background: var(--card);
-    box-shadow: var(--softShadow);
-}
-.coinLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
-.coinIcon{ width:28px; height:28px; border-radius:999px; background: rgba(0,0,0,.06); flex:0 0 auto; }
-html[data-theme="dark"] .coinIcon{ background: rgba(255,255,255,.10); }
-
-.coinName{
-    font-weight:1000;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    max-width:160px;
-    color: var(--text);
-}
-.coinSym{ opacity:.65; font-weight:900; margin-left:6px; color: var(--muted); }
-.coinRight{ text-align:right; flex:0 0 auto; }
-.coinPrice{ font-weight:1000; color: var(--text); }
-.coinChg{
-    font-weight:1000;
-    margin-top:4px;
-    display:inline-block;
-    padding:3px 8px;
-    border-radius:999px;
-}
-.chgUp{ background: rgba(0,128,0,.14); }
-.chgDown{ background: rgba(255,0,0,.14); }
-
 /* =========================
-   FEED HEADER (Market Analysis Feed)
+   FEED HEADER + POSTS
 ========================= */
 .feed-header{
     margin: 12px 0 14px;
@@ -262,26 +279,22 @@ html[data-theme="dark"] .coinIcon{ background: rgba(255,255,255,.10); }
     font-size:30px;
     font-weight:1000;
     letter-spacing:-.02em;
-    color: var(--text);
 }
 
-/* =========================
-   POSTS GRID
-========================= */
 .posts{
     display:grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap:18px;
-    padding-bottom: 40px;
+    padding-bottom:40px;
     align-items:start;
-    grid-auto-rows: min-content;
+    grid-auto-rows:min-content;
 }
 
 .post-card{
     padding:14px;
     border-radius:18px;
-    background: var(--card);
-    border:1px solid var(--border);
+    background: var(--panel);
+    border: 1px solid var(--border);
     box-shadow: var(--softShadow);
     align-self:start;
 }
@@ -315,19 +328,19 @@ html[data-theme="dark"] .coinIcon{ background: rgba(255,255,255,.10); }
 
 .post-img{
     width:100%;
-    height: 220px;
-    object-fit: cover;
-    border-radius: 14px;
+    height:220px;
+    object-fit:cover;
+    border-radius:14px;
     border: 1px solid rgba(37,99,235,.18);
     background: rgba(37,99,235,.06);
     display:block;
-    margin: 12px 0;
+    margin:12px 0;
 }
 
-.post-card h3{ margin:0; font-size:18px; font-weight:1000; color: var(--text); }
-.post-card p{ margin:8px 0 0; color: var(--muted); font-size:13px; }
+.post-card h3{ margin:0; font-size:18px; font-weight:1000; }
+.post-card p{ margin:8px 0 0; color: var(--muted); font-size:13px; font-weight:800; }
 
-/* actions */
+/* Actions */
 .post-actions{
     margin-top:12px;
     display:flex;
@@ -338,7 +351,7 @@ html[data-theme="dark"] .coinIcon{ background: rgba(255,255,255,.10); }
     flex:1;
     padding:10px 10px;
     border-radius:12px;
-    border:1px solid var(--border);
+    border: 1px solid var(--border);
     background: var(--card);
     color: var(--text);
     cursor:pointer;
@@ -351,14 +364,14 @@ html[data-theme="dark"] .coinIcon{ background: rgba(255,255,255,.10); }
     transform: translateY(-1px);
 }
 
-/* msg */
+/* Feed msg */
 .feedMsg{
     margin: 10px 0 40px;
     color: var(--muted);
     font-weight: 900;
 }
 
-/* show more */
+/* Show more */
 .postsMoreWrap{
     width:100%;
     display:flex;
@@ -385,17 +398,15 @@ html[data-theme="dark"] .postsMoreBtn:hover{
 }
 .postsMoreEnd{
     font-weight:1000;
-    opacity:.75;
+    opacity:.7;
     color: var(--muted);
 }
 
-/* =========================
-   COMMENTS (drawer)
-========================= */
+/* Comments */
 .commentsWrap{
     display:none;
     margin-top:12px;
-    border:1px solid var(--border);
+    border: 1px solid var(--border);
     background: var(--card);
     border-radius:16px;
     padding:12px;
@@ -403,25 +414,12 @@ html[data-theme="dark"] .postsMoreBtn:hover{
 }
 .post-card.isCommentsOpen .commentsWrap{ display:block; }
 
-.cHead{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:10px;
-}
-.cTitle{
-    font-weight:1000;
-    font-size:13px;
-    color: var(--text);
-}
+.cHead{ display:flex;align-items:center;justify-content:space-between; gap:10px;margin-bottom:10px; }
+.cTitle{ font-weight:1000;font-size:13px;color: var(--text); }
 .cClose{
-    width:34px;
-    height:34px;
-    border-radius:12px;
-    border:1px solid var(--border);
-    background: var(--card);
-    color: var(--text);
+    width:34px;height:34px;border-radius:12px;
+    border: 1px solid var(--border);
+    background: var(--panel);
     font-weight:1000;
     cursor:pointer;
 }
@@ -435,59 +433,27 @@ html[data-theme="dark"] .postsMoreBtn:hover{
     padding-right:4px;
     margin-bottom:10px;
 }
-.commentsList::-webkit-scrollbar{ width:8px; }
-.commentsList::-webkit-scrollbar-thumb{
-    background: rgba(15,23,42,.12);
-    border-radius:999px;
-}
-html[data-theme="dark"] .commentsList::-webkit-scrollbar-thumb{
-    background: rgba(255,255,255,.14);
-}
-
 .commentItem{
-    border:1px solid var(--border);
-    background: var(--card);
+    border: 1px solid var(--border);
+    background: var(--panel);
     border-radius:14px;
     padding:10px;
 }
-.commentText{
-    font-size:13px;
-    font-weight:900;
-    color: var(--text);
-    line-height:1.25;
-}
-.commentMeta{
-    margin-top:6px;
-    font-size:11px;
-    font-weight:900;
-    color: var(--muted);
-}
+.commentText{ font-size:13px;font-weight:900;color: var(--text);line-height:1.25; }
+.commentMeta{ margin-top:6px;font-size:11px;font-weight:900;color: var(--muted); }
 
-.commentForm{
-    display:flex;
-    gap:8px;
-    align-items:center;
-}
+.commentForm{ display:flex;gap:8px;align-items:center; }
 .commentInput{
-    flex:1;
-    height:40px;
-    padding:0 12px;
-    border-radius:14px;
-    border:1px solid var(--border);
-    background: var(--card);
-    color: var(--text);
-    outline:none;
-    font-weight:900;
+    flex:1;height:40px;padding:0 12px;border-radius:14px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    outline:none;font-weight:900;
 }
 .commentSend{
-    height:40px;
-    padding:0 14px;
-    border-radius:14px;
-    border:1px solid var(--border);
+    height:40px;padding:0 14px;border-radius:14px;
+    border: 1px solid var(--border);
     background: var(--card);
-    color: var(--text);
-    font-weight:1000;
-    cursor:pointer;
+    font-weight:1000;cursor:pointer;
 }
 .commentSend:hover{
     background: rgba(37,99,235,.08);
@@ -495,14 +461,29 @@ html[data-theme="dark"] .commentsList::-webkit-scrollbar-thumb{
 }
 
 /* =========================
-   ECON CALENDAR (if used on feed)
+   ECONOMIC CALENDAR (NO BOX BEHIND)
 ========================= */
 .econIframeWrap{
     width:100%;
-    overflow:hidden;
-    border-radius:14px;
-    border:1px solid var(--border);
-    background: var(--panel);
+    overflow: visible;
+    border-radius: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
 }
-.econIframe{ width:100%; height:620px; border:0; }
-.econMobile{ display:none; }
+.econIframe{
+    width:100%;
+    height:620px;
+    border:0;
+    background: transparent;
+}
+
+/* =========================
+   MOBILE
+========================= */
+@media(max-width:900px){
+    .container{ padding: 0 14px 44px; }
+    .dash2{ grid-template-columns:1fr; }
+    .newsSlider{ height:260px; }
+    .coinGrid{ grid-template-columns:1fr; }
+}
