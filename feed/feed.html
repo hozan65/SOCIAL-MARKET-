@@ -23,21 +23,31 @@
             </div>
         </div>
 
-        <div class="dashBox">
-            <div class="dashHead"><h3>Top Crypto</h3></div>
+        <div class="dashBox topCryptoBox">
+            <div class="dashHead">
+                <h3>Top Crypto</h3>
+            </div>
 
             <div class="dashBody">
+                <!-- TABS -->
                 <div class="gTabs">
                     <button class="gTab active" data-tab="trending" type="button">TRENDING</button>
                     <button class="gTab" data-tab="gainers" type="button">TOP GAINERS</button>
-                    <button class="gTab" data-tab="meme" type="button">MEME COINS</button>
+                    <button class="gTab" data-tab="losers" type="button">TOP LOSERS</button>
                     <button class="gTab" data-tab="volume" type="button">TOP VOLUME</button>
                 </div>
 
+                <!-- ✅ COIN LIST (scroll burası) -->
                 <div id="cryptoGrid" class="coinGrid"></div>
-                <p id="cryptoMsg" class="miniMsg"></p>
+
+                <!-- ✅ SEARCH (kutunun en altına sabit) -->
+                <div class="cryptoFooter">
+                    <input id="cryptoSearch" class="cryptoSearch" placeholder="Search coin (BTC, ETH, SOL...)" />
+                    <div id="cryptoMsg" class="miniMsg"></div>
+                </div>
             </div>
         </div>
+
 
     </section>
 
@@ -50,31 +60,35 @@
     <p class="feedMsg" id="feedMsg"></p>
 
 
-    <div class="dashBox topCryptoBox">
+    <section class="dashBox fullRow econWrap">
         <div class="dashHead">
-            <h3>Top Crypto</h3>
+            <h3>Economic Calendar</h3>
         </div>
 
-        <div class="dashBody">
-            <div class="gTabs">
-                <button class="gTab active" data-tab="trending" type="button">TRENDING</button>
-                <button class="gTab" data-tab="gainers" type="button">TOP GAINERS</button>
-                <button class="gTab" data-tab="meme" type="button">MEME COINS</button>
-                <button class="gTab" data-tab="volume" type="button">TOP VOLUME</button>
-            </div>
+        <div class="econIframeWrap">
+            <!-- DESKTOP -->
+            <iframe
+                    class="econIframe econDesktop"
+                    src="https://sslecal2.investing.com?columns=exc_flags,exc_currency,exc_importance,exc_actual,exc_forecast,exc_previous&features=datepicker,timezone&calType=week&timeZone=8&lang=1"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    title="Economic Calendar Desktop"
+                    frameborder="0"
+                    allowtransparency="true"
+            ></iframe>
 
-            <!-- ✅ SEARCH -->
-            <div class="cryptoSearchWrap">
-                <input id="cryptoSearch" class="cryptoSearch" placeholder="Search coin (BTC, ETH, SOL...)" />
-            </div>
-
-            <!-- ✅ GRID -->
-            <div id="cryptoGrid" class="coinGrid"></div>
-
-            <!-- ✅ mini msg -->
-            <div id="cryptoMsg" class="miniMsg"></div>
+            <!-- MOBILE (daha sade, daha dar) -->
+            <iframe
+                    class="econIframe econMobile"
+                    src="https://sslecal2.investing.com?columns=exc_currency,exc_importance,exc_actual&features=timezone&calType=week&timeZone=8&lang=1"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    title="Economic Calendar Mobile"
+                    frameborder="0"
+                    allowtransparency="true"
+            ></iframe>
         </div>
-    </div>
+    </section>
 
 
 
