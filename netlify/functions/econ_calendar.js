@@ -1,4 +1,3 @@
-// netlify/functions/econ_calendar.js
 export default async (req) => {
     try {
         const url = new URL(req.url);
@@ -19,11 +18,10 @@ export default async (req) => {
         const r = await fetch(upstream, { headers: { "user-agent": "social-market-netlify-function" } });
         const text = await r.text();
 
-        // Parse dene
         let parsed = null;
         try { parsed = JSON.parse(text); } catch {}
 
-        // Upstream hata ise body'yi aynen döndür
+        // Upstream hata ise body'yi göster
         if (!r.ok) {
             return new Response(
                 JSON.stringify({
@@ -36,14 +34,10 @@ export default async (req) => {
             );
         }
 
-        // Upstream 200 ama JSON hata olabilir (EODHD bazen {error: "..."} döndürebilir)
+        // Upstream 200 ama error objesi döndüyse
         if (parsed && !Array.isArray(parsed) && (parsed.error || parsed.message)) {
             return new Response(
-                JSON.stringify({
-                    ok: false,
-                    error: "Upstream returned error object",
-                    upstream_body: parsed,
-                }),
+                JSON.stringify({ ok: false, error: "Upstream returned error object", upstream_body: parsed }),
                 { status: 502, headers: { "content-type": "application/json; charset=utf-8" } }
             );
         }
