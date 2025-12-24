@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <title>News | Social Market</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="stylesheet" href="../styles/variables.css?v=1">
+    <link rel="stylesheet" href="../styles/base.css?v=1">
+    <link rel="stylesheet" href="../styles/layout.css?v=1">
+    <link rel="stylesheet" href="./news.css?v=1">
+</head>
+
+<body>
+
+<!-- ✅ GLOBAL HEADER -->
+<div id="headerMount"></div>
+
+<main class="page">
+    <!-- HEAD -->
+    <div class="news-head">
+        <h1 class="page-title">📰 Economy News</h1>
+    </div>
+
+    <!-- ✅ CATEGORIES -->
+    <div class="news-tabs-wrap">
+        <div class="news-tabs" id="news-tabs" aria-label="News Categories">
+            <button class="news-tab active" data-cat="all" type="button">All</button>
+            <button class="news-tab" data-cat="crypto" type="button">Crypto</button>
+            <button class="news-tab" data-cat="forex" type="button">Forex</button>
+            <button class="news-tab" data-cat="indices" type="button">Indices</button>
+            <button class="news-tab" data-cat="commodities" type="button">Commodities</button>
+            <button class="news-tab" data-cat="stocks" type="button">Stocks</button>
+            <button class="news-tab" data-cat="macro" type="button">Macro</button>
+        </div>
+    </div>
+
+    <!-- GRID -->
+    <div id="news-grid" class="news-grid">
+        <div class="news-loading">News Loading...</div>
+    </div>
+</main>
+
+<!-- MODAL -->
+<div id="news-modal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" data-close="1"></div>
+
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <button class="modal-close" type="button" aria-label="Kapat" data-close="1">✕</button>
+
+        <img id="modal-img" class="modal-img" alt="">
+        <div class="modal-body">
+            <div id="modal-meta" class="modal-meta"></div>
+            <h2 id="modal-title" class="modal-title"></h2>
+            <p id="modal-text" class="modal-text"></p>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ HEADER JS (hamburger + active menu) -->
+<script src="/assets1/header.js"></script>
+
+<!-- Page JS -->
+<script type="module" src="./news.js?v=1"></script>
+
+</body>
+</html>

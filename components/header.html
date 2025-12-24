@@ -1,0 +1,36 @@
+<header class="topbar">
+    <div class="logo">Social Market</div>
+
+    <!-- Desktop menu -->
+    <nav class="menu">
+        <a data-page="feed" href="/feed/feed.html">FEED</a>
+        <a data-page="post" href="/post/post.html">POST</a>
+        <a data-page="signal" href="/signal/signal.html">SIGNAL</a>
+        <a data-page="news" href="/news/news.html">NEWS</a>
+        <a data-page="tools" href="/tools/tools.html">TOOLS</a>
+    </nav>
+
+    <!-- ✅ AUTH SLOT (Register/Profile buraya gelecek) -->
+    <div id="authSlot"></div>
+
+    <!-- Mobile hamburger -->
+    <button
+            class="hamburger"
+            id="hamburgerBtn"
+            type="button"
+            aria-label="Menu"
+            aria-expanded="false"
+    >☰</button>
+</header>
+
+<!-- Mobile drawer -->
+<div class="mobileMenu" id="mobileMenu" aria-hidden="true">
+    <a data-page="feed" href="/feed/feed.html">Feed</a>
+    <a data-page="post" href="/post/post.html">Post</a>
+    <a data-page="signal" href="/signal/signal.html">Signal</a>
+    <a data-page="news" href="/news/news.html">News</a>
+    <a data-page="tools" href="/tools/tools.html">Tools</a>
+</div>
+
+<!-- Backdrop -->
+<div class="backdrop" id="menuBackdrop"></div>

@@ -1,0 +1,147 @@
+.tools-head{ margin: 6px 0 16px; }
+.tools-title{ margin:0; font-size:30px; font-weight:900; letter-spacing:-.02em; }
+.tools-sub{ margin-top:6px; opacity:.75; font-weight:800; }
+
+.tools-grid{
+    display:grid;
+    gap:14px;
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    padding-bottom: 40px;
+}
+@media (min-width: 640px){ .tools-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (min-width: 980px){ .tools-grid{ grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (min-width: 1400px){ .tools-grid{ grid-template-columns: repeat(4, minmax(0,1fr)); } }
+
+.tool-card{
+    border-radius:18px;
+    background: rgba(255,255,255,.90);
+    border:1px solid rgba(0,0,0,.08);
+    box-shadow: 0 18px 40px rgba(15,23,42,.08);
+    padding:14px;
+    cursor:pointer;
+    transition: transform .16s ease, box-shadow .16s ease;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    min-height: 150px;
+}
+.tool-card:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 24px 50px rgba(15,23,42,.12);
+}
+.tool-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.tool-ico{ font-size:22px; }
+.tool-badge{
+    font-size:11px;
+    font-weight:900;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid rgba(37,99,235,.18);
+    background: rgba(37,99,235,.10);
+}
+.tool-name{ font-weight:900; font-size:16px; margin:0; }
+.tool-desc{ opacity:.72; font-weight:800; margin:0; line-height:1.35; }
+
+/* Modal */
+.tmodal{ display:none; }
+.tmodal.open{ display:block; }
+
+.tmodal-backdrop{
+    position:fixed; inset:0;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(6px);
+}
+
+.tmodal-card{
+    position:fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(980px, calc(100vw - 28px));
+    max-height: calc(100vh - 28px);
+    overflow:auto;
+
+    border-radius:18px;
+    border:1px solid rgba(255,255,255,.14);
+    background: rgba(20,20,25,.96);
+    color:#fff;
+    box-shadow: 0 26px 70px rgba(0,0,0,.35);
+}
+.tmodal-close{
+    position:absolute; top:10px; right:10px;
+    width:38px; height:38px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.10);
+    cursor:pointer;
+    color:#fff;
+}
+.tmodal-head{ padding:16px 16px 10px; }
+.tmodal-kicker{ opacity:.75; font-weight:900; font-size:12px; letter-spacing:.06em; text-transform:uppercase; }
+.tmodal-title{ margin:6px 0 6px; font-size:22px; font-weight:900; }
+.tmodal-desc{ opacity:.85; font-weight:700; }
+
+.tmodal-body{ padding: 0 16px 16px; }
+
+/* Tool form */
+.tbox{
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius:16px;
+    padding:14px;
+    margin-top: 10px;
+}
+.trow{ display:grid; gap:10px; grid-template-columns: repeat(1, minmax(0,1fr)); }
+@media (min-width: 720px){ .trow{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+.tfield label{ display:block; opacity:.8; font-weight:900; font-size:12px; margin-bottom:6px; }
+.tfield input, .tfield select, .tfield textarea{
+    width:100%;
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.06);
+    color:#fff;
+    outline:none;
+}
+.tfield textarea{ min-height: 90px; resize: vertical; }
+
+.tactions{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+.tbtn{
+    padding:10px 14px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.10);
+    color:#fff;
+    cursor:pointer;
+    font-weight:900;
+}
+.tbtn.primary{
+    background: linear-gradient(135deg, rgba(37,99,235,.92), rgba(37,99,235,.78));
+    border-color: rgba(37,99,235,.55);
+}
+.tresult{
+    margin-top:12px;
+    padding:12px;
+    border-radius:14px;
+    background: rgba(37,99,235,.12);
+    border: 1px solid rgba(37,99,235,.28);
+    font-weight:900;
+    line-height:1.45;
+    white-space: pre-wrap;
+}
+.tmuted{ opacity:.75; font-weight:800; }
+
+.tlist{ margin-top: 12px; display:flex; flex-direction:column; gap:10px; }
+.titem{
+    border:1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    border-radius:14px;
+    padding:12px;
+}
+.titem-top{ display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.tpill{
+    font-size:11px; font-weight:900;
+    padding:6px 10px; border-radius:999px;
+    border:1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.08);
+}

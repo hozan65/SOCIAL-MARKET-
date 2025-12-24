@@ -1,0 +1,336 @@
+/* =========================
+   NEWS.CSS (FULL - CLEAN + FULL WIDTH FADE TABS)
+   ✅ Sağ taraf mavi, sola doğru beyaza fade
+   ✅ Mobile optimize
+   ✅ Tap highlight kapalı
+========================= */
+
+/* Global tap highlight (mobil mavi efekt kalksın) */
+a, button, input, textarea, select, .news-card{
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Page: ortalı container */
+.page{
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.news-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom: 10px;
+}
+
+.page-title{ margin:0; }
+
+/* Loading / Empty */
+.news-loading,
+.news-empty{
+    opacity:.78;
+    padding: 14px;
+    border: 1px dashed rgba(0,0,0,.12);
+    border-radius: 14px;
+    background: rgba(255,255,255,.4);
+}
+
+/* =========================
+   ✅ FULL WIDTH FADE BAR
+   Sağ taraf mavi, sola doğru beyaza karışır
+========================= */
+.news-tabs-wrap{
+    position: sticky;
+    top: 74px;
+    z-index: 20;
+    margin-bottom: 14px;
+    width: 100%;
+    border-radius: 18px;
+    padding: 10px;
+
+    /* ✅ DAHA BELİRGİN MAVİ (sağda güçlü, sola beyaza fade) */
+    background: linear-gradient(
+            90deg,
+            rgba(255,255,255,0) 0%,
+            rgba(220, 235, 255, .85) 45%,
+            rgba(185, 215, 255, .98) 100%
+    );
+
+    border: 1px solid rgba(0,0,0,.06);
+    box-shadow: 0 10px 26px rgba(0,0,0,.08);
+    backdrop-filter: blur(10px);
+}
+
+/* Tabs container: sadece butonları taşır */
+.news-tabs{
+    display:flex;
+    gap:10px;
+    flex-wrap: nowrap;
+    overflow:auto;
+
+    padding: 0;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+.news-tabs::-webkit-scrollbar{ display:none; }
+
+.news-tab{
+    white-space: nowrap;
+    padding: 9px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.92);
+    font-weight: 900;
+    font-size: 12px;
+    cursor: pointer;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease, background .12s ease;
+}
+
+.news-tab:hover{
+    transform: translateY(-1px);
+    border-color: rgba(0,0,0,.16);
+    box-shadow: 0 10px 18px rgba(0,0,0,.08);
+}
+
+.news-tab:active{
+    transform: translateY(0);
+}
+
+.news-tab.active{
+    background: rgba(20,20,25,.92);
+    color: #fff;
+    border-color: rgba(255,255,255,.14);
+    box-shadow: 0 12px 24px rgba(0,0,0,.16);
+}
+
+/* =========================
+   ✅ GRID: kartlar geniş
+========================= */
+.news-grid{
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+/* Card */
+.news-card{
+    cursor: pointer;
+    border: 1px solid rgba(0,0,0,.10);
+    border-radius: 16px;
+    background: rgba(255,255,255,.55);
+    overflow: hidden;
+    outline: none;
+    box-shadow: 0 10px 26px rgba(0,0,0,.06);
+    transform: translateY(0);
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.news-card:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 16px 34px rgba(0,0,0,.10);
+    border-color: rgba(0,0,0,.14);
+}
+
+.news-card:focus{
+    box-shadow: 0 0 0 3px rgba(0, 86, 255, 0.25), 0 16px 34px rgba(0,0,0,.10);
+}
+
+/* Image area */
+.news-thumb{
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    position: relative;
+    background: rgba(0,0,0,.04);
+}
+
+.news-img{
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+
+    /* ✅ scroll daha akıcı */
+    will-change: transform;
+    transform: translateZ(0) scale(1.03);
+}
+
+.news-thumb-overlay{
+    position:absolute;
+    inset:0;
+    background: linear-gradient(to bottom, rgba(0,0,0,0) 55%, rgba(0,0,0,.18) 100%);
+}
+
+.news-content{
+    padding: 12px 12px 14px 12px;
+}
+
+.news-title{
+    font-weight: 900;
+    font-size: 14px;
+    line-height: 1.2;
+    color: rgba(0,0,0,.88);
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(1.2em * 2);
+}
+
+.news-body{
+    margin-top: 8px;
+    opacity: .80;
+    line-height: 1.35;
+    color: rgba(0,0,0,.75);
+
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: calc(1.35em * 2);
+}
+
+.news-meta{
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+    opacity: .75;
+    color: rgba(0,0,0,.68);
+}
+
+.news-dot{ opacity: .45; }
+.news-cat{
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+/* =========================
+   ✅ Modal
+========================= */
+.modal{ display:none; }
+.modal.open{ display:block; }
+
+.modal-backdrop{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(6px);
+}
+
+.modal-card{
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(940px, calc(100vw - 28px));
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(20, 20, 25, .96);
+    color: #fff;
+    box-shadow: 0 26px 70px rgba(0,0,0,.35);
+}
+
+.modal-close{
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.18);
+    background: rgba(255,255,255,.10);
+    cursor: pointer;
+    color: #fff;
+
+    /* mobil tap highlight kapalı */
+    -webkit-tap-highlight-color: transparent;
+}
+
+.modal-close:hover{
+    background: rgba(255,255,255,.14);
+}
+
+.modal-img{
+    width: 100%;
+    height: 360px;
+    object-fit: cover;
+    display: block;
+}
+
+.modal-body{
+    padding: 16px 16px 18px;
+    background: linear-gradient(
+            to bottom,
+            rgba(20,20,25,0) 0%,
+            rgba(20,20,25,.88) 20%,
+            rgba(20,20,25,.96) 100%
+    );
+}
+
+.modal-meta{
+    opacity: .80;
+    font-size: 12px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: rgba(255,255,255,.78);
+}
+
+.modal-title{
+    margin: 0 0 10px 0;
+    font-size: 20px;
+    line-height: 1.15;
+    color: #fff;
+}
+
+.modal-text{
+    margin: 0;
+    opacity: .92;
+    line-height: 1.55;
+    color: rgba(255,255,255,.92);
+    white-space: pre-wrap;
+}
+
+/* =========================
+   ✅ Mobile
+========================= */
+@media (max-width: 900px){
+    .page{ padding: 14px; }
+    .news-tabs-wrap{
+        top: 64px;
+        border-radius: 16px;
+        padding: 9px;
+    }
+    .news-grid{
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 12px;
+    }
+}
+
+@media (max-width: 640px){
+    .page{ padding: 12px; }
+    .news-tabs-wrap{
+        top: 58px;
+        border-radius: 14px;
+        padding: 8px;
+    }
+    .news-tab{
+        font-size: 11px;
+        padding: 8px 12px;
+    }
+    .news-grid{
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .modal-img{ height: 240px; }
+}

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Post | Social Market</title>
+
+    <link rel="stylesheet" href="../styles/variables.css?v=30">
+    <link rel="stylesheet" href="../styles/base.css?v=30">
+    <link rel="stylesheet" href="../styles/layout.css?v=30">
+    <link rel="stylesheet" href="./post.css?v=30">
+</head>
+
+<body>
+
+<!-- Global header -->
+<div id="headerMount"></div>
+
+<main class="container">
+    <div class="postPage">
+        <h1>New Analysis</h1>
+
+        <form id="postForm" class="postCard">
+
+            <div class="field">
+                <label>Market</label>
+                <select id="market" required>
+                    <option value="CRYPTO">Crypto</option>
+                    <option value="FOREX">Forex</option>
+                    <option value="METAL">Metal</option>
+                    <option value="CFD">CFD</option>
+                    <option value="INDEX">Index</option>
+                    <option value="ENERGY">Energy</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Pair</label>
+                <input id="pair" type="text" placeholder="BTCUSDT, EURUSD" required />
+            </div>
+
+            <div class="field">
+                <label>Timeframe</label>
+                <select id="timeframe" required>
+                    <option value="1M">1M</option>
+                    <option value="5M">5M</option>
+                    <option value="15M">15M</option>
+                    <option value="1H">1H</option>
+                    <option value="4H">4H</option>
+                    <option value="1D">DAY</option>
+                    <option value="1W">WEEK</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <label>Analysis</label>
+                <textarea id="description" placeholder="Write your analysis..." required></textarea>
+            </div>
+
+            <div class="field">
+                <label>Chart Image (public)</label>
+                <input id="image" type="file" accept="image/*" required />
+                <small class="hint">The uploaded image will be visible to everyone.</small>
+            </div>
+
+            <button class="btn primary" type="submit" id="publishBtn">Publish</button>
+            <p class="formMsg" id="formMsg"></p>
+        </form>
+    </div>
+</main>
+
+<!-- Header -->
+<script src="/assets1/header.js"></script>
+
+<!-- ✅ AUTH UI (ZORUNLU: sm_uid yazar) -->
+<script type="module" src="/assets/auth-ui.js"></script>
+
+<!-- Page JS -->
+<script type="module" src="./post.js?v=30"></script>
+
+</body>
+</html>

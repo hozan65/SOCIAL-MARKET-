@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Tools | Social Market</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="stylesheet" href="../styles/variables.css?v=1" />
+    <link rel="stylesheet" href="../styles/base.css?v=1" />
+    <link rel="stylesheet" href="../styles/layout.css?v=1" />
+    <link rel="stylesheet" href="./tools.css?v=1" />
+</head>
+
+<body>
+
+<!-- ✅ GLOBAL HEADER (ZORUNLU) -->
+<div id="headerMount"></div>
+
+<main class="page">
+    <div class="tools-head">
+        <h1 class="tools-title">🧰 Tools</h1>
+        <div class="tools-sub">Fast • Offline • Risk-first</div>
+    </div>
+
+    <div class="tools-grid" id="tools-grid"></div>
+</main>
+
+<!-- MODAL -->
+<div id="tool-modal" class="tmodal" aria-hidden="true">
+    <div class="tmodal-backdrop" data-close="1"></div>
+
+    <div class="tmodal-card" role="dialog" aria-modal="true" aria-labelledby="tmodal-title">
+        <button class="tmodal-close" type="button" aria-label="Close" data-close="1">✕</button>
+
+        <div class="tmodal-head">
+            <div class="tmodal-kicker" id="tmodal-kicker"></div>
+            <h2 class="tmodal-title" id="tmodal-title"></h2>
+            <div class="tmodal-desc" id="tmodal-desc"></div>
+        </div>
+
+        <div class="tmodal-body" id="tmodal-body"></div>
+    </div>
+</div>
+
+<!-- ✅ HEADER JS (hamburger + active menu) -->
+<script src="/assets1/header.js"></script>
+
+<!-- Page JS -->
+<script type="module" src="./tools.js?v=1"></script>
+
+</body>
+</html>

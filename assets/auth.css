@@ -1,0 +1,76 @@
+:root{
+    --bg:#0b1220;
+    --card: rgba(255,255,255,.06);
+    --stroke: rgba(255,255,255,.12);
+    --text:#fff;
+}
+
+*{box-sizing:border-box}
+body{
+    margin:0;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+    background: var(--bg);
+    color: var(--text);
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+}
+
+.authCard{
+    width:min(520px,100%);
+    border-radius:18px;
+    border:1px solid var(--stroke);
+    background: var(--card);
+    backdrop-filter: blur(12px);
+    padding:18px;
+}
+
+.authTabs{display:flex;gap:10px;margin-bottom:14px;}
+.authTab{
+    flex:1;
+    padding:10px 12px;
+    border-radius:12px;
+    border:1px solid var(--stroke);
+    background:rgba(255,255,255,.06);
+    color:#fff;
+    font-weight:900;
+    cursor:pointer;
+}
+.authTab.active{background:rgba(255,255,255,.14);}
+
+label{display:block;font-weight:800;margin:10px 0 6px;opacity:.9}
+input{
+    width:100%;
+    padding:12px 12px;
+    border-radius:12px;
+    border:1px solid var(--stroke);
+    background:rgba(0,0,0,.22);
+    color:#fff;
+    outline:none;
+}
+.authBtn{
+    width:100%;
+    margin-top:14px;
+    padding:12px 14px;
+    border-radius:12px;
+    border:0;
+    background:#ffffff;
+    color:#111;
+    font-weight:1000;
+    cursor:pointer;
+}
+.authBtn:hover{opacity:.92}
+.authBtn.ghost{
+    background: rgba(255,255,255,.10);
+    color:#fff;
+    border:1px solid var(--stroke);
+}
+
+.authMsg{margin-top:10px;opacity:.9}
+.authRow{display:none;}
+.authRow.active{display:block;}
+.authBack{margin-top:14px;}
+.authBack a{color:#9bd1ff;text-decoration:none}
+.authBack a:hover{text-decoration:underline}

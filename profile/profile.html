@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>My Profile | Social Market</title>
+
+    <!-- Global styles -->
+    <link rel="stylesheet" href="/styles/variables.css">
+    <link rel="stylesheet" href="/styles/base.css">
+    <link rel="stylesheet" href="/styles/layout.css">
+
+    <!-- Profile styles -->
+    <link rel="stylesheet" href="/profile/profile.css">
+</head>
+<body>
+
+<!-- Global header -->
+<div id="headerMount"></div>
+
+<main class="container profileWrap">
+
+    <!-- ===== TOP ===== -->
+    <section class="card profileTop">
+        <div class="avatarRow">
+            <img id="avatarImg" class="avatar" alt="avatar" />
+
+            <div class="who">
+                <div class="title">My profile</div>
+
+                <div class="nameLine">
+                    <h2 id="nameText">—</h2>
+                    <span class="pill">You</span>
+                </div>
+
+                <div id="emailText" class="email">—</div>
+
+                <div class="topBtns">
+                    <button id="saveBtnTop" class="btn primary">Save changes</button>
+                    <button id="logoutBtn" class="btn danger">Logout</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FORM ===== -->
+    <section class="card profileForm">
+        <div class="grid2">
+            <div class="field">
+                <label>Username</label>
+                <input id="nameInput" type="text" placeholder="Username" />
+            </div>
+
+            <div class="field">
+                <label>Email</label>
+                <input id="emailInput" type="email" readonly />
+            </div>
+
+            <div class="field">
+                <label>Skills</label>
+                <input id="skillsInput" type="text" placeholder="Forex, Crypto, TA..." />
+            </div>
+
+            <div class="field">
+                <label>Description</label>
+                <input id="descInput" type="text" placeholder="Short description" />
+            </div>
+
+            <div class="field full">
+                <label>Bio</label>
+                <textarea id="bioInput" rows="4" placeholder="Tell something about yourself"></textarea>
+            </div>
+        </div>
+
+        <hr class="sep">
+
+        <h3 class="sectionTitle">Social & website links</h3>
+
+        <div class="grid2">
+            <div class="field">
+                <label>X</label>
+                <input id="xInput" type="text" placeholder="@username" />
+            </div>
+
+            <div class="field">
+                <label>YouTube</label>
+                <input id="ytInput" type="text" placeholder="youtube.com/@channel" />
+            </div>
+
+            <div class="field">
+                <label>Facebook</label>
+                <input id="fbInput" type="text" placeholder="@username" />
+            </div>
+
+            <div class="field">
+                <label>Instagram</label>
+                <input id="igInput" type="text" placeholder="@username" />
+            </div>
+
+            <div class="field full">
+                <label>Website</label>
+                <input id="webInput" type="text" placeholder="https://example.com" />
+            </div>
+        </div>
+
+        <div class="formBtns">
+            <button id="saveBtn" class="btn primary">Save</button>
+            <span id="statusText" class="status"></span>
+        </div>
+    </section>
+
+    <!-- ===== STATS (READ ONLY) ===== -->
+    <section class="card statsRow">
+        <div class="stat">
+            <div class="statNum" id="followersNum">0</div>
+            <div class="statLbl">Followers</div>
+        </div>
+        <div class="stat">
+            <div class="statNum" id="followingNum">0</div>
+            <div class="statLbl">Following</div>
+        </div>
+    </section>
+
+</main>
+
+<!-- Scripts -->
+<script src="/assets1/header.js"></script>
+<script type="module" src="/profile/profile.js"></script>
+
+</body>
+</html>
