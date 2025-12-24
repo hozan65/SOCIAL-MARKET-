@@ -5,8 +5,7 @@ console.log("✅ econ-calendar.js loaded");
     const root = document.getElementById("econCalendar");
     if (!root) return;
 
-    // ✅ cache var (server zaten 5 dk cacheli) — no-store kullanmıyoruz
-    const ENDPOINT = "/.netlify/functions/econ_calendar?days=7&limit=40";
+    const ENDPOINT = "/.netlify/functions/econ_calendar?days=7";
 
     const esc = (s) =>
         String(s ?? "")
@@ -25,94 +24,90 @@ console.log("✅ econ-calendar.js loaded");
         }
     };
 
-    const impactDot = (i) =>
-        i === "high" ? "🔴" : i === "medium" ? "🟠" : i === "low" ? "🟢" : "⚪";
-
-    function header(statusRight) {
-        return `
-      <div style="padding:12px 14px;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(0,0,0,.06)">
-        <div style="font-weight:900;font-size:14px">Economic Calendar</div>
-        <div style="font-weight:800;font-size:11px;opacity:.7">${esc(statusRight)}</div>
-      </div>
-    `;
+    function impactDot(v) {
+        const s = String(v || "").toLowerCase();
+        if (s.includes("high")) return "🔴";
+        if (s.includes("medium")) return "🟠";
+        if (s.includes("low")) return "🟢";
+        return "⚪";
     }
 
     function renderLoading() {
-        root.innerHTML = header("Loading…") + `
-      <div style="padding:12px;font-weight:900;opacity:.7">Loading economic calendar…</div>
-    `;
+        root.innerHTML = `<div class="news-loading">Calendar loading...</div>`;
     }
 
-    function renderError(msg) {
-        root.innerHTML = header("Error") + `
-      <div style="padding:12px;color:#ef4444;font-weight:900">❌ ${esc(msg)}</div>
-      <div style="padding:0 12px 12px;font-weight:800;opacity:.7">
-        Tip: Netlify ENV → TE_CREDENTIALS (KEY:SECRET) / TradingEconomics geçici down olabilir.
+    function render(items) {
+        if (!items.length) {
+            root.innerHTML = `<div class="news-loading">No events.</div>`;
+            return;
+        }
+
+        root.innerHTML = `
+      <div class="calHead">
+        <div class="calTitle">📅 Economic Calendar</div>
       </div>
-    `;
-    }
 
-    function renderEvents(ev) {
-        root.innerHTML =
-            header("Upcoming") +
-            `
-      <div style="padding:12px">
-        <div style="display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto;padding-right:4px">
-          ${
-                ev.length
-                    ? ev
-                        .map(
-                            (e) => `
-            <div style="display:grid;grid-template-columns:120px 1fr;gap:10px;padding:10px;border-radius:12px;border:1px solid rgba(0,0,0,.06);background:#fff">
-              <div style="font-weight:900;font-size:11px;opacity:.85">${esc(fmtTime(e.time))}</div>
-
-              <div>
-                <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">
-                  <div style="font-weight:900;font-size:11px">
-                    ${esc((e.currency || e.country || "").toUpperCase())}
-                  </div>
-                  <div style="font-weight:900;font-size:11px">
-                    ${impactDot(e.impact)} ${esc(String(e.impact || "").toUpperCase())}
-                  </div>
-                </div>
-
-                <div style="font-weight:900;font-size:13px;line-height:1.2">
-                  ${esc(e.title)}
-                </div>
-
-                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;font-weight:800;font-size:11px;opacity:.7">
-                  ${e.previous != null ? `<span>Prev: ${esc(e.previous)}</span>` : ""}
-                  ${e.forecast != null ? `<span>Fcst: ${esc(e.forecast)}</span>` : ""}
-                  ${e.actual != null ? `<span>Act: ${esc(e.actual)}</span>` : ""}
-                </div>
-              </div>
+      <div class="calList">
+        ${items
+            .map(
+                (x) => `
+          <div class="calRow">
+            <div class="calLeft">
+              <div class="calTime">${esc(fmtTime(x.date))}</div>
+              <div class="calMeta">${esc(x.country)} • ${esc(x.currency)} • ${impactDot(x.importance)} ${esc(x.importance)}</div>
+              <div class="calEvent">${esc(x.event)}</div>
             </div>
-          `
-                        )
-                        .join("")
-                    : `<div style="padding:12px;text-align:center;font-weight:900;opacity:.7">No upcoming events.</div>`
-            }
-        </div>
+            <div class="calRight">
+              <div class="calVal"><span>Actual</span><b>${esc(x.actual)}</b></div>
+              <div class="calVal"><span>Forecast</span><b>${esc(x.forecast)}</b></div>
+              <div class="calVal"><span>Prev</span><b>${esc(x.previous)}</b></div>
+            </div>
+          </div>
+        `
+            )
+            .join("")}
       </div>
     `;
+
+        injectCSS();
+    }
+
+    function injectCSS() {
+        if (document.getElementById("calCSS")) return;
+        const style = document.createElement("style");
+        style.id = "calCSS";
+        style.textContent = `
+      .calHead{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+      .calTitle{font-weight:900}
+      .calList{display:flex;flex-direction:column;gap:10px}
+      .calRow{display:flex;gap:12px;justify-content:space-between;border:1px solid rgba(15,23,42,.10);background:#fff;border-radius:16px;padding:12px}
+      .calLeft{min-width:0;flex:1}
+      .calTime{font-size:12px;font-weight:900;color:rgba(15,23,42,.55)}
+      .calMeta{font-size:12px;font-weight:800;color:rgba(15,23,42,.55);margin-top:2px}
+      .calEvent{font-size:13px;font-weight:900;color:rgba(15,23,42,.90);margin-top:6px}
+      .calRight{display:grid;gap:6px;min-width:210px}
+      .calVal{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:800;color:rgba(15,23,42,.75)}
+      .calVal b{color:rgba(15,23,42,.95)}
+      @media(max-width:720px){
+        .calRow{flex-direction:column}
+        .calRight{min-width:0}
+      }
+    `;
+        document.head.appendChild(style);
     }
 
     async function load() {
         renderLoading();
         try {
-            const r = await fetch(ENDPOINT); // ✅ cache devrede
-            const j = await r.json().catch(() => ({}));
-            if (!r.ok) throw new Error(j?.error || `API error ${r.status}`);
-
-            const ev = Array.isArray(j?.events) ? j.events : [];
-            renderEvents(ev);
-        } catch (err) {
-            console.error("ECON CAL ERROR:", err);
-            renderError(err?.message || "unknown");
+            const r = await fetch(ENDPOINT);
+            const j = await r.json().catch(() => null);
+            if (!r.ok) throw new Error(j?.error || `API error (${r.status})`);
+            render(j?.items || []);
+        } catch (e) {
+            console.error("ECON CAL ERROR:", e);
+            root.innerHTML = `<div class="news-loading">❌ Calendar error: ${esc(e.message)}</div>`;
         }
     }
 
     load();
-    // ✅ 10 dakikaya çektim (5 dakikada bir gereksiz)
-    setInterval(load, 10 * 60 * 1000);
 })();
