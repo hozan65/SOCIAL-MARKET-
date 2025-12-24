@@ -444,36 +444,56 @@
 }
 
 
-/* ===== ECON CALENDAR UI ===== */
-.econBox { margin-top: 16px; }
+/* ===== ECON CALENDAR + BROKER CTA ===== */
+.econWrap { margin-top: 16px; }
 
-.econMsg { margin: 6px 0 10px; opacity: .8; font-weight: 700; }
+.econAd{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px;
+    border-radius:14px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.75);
+    margin-bottom: 10px;
+}
+.econAdTitle{ font-weight: 900; font-size: 15px; }
+.econAdText{ opacity:.8; margin-top:4px; }
+.econAdBtn{
+    display:inline-block;
+    padding:10px 14px;
+    border-radius:999px;
+    background: rgba(0,0,0,.10);
+    font-weight: 900;
+    text-decoration:none;
+    color: inherit;
+    white-space:nowrap;
+}
 
-.econTableWrap { overflow: auto; border-radius: 12px; }
+.econMsg{ margin: 6px 0 10px; opacity:.8; font-weight: 800; }
 
-.econTable {
+.econTableWrap{ overflow:auto; border-radius: 12px; }
+.econTable{
     width: 100%;
     border-collapse: collapse;
     font-size: 14px;
-    min-width: 900px; /* masaüstünde düzgün, mobilde yatay kaydır */
+    min-width: 900px;
 }
-
-.econTable th {
+.econTable th{
     position: sticky;
     top: 0;
     background: rgba(0,0,0,.06);
-    text-align: left;
+    text-align:left;
     padding: 10px;
     font-weight: 900;
 }
-
-.econTable td {
+.econTable td{
     padding: 10px;
     border-bottom: 1px solid rgba(0,0,0,.10);
     vertical-align: top;
 }
-
-.econTable td:nth-child(3) { min-width: 380px; } /* Event kolonunu geniş tut */
+.econTable td:nth-child(3){ min-width: 380px; }
 
 .impactBadge{
     display:inline-block;
@@ -486,4 +506,27 @@
 .impactHigh{ background: rgba(255,0,0,.14); }
 .impactMed{ background: rgba(255,165,0,.18); }
 .impactLow{ background: rgba(0,128,0,.16); }
+
+.brokerRow{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top: 12px;
+}
+.brokerBtn{
+    padding:10px 14px;
+    border-radius: 999px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.85);
+    text-decoration:none;
+    font-weight: 900;
+    color: inherit;
+}
+.brokerNote{ opacity:.75; margin-top: 8px; }
+
+/* Mobil */
+@media (max-width: 900px){
+    .econAd{ flex-direction:column; align-items:flex-start; }
+    .econTable{ min-width: 760px; }
+}
 
