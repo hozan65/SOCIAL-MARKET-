@@ -447,7 +447,7 @@
 
 .econIframeWrap{
     width:100%;
-    overflow:hidden;           /* mobilde alttaki yatay barı gizler */
+    overflow:hidden; /* dış yatay scroll yok */
     border-radius:14px;
     border:1px solid rgba(0,0,0,.10);
     background:rgba(255,255,255,.85);
@@ -455,15 +455,14 @@
 
 .econIframe{
     width:100%;
-    height:560px;
+    height:620px;
     border:0;
 }
 
 .econMobile{ display:none; }
 
-/* Mobilde desktop yerine mobile iframe */
 @media (max-width: 900px){
     .econDesktop{ display:none; }
     .econMobile{ display:block; }
-    .econIframe{ height:650px; }
+    .econIframe{ height:720px; } /* telefon ekranında daha çok satır */
 }
