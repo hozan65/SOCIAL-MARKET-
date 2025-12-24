@@ -455,3 +455,25 @@
     .post-img{ height: 200px; }
     .feed-header h2{ font-size:24px; }
 }
+
+
+/* ================= ECONOMIC CALENDAR ================= */
+
+.econ-calendar-box {
+    margin-top: 20px;
+}
+
+.econ-calendar-iframe {
+    width: 100%;
+    height: 620px;
+    border: none;
+    border-radius: 12px;
+    background: #ffffff;
+}
+
+/* Mobil */
+@media (max-width: 768px) {
+    .econ-calendar-iframe {
+        height: 520px;
+    }
+}
