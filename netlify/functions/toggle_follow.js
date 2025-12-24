@@ -1,87 +1,86 @@
 // netlify/functions/toggle_follow.js
-import { createClient } from "@supabase/supabase-js";
-import { verifyAppwriteUser } from "./_verify.js";
+const { appwriteMe, getBearerToken } = require("./_auth_user");
 
-export default async (req) => {
+function json(statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        },
+        body: JSON.stringify(body),
+    };
+}
+
+async function sbFetch(path, { method = "GET", body = null } = {}) {
+    const base = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!base) throw new Error("MISSING_SUPABASE_URL");
+    if (!key) throw new Error("MISSING_SERVICE_ROLE_KEY");
+
+    const res = await fetch(`${base}${path}`, {
+        method,
+        headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+        },
+        body: body ? JSON.stringify(body) : null,
+    });
+
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    return { ok: res.ok, status: res.status, data };
+}
+
+exports.handler = async (event) => {
+    if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+    if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method not allowed" });
+
     try {
-        if (req.method !== "POST") {
-            return new Response(
-                JSON.stringify({ error: "Method not allowed" }),
-                { status: 405 }
+        const token = getBearerToken(event);
+        const follower_id = await appwriteMe(token);
+
+        let payload = {};
+        try { payload = JSON.parse(event.body || "{}"); } catch {}
+        const following_id = payload.following_id;
+        if (!following_id) return json(400, { ok: false, error: "Missing following_id" });
+        if (String(following_id) === String(follower_id)) return json(400, { ok: false, error: "Cannot follow yourself" });
+
+        const q =
+            `/rest/v1/follows?select=follower_id,following_id` +
+            `&follower_id=eq.${encodeURIComponent(follower_id)}` +
+            `&following_id=eq.${encodeURIComponent(following_id)}` +
+            `&limit=1`;
+
+        const exists = await sbFetch(q);
+        if (!exists.ok) return json(500, { ok: false, error: "Select failed", detail: exists });
+
+        const hasFollow = Array.isArray(exists.data) && exists.data.length > 0;
+
+        if (hasFollow) {
+            const del = await sbFetch(
+                `/rest/v1/follows?follower_id=eq.${encodeURIComponent(follower_id)}&following_id=eq.${encodeURIComponent(following_id)}`,
+                { method: "DELETE" }
             );
-        }
-
-        const { userId } = await verifyAppwriteUser(req);
-        const { targetUserId } = await req.json();
-
-        if (!targetUserId) {
-            return new Response(
-                JSON.stringify({ error: "targetUserId missing" }),
-                { status: 400 }
-            );
-        }
-
-        if (targetUserId === userId) {
-            return new Response(
-                JSON.stringify({ error: "You cannot follow yourself" }),
-                { status: 400 }
-            );
-        }
-
-        const sb = createClient(
-            process.env.SUPABASE_URL,
-            process.env.SUPABASE_SERVICE_ROLE_KEY
-        );
-
-        // Check existing follow
-        const { data: existing, error: selErr } = await sb
-            .from("follows")
-            .select("follower_id")
-            .eq("follower_id", userId)
-            .eq("following_id", targetUserId)
-            .maybeSingle();
-
-        if (selErr) throw selErr;
-
-        let following;
-
-        if (existing) {
-            // UNFOLLOW
-            const { error } = await sb
-                .from("follows")
-                .delete()
-                .eq("follower_id", userId)
-                .eq("following_id", targetUserId);
-
-            if (error) throw error;
-            following = false;
+            if (!del.ok) return json(500, { ok: false, error: "Delete failed", detail: del });
+            return json(200, { ok: true, following: false });
         } else {
-            // FOLLOW
-            const { error } = await sb
-                .from("follows")
-                .insert({
-                    follower_id: userId,
-                    following_id: targetUserId,
-                });
-
-            if (error) throw error;
-            following = true;
+            const ins = await sbFetch(`/rest/v1/follows`, {
+                method: "POST",
+                body: [{ follower_id, following_id }],
+            });
+            if (!ins.ok) return json(500, { ok: false, error: "Insert failed", detail: ins });
+            return json(200, { ok: true, following: true });
         }
-
-        return new Response(
-            JSON.stringify({ ok: true, following }),
-            {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-            }
-        );
     } catch (e) {
-        return new Response(
-            JSON.stringify({ error: e?.message || "unknown" }),
-            {
-                status: 401,
-                headers: { "Content-Type": "application/json" },
-            }
-        );
+        const msg = e?.message || "unknown";
+        const code = (msg === "MISSING_TOKEN" || msg === "UNAUTHORIZED") ? 401 : 500;
+        return json(code, { ok: false, error: msg });
     }
 };
