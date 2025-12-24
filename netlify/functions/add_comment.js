@@ -1,5 +1,6 @@
 // netlify/functions/add_comment.js
-const { appwriteMe, getBearerToken } = require("./_auth_user");
+const { createClient } = require("@supabase/supabase-js");
+const authUser = require("./_auth_user");
 
 function json(statusCode, body) {
     return {
@@ -15,57 +16,46 @@ function json(statusCode, body) {
     };
 }
 
-async function sbFetch(path, { method = "GET", body = null } = {}) {
-    const base = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!base) throw new Error("MISSING_SUPABASE_URL");
-    if (!key) throw new Error("MISSING_SERVICE_ROLE_KEY");
-
-    const res = await fetch(`${base}${path}`, {
-        method,
-        headers: {
-            apikey: key,
-            Authorization: `Bearer ${key}`,
-            "Content-Type": "application/json",
-            Prefer: "return=representation",
-        },
-        body: body ? JSON.stringify(body) : null,
-    });
-
-    const text = await res.text();
-    let data = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    return { ok: res.ok, status: res.status, data };
-}
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 exports.handler = async (event) => {
     if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
     if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method not allowed" });
 
     try {
-        const token = getBearerToken(event);
-        const user_id = await appwriteMe(token);
+        const { userId } = await authUser(event);
 
-        let payload = {};
-        try { payload = JSON.parse(event.body || "{}"); } catch {}
-        const post_id = payload.post_id;
-        const content = String(payload.content || "").trim();
+        let body = {};
+        try { body = JSON.parse(event.body || "{}"); } catch {}
+        const post_id = body.post_id || body.postId;
+        const content = String(body.content || "").trim();
 
-        if (!post_id) return json(400, { ok: false, error: "Missing post_id" });
-        if (!content) return json(400, { ok: false, error: "Missing content" });
-        if (content.length > 1000) return json(400, { ok: false, error: "Content too long (max 1000)" });
+        if (!post_id) return json(400, { ok: false, error: "post_id missing" });
+        if (!content) return json(400, { ok: false, error: "content empty" });
 
-        const ins = await sbFetch(`/rest/v1/post_comments`, {
-            method: "POST",
-            body: [{ post_id, user_id, content }],
-        });
+        const ins = await supabase
+            .from("post_comments")
+            .insert({ post_id, user_id: userId, content })
+            .select("id, post_id, user_id, content, created_at")
+            .single();
 
-        if (!ins.ok) return json(500, { ok: false, error: "Insert failed", detail: ins });
+        if (ins.error) return json(500, { ok: false, error: "Supabase insert failed", detail: ins.error });
 
-        return json(200, { ok: true, comment: Array.isArray(ins.data) ? ins.data[0] : ins.data });
+        // return latest comments
+        const list = await supabase
+            .from("post_comments")
+            .select("id, user_id, content, created_at")
+            .eq("post_id", post_id)
+            .order("created_at", { ascending: true })
+            .limit(50);
+
+        if (list.error) return json(500, { ok: false, error: "Supabase load failed", detail: list.error });
+
+        return json(200, { ok: true, comment: ins.data, comments: list.data || [] });
     } catch (e) {
-        const msg = e?.message || "unknown";
-        const code = (msg === "MISSING_TOKEN" || msg === "UNAUTHORIZED") ? 401 : 500;
-        return json(code, { ok: false, error: msg });
+        return json(401, { ok: false, error: e?.message || "Unauthorized" });
     }
 };

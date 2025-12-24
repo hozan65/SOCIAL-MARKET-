@@ -5,26 +5,19 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>My Profile | Social Market</title>
 
-    <!-- Global styles -->
     <link rel="stylesheet" href="/styles/variables.css">
     <link rel="stylesheet" href="/styles/base.css">
     <link rel="stylesheet" href="/styles/layout.css">
-
-    <!-- Profile styles -->
     <link rel="stylesheet" href="/profile/profile.css">
 </head>
-<body>
 
-<!-- Global header -->
+<body>
 <div id="headerMount"></div>
 
 <main class="container profileWrap">
-
-    <!-- ===== TOP ===== -->
     <section class="card profileTop">
         <div class="avatarRow">
             <img id="avatarImg" class="avatar" alt="avatar" />
-
             <div class="who">
                 <div class="title">My profile</div>
 
@@ -36,14 +29,13 @@
                 <div id="emailText" class="email">—</div>
 
                 <div class="topBtns">
-                    <button id="saveBtnTop" class="btn primary">Save changes</button>
-                    <button id="logoutBtn" class="btn danger">Logout</button>
+                    <button id="saveBtnTop" class="btn primary" type="button">Save changes</button>
+                    <button id="logoutBtn" class="btn danger" type="button">Logout</button>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ===== FORM ===== -->
     <section class="card profileForm">
         <div class="grid2">
             <div class="field">
@@ -104,12 +96,11 @@
         </div>
 
         <div class="formBtns">
-            <button id="saveBtn" class="btn primary">Save</button>
+            <button id="saveBtn" class="btn primary" type="button">Save</button>
             <span id="statusText" class="status"></span>
         </div>
     </section>
 
-    <!-- ===== STATS (READ ONLY) ===== -->
     <section class="card statsRow">
         <div class="stat">
             <div class="statNum" id="followersNum">0</div>
@@ -120,12 +111,13 @@
             <div class="statLbl">Following</div>
         </div>
     </section>
-
 </main>
 
-<!-- Scripts -->
 <script src="/assets1/header.js"></script>
-<script type="module" src="/profile/profile.js"></script>
 
+<!-- Eğer profile.js JWT/UID kullanıyorsa bunu eklemek genelde şart -->
+<script type="module" src="/assets/auth-ui.js"></script>
+
+<script type="module" src="/profile/profile.js"></script>
 </body>
 </html>

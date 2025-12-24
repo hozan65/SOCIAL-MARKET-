@@ -5,15 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>New Post | Social Market</title>
 
-    <link rel="stylesheet" href="../styles/variables.css?v=30">
-    <link rel="stylesheet" href="../styles/base.css?v=30">
-    <link rel="stylesheet" href="../styles/layout.css?v=30">
-    <link rel="stylesheet" href="./post.css?v=30">
+    <link rel="stylesheet" href="/styles/variables.css?v=30">
+    <link rel="stylesheet" href="/styles/base.css?v=30">
+    <link rel="stylesheet" href="/styles/layout.css?v=30">
+    <link rel="stylesheet" href="/post/post.css?v=30">
 </head>
 
 <body>
-
-<!-- Global header -->
 <div id="headerMount"></div>
 
 <main class="container">
@@ -21,7 +19,6 @@
         <h1>New Analysis</h1>
 
         <form id="postForm" class="postCard">
-
             <div class="field">
                 <label>Market</label>
                 <select id="market" required>
@@ -64,19 +61,13 @@
             </div>
 
             <button class="btn primary" type="submit" id="publishBtn">Publish</button>
-            <p class="formMsg" id="formMsg"></p>
+            <p class="formMsg" id="formMsg" aria-live="polite"></p>
         </form>
     </div>
 </main>
 
-<!-- Header -->
 <script src="/assets1/header.js"></script>
-
-<!-- ✅ AUTH UI (ZORUNLU: sm_uid yazar) -->
 <script type="module" src="/assets/auth-ui.js"></script>
-
-<!-- Page JS -->
-<script type="module" src="./post.js?v=30"></script>
-
+<script type="module" src="/post/post.js?v=30"></script>
 </body>
 </html>

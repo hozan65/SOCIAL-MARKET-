@@ -10,15 +10,14 @@
     <link rel="stylesheet" href="/styles/layout.css">
     <link rel="stylesheet" href="/profile/profile.css">
 </head>
-<body>
 
+<body>
 <div id="headerMount"></div>
 
 <main class="container profileWrap">
-
     <section class="card profileTop">
         <div class="avatarRow">
-            <img id="avatarImg" class="avatar" />
+            <img id="avatarImg" class="avatar" alt="avatar" />
             <div class="who">
                 <div class="title">Public profile</div>
 
@@ -28,24 +27,23 @@
 
                 <div id="emailText" class="email">—</div>
 
-                <button id="followBtn" class="btn primary">Follow</button>
+                <button id="followBtn" class="btn primary" type="button">Follow</button>
             </div>
         </div>
     </section>
-
 </main>
 
-<!-- ✅ 1. Supabase CDN (ZORUNLU ve İLK) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- ✅ 1) Supabase (READ-ONLY client) -->
+<script type="module" src="/services/supabase.js"></script>
 
-<!-- ✅ 2. Header -->
+<!-- ✅ 2) Header (eğer header.js global supabase bekliyorsa: bu artık import’a dönmeli.
+         Şimdilik sırada kalsın, ama ideal çözüm header.js'yi module yapmak. -->
 <script src="/assets1/header.js"></script>
 
-<!-- ✅ 3. Auth UI (sm_uid localStorage yazar) -->
+<!-- ✅ 3) Auth UI (gerekiyorsa kalsın; "public profile" için şart değil) -->
 <script type="module" src="/assets/auth-ui.js"></script>
 
-<!-- ✅ 4. SADECE burada -->
-<script src="/u/u.js"></script>
-
+<!-- ✅ 4) Profile logic -->
+<script type="module" src="/u/u.js"></script>
 </body>
 </html>

@@ -10,27 +10,16 @@
     <link rel="stylesheet" href="/styles/layout.css">
 
     <style>
-        .btnRow{
-            display:flex;
-            gap:10px;
-            margin-top:10px;
-        }
-        .btnRow .btn{
-            width:50%;
-        }
+        .btnRow{display:flex;gap:10px;margin-top:10px}
+        .btnRow .btn{width:50%}
     </style>
 </head>
 
 <body>
-
 <main class="container" style="max-width:420px;margin-top:80px">
-
     <h1 style="font-weight:900;margin-bottom:8px">Welcome 👋</h1>
-    <p style="margin-bottom:24px;color:var(--muted)">
-        Login or create your account
-    </p>
+    <p style="margin-bottom:24px;color:var(--muted)">Login or create your account</p>
 
-    <!-- ✅ Form submit KULLANMIYORUZ (karışıklık olmasın) -->
     <form id="authForm" class="soft" style="padding:20px" autocomplete="on">
         <input id="email" type="email" placeholder="Email" required
                style="width:100%;margin-bottom:12px;padding:12px">
@@ -46,14 +35,11 @@
         <p id="msg" style="margin-top:12px;color:var(--muted);font-weight:800;"></p>
     </form>
 
-    <div style="margin:18px 0;text-align:center;font-weight:800;opacity:.6">
-        OR
-    </div>
+    <div style="margin:18px 0;text-align:center;font-weight:800;opacity:.6">OR</div>
 
-    <button id="googleBtn" class="btn" style="width:100%">
+    <button id="googleBtn" class="btn" type="button" style="width:100%">
         Continue with Google
     </button>
-
 </main>
 
 <script type="module" src="/auth/login.js"></script>

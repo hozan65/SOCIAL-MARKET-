@@ -1,34 +1,68 @@
-// netlify/functions/_auth_user.js
-async function appwriteMe(appwriteJwt) {
-    const endpoint = process.env.APPWRITE_ENDPOINT;
-    const project = process.env.APPWRITE_PROJECT_ID;
+// netlify/functions/sync_user.js
+// ✅ Server-side: verifies Appwrite JWT, then upserts into Supabase with SERVICE_ROLE
+// Requires ENV:
+//   APPWRITE_ENDPOINT
+//   APPWRITE_PROJECT_ID
+//   SUPABASE_URL
+//   SUPABASE_SERVICE_ROLE_KEY
 
-    if (!endpoint) throw new Error("MISSING_APPWRITE_ENDPOINT");
-    if (!project) throw new Error("MISSING_APPWRITE_PROJECT_ID");
-    if (!appwriteJwt) throw new Error("MISSING_TOKEN");
+const { createClient } = require("@supabase/supabase-js");
+const authUser = require("./_auth_user");
 
-    const r = await fetch(`${endpoint}/account`, {
-        method: "GET",
+function json(statusCode, body) {
+    return {
+        statusCode,
         headers: {
-            "X-Appwrite-Project": project,
-            "X-Appwrite-JWT": appwriteJwt,
-            "Content-Type": "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
         },
-    });
-
-    const text = await r.text();
-    let data = null;
-    try { data = JSON.parse(text); } catch { data = text; }
-
-    if (!r.ok) throw new Error("UNAUTHORIZED");
-    const userId = data?.$id;
-    if (!userId) throw new Error("NO_USER_ID");
-    return String(userId);
+        body: JSON.stringify(body),
+    };
 }
 
-function getBearerToken(event) {
-    const auth = event.headers.authorization || event.headers.Authorization || "";
-    return auth.startsWith("Bearer ") ? auth.slice(7) : "";
-}
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-module.exports = { appwriteMe, getBearerToken };
+exports.handler = async (event) => {
+    if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+    if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method not allowed" });
+
+    try {
+        const { userId } = await authUser(event);
+
+        // Check existing by appwrite_user_id
+        const existing = await supabase
+            .from("users")
+            .select("id")
+            .eq("appwrite_user_id", userId)
+            .maybeSingle();
+
+        if (existing.error && existing.status !== 406) {
+            return json(500, { ok: false, error: "Supabase select failed", detail: existing.error });
+        }
+
+        if (existing.data?.id) {
+            return json(200, { ok: true, user_id: userId, created: false });
+        }
+
+        // Insert minimal row
+        const ins = await supabase
+            .from("users")
+            .insert({ appwrite_user_id: userId })
+            .select("id")
+            .single();
+
+        if (ins.error) {
+            return json(500, { ok: false, error: "Supabase insert failed", detail: ins.error });
+        }
+
+        return json(200, { ok: true, user_id: userId, created: true, id: ins.data.id });
+    } catch (e) {
+        return json(401, { ok: false, error: e?.message || "Unauthorized" });
+    }
+};

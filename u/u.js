@@ -1,5 +1,7 @@
 // /u/u.js (NO MODULE)
-// Public profile viewer + follow/unfollow
+// Public profile viewer + follow/unfollow (SAFE)
+// - READ: Supabase anon
+// - WRITE: Netlify Function toggle_follow (Appwrite JWT)
 
 console.log("✅ u.js running");
 
@@ -9,6 +11,8 @@ const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
 const sb = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
+
+const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";
 
 const $ = (id) => document.getElementById(id);
 
@@ -27,6 +31,28 @@ function getViewerId() {
     return localStorage.getItem("sm_uid") || "";
 }
 
+function getJWT() {
+    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt");
+    if (!jwt) throw new Error("Login required");
+    return jwt;
+}
+
+async function fnPost(url, body) {
+    const jwt = getJWT();
+    const r = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify(body || {}),
+    });
+
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
+    return j;
+}
+
 async function getFollowCounts(targetId) {
     const [a, b] = await Promise.all([
         sb.from("follows").select("*", { count: "exact", head: true }).eq("following_id", targetId),
@@ -40,6 +66,7 @@ async function getFollowCounts(targetId) {
 }
 
 async function isFollowing(viewerId, targetId) {
+    // READ ok (anon)
     const { data, error } = await sb
         .from("follows")
         .select("follower_id")
@@ -51,21 +78,9 @@ async function isFollowing(viewerId, targetId) {
     return !!data;
 }
 
-async function follow(viewerId, targetId) {
-    const { error } = await sb.from("follows").insert({
-        follower_id: viewerId,
-        following_id: targetId,
-    });
-    if (error) throw error;
-}
-
-async function unfollow(viewerId, targetId) {
-    const { error } = await sb
-        .from("follows")
-        .delete()
-        .eq("follower_id", viewerId)
-        .eq("following_id", targetId);
-    if (error) throw error;
+async function toggleFollow(targetId) {
+    // WRITE via function
+    return fnPost(FN_TOGGLE_FOLLOW, { following_id: String(targetId) }); // { ok, following }
 }
 
 (async function boot() {
@@ -83,7 +98,7 @@ async function unfollow(viewerId, targetId) {
 
     const viewerId = getViewerId();
 
-    // Load profile row (profiles table MUST exist)
+    // Load profile (profiles table must exist)
     const { data: profile, error } = await sb
         .from("profiles")
         .select("*")
@@ -116,15 +131,17 @@ async function unfollow(viewerId, targetId) {
     $("avatarImg").src = profile.avatar_url || avatarFromEmail(profile.email);
 
     // Counts
-    try {
-        const counts = await getFollowCounts(targetId);
-        $("followersNum").textContent = String(counts.followers);
-        $("followingNum").textContent = String(counts.following);
-    } catch (e) {
-        console.warn("Count load failed:", e?.message || e);
+    async function refreshCounts() {
+        try {
+            const counts = await getFollowCounts(targetId);
+            $("followersNum").textContent = String(counts.followers);
+            $("followingNum").textContent = String(counts.following);
+        } catch (e) {
+            console.warn("Count load failed:", e?.message || e);
+        }
     }
+    await refreshCounts();
 
-    // Follow button logic
     const followBtn = $("followBtn");
 
     // not logged in
@@ -134,33 +151,29 @@ async function unfollow(viewerId, targetId) {
         return;
     }
 
-    // viewing own public profile -> disable follow
+    // viewing own profile -> disable follow
     if (viewerId === targetId) {
         followBtn.textContent = "This is you";
         followBtn.disabled = true;
         return;
     }
 
-    async function refresh() {
+    async function refreshFollowState() {
         const ok = await isFollowing(viewerId, targetId);
         followBtn.textContent = ok ? "Following" : "Follow";
         followBtn.classList.toggle("isFollowing", ok);
     }
 
-    await refresh();
+    await refreshFollowState();
 
     followBtn.onclick = async () => {
         followBtn.disabled = true;
         try {
-            const ok = followBtn.classList.contains("isFollowing");
-            if (ok) await unfollow(viewerId, targetId);
-            else await follow(viewerId, targetId);
+            const res = await toggleFollow(targetId); // { following: true/false }
+            followBtn.textContent = res?.following ? "Following" : "Follow";
+            followBtn.classList.toggle("isFollowing", !!res?.following);
 
-            await refresh();
-
-            const counts = await getFollowCounts(targetId);
-            $("followersNum").textContent = String(counts.followers);
-            $("followingNum").textContent = String(counts.following);
+            await refreshCounts();
         } catch (e) {
             console.error(e);
             alert(e?.message || "Follow action failed");
