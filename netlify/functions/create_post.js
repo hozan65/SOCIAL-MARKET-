@@ -1,65 +1,111 @@
 // netlify/functions/create_post.js
+// FINAL: Appwrite JWT -> Appwrite /account ile doğrula -> Supabase (service_role) insert
+// RLS bypass: service_role
+
 const { createClient } = require("@supabase/supabase-js");
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT;      // örn: https://cloud.appwrite.io/v1
+const APPWRITE_PROJECT_ID = process.env.APPWRITE_PROJECT_ID;  // Appwrite Project ID
+
+function json(statusCode, bodyObj) {
+    return {
+        statusCode,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+        },
+        body: JSON.stringify(bodyObj),
+    };
+}
+
+async function getBearerToken(event) {
+    const auth = event.headers.authorization || event.headers.Authorization || "";
+    if (!auth.startsWith("Bearer ")) return null;
+    return auth.slice(7).trim() || null;
+}
+
+async function getAppwriteUser(jwt) {
+    if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID) {
+        throw new Error("Missing APPWRITE_ENDPOINT / APPWRITE_PROJECT_ID in Netlify env");
+    }
+
+    const url = `${APPWRITE_ENDPOINT.replace(/\/$/, "")}/account`;
+
+    const r = await fetch(url, {
+        method: "GET",
+        headers: {
+            "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+            "X-Appwrite-JWT": jwt,
+        },
+    });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok) {
+        const msg = j?.message || `Appwrite auth failed (${r.status})`;
+        throw new Error(msg);
+    }
+
+    // Appwrite user object usually has $id and email
+    const uid = j?.$id || j?.id || null;
+    const email = j?.email || null;
+
+    if (!uid) throw new Error("Appwrite user id not found");
+    return { uid, email };
+}
 
 exports.handler = async (event) => {
     try {
-        if (event.httpMethod !== "POST") {
-            return { statusCode: 405, body: JSON.stringify({ error: "Method not allowed" }) };
-        }
+        if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
         if (!SUPABASE_URL || !SERVICE_KEY) {
-            return { statusCode: 500, body: JSON.stringify({ error: "Missing Supabase env" }) };
+            return json(500, { error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY" });
         }
 
-        const auth = event.headers.authorization || event.headers.Authorization || "";
-        const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-        if (!token) return { statusCode: 401, body: JSON.stringify({ error: "Missing JWT" }) };
+        const jwt = await getBearerToken(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
 
-        // ✅ JWT doğrulama: senin projede zaten var
-        // Not: _auth_user.js'nin export'una göre import yolu çalışmalı
-        const { requireUser } = require("./_auth_user");
-        const user = await requireUser(token); // { uid, email } gibi dönmeli
+        const user = await getAppwriteUser(jwt);
 
         const body = JSON.parse(event.body || "{}");
 
         const market = String(body.market || "").trim();
+        const category = String(body.category || "").trim() || null;
         const timeframe = String(body.timeframe || "").trim();
-        const pair = String(body.pair || "").trim();
         const content = String(body.content || "").trim();
-        const image_path = body.image_path ? String(body.image_path) : null;
+        const pairs = String(body.pairs || "").trim(); // ✅ FEED’de text bekliyoruz
+        const image_path = body.image_path ? String(body.image_path).trim() : null;
 
-        // FEED.js senin tablonda pairs bekliyor:
-        // burada pair'i pairs olarak da yazalım
-        const pairs = pair;
-
-        if (!market || !timeframe || !content) {
-            return { statusCode: 400, body: JSON.stringify({ error: "Missing fields" }) };
+        if (!market || !timeframe || !content || !pairs) {
+            return json(400, { error: "Missing fields (market/timeframe/content/pairs)" });
         }
 
         const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
         const { data, error } = await sb
             .from("analyses")
-            .insert([{
-                author_id: user.uid,     // ✅ Appwrite UID
-                market,
-                category: body.category ? String(body.category) : null, // varsa
-                timeframe,
-                pairs,
-                content,
-                image_path
-            }])
+            .insert([
+                {
+                    author_id: user.uid,   // ✅ Appwrite UID
+                    market,
+                    category,
+                    timeframe,
+                    content,
+                    pairs,
+                    image_path,
+                },
+            ])
             .select("id")
             .single();
 
         if (error) throw error;
 
-        return { statusCode: 200, body: JSON.stringify({ ok: true, id: data.id }) };
+        return json(200, { ok: true, id: data.id });
     } catch (e) {
         console.error("create_post error:", e);
-        return { statusCode: 500, body: JSON.stringify({ error: e.message || "Server error" }) };
+        return json(500, { error: e.message || "Server error" });
     }
 };
