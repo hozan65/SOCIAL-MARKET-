@@ -1,22 +1,43 @@
+/* =========================
+   VARIABLES (SINGLE SOURCE OF TRUTH)
+========================= */
 :root{
-    /* Base */
-    --bg: #f5f8ff;                /* sayfa arka planı (beyazımsı) */
+    /* Theme */
+    --bg: #f6f9ff;
     --panel: rgba(255,255,255,.86);
     --card: rgba(255,255,255,.92);
 
-    --stroke: rgba(15,23,42,.10); /* slate border */
-    --shadow: 0 18px 55px rgba(15,23,42,.12);
-
     /* Text */
-    --text: rgba(15,23,42,.92);   /* koyu lacivert */
+    --text: rgba(15,23,42,.92);
     --muted: rgba(15,23,42,.60);
 
-    /* Brand (Blue) */
-    --brand: #2563eb;             /* ana mavi */
-    --brand2: #1d4ed8;            /* hover mavi */
-    --danger: #ef4444;
-    --success: #16a34a;
+    /* Borders / shadow */
+    --border: rgba(15,23,42,.10);
+    --stroke: var(--border); /* eski CSS uyumu */
+    --shadow: 0 18px 55px rgba(15,23,42,.12);
+    --softShadow: 0 10px 22px rgba(2,8,23,.08);
 
+    /* Brand */
+    --brand: #2563eb;
+    --brand2: #1d4ed8;
+
+    /* Radius / blur */
     --radius: 18px;
     --blur: 12px;
+}
+
+/* Dark */
+html[data-theme="dark"]{
+    --bg: #070b14;
+    --panel: rgba(255,255,255,.06);
+    --card: rgba(255,255,255,.08);
+
+    --text: rgba(255,255,255,.92);
+    --muted: rgba(255,255,255,.62);
+
+    --border: rgba(255,255,255,.10);
+    --stroke: var(--border);
+
+    --shadow: 0 18px 45px rgba(0,0,0,.45);
+    --softShadow: 0 14px 30px rgba(0,0,0,.35);
 }

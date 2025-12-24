@@ -545,3 +545,75 @@
     .coinGrid{ grid-template-columns:1fr; }
     .newsSlider{ height:260px; }
 }
+
+/* =========================
+   FEED DARK OPT + FIXES (paste at END)
+========================= */
+
+/* 1) Arkadaki "kare kutu" fix (dash wrapper boyanmasın) */
+.dash2{
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+.dash2::before,.dash2::after{ content:none !important; }
+
+/* 2) Dash box ve içerikler theme token kullansın */
+.dashBox{
+    background: var(--panel) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--softShadow) !important;
+}
+
+/* 3) News skeleton text darkta görünür */
+html[data-theme="dark"] .newsSlideSkeleton{
+    color: rgba(255,255,255,.75) !important;
+}
+
+/* 4) Post card / comment / coin card beyaz basmasın */
+.post-card,
+.commentsWrap,
+.commentItem,
+.coinCard{
+    background: var(--card) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--softShadow) !important;
+}
+
+/* 5) Yazılar */
+.post-card p,
+.feedMsg,
+.postsMoreEnd,
+.newsMeta,
+.commentMeta{
+    color: var(--muted) !important;
+}
+.tags span{
+    color: var(--text) !important;
+}
+
+/* 6) Butonlar / inputlar */
+.post-actions button,
+.postsMoreBtn,
+.commentSend,
+.commentInput,
+.cryptoSearch,
+.gTab{
+    background: var(--card) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+}
+
+/* 7) Dark’ta hover daha temiz */
+html[data-theme="dark"] .post-actions button:hover,
+html[data-theme="dark"] .commentSend:hover,
+html[data-theme="dark"] .postsMoreBtn:hover{
+    background: rgba(255,255,255,.10) !important;
+}
+
+/* 8) Topbar da theme ile uyumlu olsun (header kareleşmesin) */
+.topbar{
+    background: var(--panel) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: var(--softShadow) !important;
+}
