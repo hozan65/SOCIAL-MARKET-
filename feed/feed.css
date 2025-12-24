@@ -167,11 +167,75 @@
     color: rgba(15,23,42,.75);
 }
 
-/* ========== TOP CRYPTO (cards + inner scroll) ========== */
+/* =========================
+   TOP CRYPTO BOX (Tabs + Search + Cards)
+========================= */
+
+/* Tabs */
+.gTabs{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:10px;
+}
+
+.gTab{
+    padding:8px 12px;
+    border-radius:999px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.85);
+    font-weight:900;
+    font-size:11px;
+    letter-spacing:.08em;
+    cursor:pointer;
+    opacity:.75;
+    transition: transform .12s ease, opacity .12s ease, background .12s ease;
+}
+.gTab:hover{ transform: translateY(-1px); opacity:.9; }
+.gTab.active{
+    opacity:1;
+    color:#2563eb;
+    background: rgba(37,99,235,.10);
+    border-color: rgba(37,99,235,.22);
+}
+
+/* Search */
+.cryptoSearchWrap{
+    margin: 8px 0 10px;
+}
+.cryptoSearch{
+    width:100%;
+    height:40px;
+    border-radius:14px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.92);
+    padding: 0 12px;
+    font-weight: 900;
+    outline:none;
+}
+.cryptoSearch:focus{
+    border-color: rgba(37,99,235,.35);
+    box-shadow: 0 10px 22px rgba(37,99,235,.10);
+}
+
+/* Cards grid + SCROLL (eşit yükseklik için) */
+.topCryptoBox{
+    display:flex;
+    flex-direction:column;
+    min-height:0;      /* scroll chain */
+}
+.topCryptoBox .dashBody{
+    flex:1;
+    min-height:0;      /* scroll chain */
+    display:flex;
+    flex-direction:column;
+}
+
+/* ✅ sadece coin listesi scroll */
 .coinGrid{
-    flex:1;               /* ✅ fill remaining height in dashBody */
-    min-height:0;         /* ✅ allow scroll */
-    overflow:auto;        /* ✅ inner scroll */
+    flex:1;
+    min-height:0;
+    overflow:auto;
     padding-right:6px;
     -webkit-overflow-scrolling: touch;
 
@@ -180,16 +244,18 @@
     gap:10px;
 }
 
+/* Scrollbar */
 .coinGrid::-webkit-scrollbar{ width:8px; }
 .coinGrid::-webkit-scrollbar-thumb{
     background: rgba(0,0,0,.18);
-    border-radius: 999px;
+    border-radius:999px;
 }
 .coinGrid::-webkit-scrollbar-track{
     background: rgba(0,0,0,.06);
-    border-radius: 999px;
+    border-radius:999px;
 }
 
+/* Card */
 .coinCard{
     display:flex;
     align-items:center;
@@ -215,9 +281,9 @@
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    max-width:150px;
+    max-width:160px;
 }
-.coinSym{ opacity:.75; font-weight:800; margin-left:6px; }
+.coinSym{ opacity:.65; font-weight:800; margin-left:6px; }
 
 .coinRight{ text-align:right; flex:0 0 auto; }
 .coinPrice{ font-weight:900; }
@@ -235,6 +301,12 @@
     opacity:.75;
     margin-top:8px;
     font-weight:800;
+}
+
+/* Responsive */
+@media(max-width:900px){
+    .coinGrid{ grid-template-columns:1fr; }
+    .coinName{ max-width:220px; }
 }
 
 /* ========== FEED HEADER ========== */
@@ -484,28 +556,3 @@
 }
 .econMobile{ display:none; }
 
-/* ========== RESPONSIVE ========== */
-@media (max-width: 980px){
-    .dash2{ grid-template-columns: 1fr; }
-}
-
-@media(max-width:900px){
-    .coinGrid{ grid-template-columns:1fr; }
-    .econDesktop{ display:none; }
-    .econMobile{ display:block; }
-    .econIframe{ height:720px; }
-}
-
-@media (max-width: 420px){
-    .post-actions{ flex-direction:column; }
-    .post-img{ height: 200px; }
-    .feed-header h2{ font-size:24px; }
-    .newsSlider{ min-height: 300px; }
-}
-
-/* ✅ HOTFIX: Eğer JS active atamazsa ilk slide görünsün */
-.newsSlider .newsSlide:first-child{
-    opacity:1 !important;
-    transform: scale(1) !important;
-    pointer-events:auto !important;
-}
