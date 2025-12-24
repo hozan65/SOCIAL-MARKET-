@@ -445,51 +445,22 @@
 
 
 
-/* ===== GO TO BROKER BAR ===== */
-.goBrokerBar{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    padding:14px 16px;
-    border-radius:14px;
-    margin-bottom:12px;
-    background: linear-gradient(135deg,#eef2ff,#f8fafc);
-    border:1px solid rgba(0,0,0,.08);
-    font-weight:900;
-}
-.goBrokerBtn{
-    padding:8px 16px;
-    border-radius:999px;
-    background:#4f46e5;
-    color:#fff;
-    text-decoration:none;
-    white-space:nowrap;
-}
-
-/* ===== ECON CALENDAR IFRAME ===== */
 .econIframeWrap{
     width:100%;
-    overflow:auto;
+    overflow:hidden;
     border-radius:14px;
     border:1px solid rgba(0,0,0,.10);
     background:rgba(255,255,255,.85);
 }
+
 .econIframe{
     width:100%;
-    min-width:980px; /* calendar geniş */
-    height:540px;
+    height:560px;
     border:0;
 }
 
-/* Mobil */
 @media(max-width:900px){
-    .goBrokerBar{
-        flex-direction:column;
-        align-items:flex-start;
-    }
     .econIframe{
-        min-width:900px;
-        height:580px;
+        height:620px;
     }
 }
