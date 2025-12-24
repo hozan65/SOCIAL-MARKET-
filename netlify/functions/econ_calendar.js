@@ -12,7 +12,6 @@ export default async (req) => {
             });
         }
 
-        // EODHD Economic Events API
         const upstream = `https://eodhd.com/api/economic-events?api_token=${encodeURIComponent(
             TOKEN
         )}&fmt=json`;
@@ -20,23 +19,36 @@ export default async (req) => {
         const r = await fetch(upstream, { headers: { "user-agent": "social-market-netlify-function" } });
         const text = await r.text();
 
-        let data;
-        try { data = JSON.parse(text); } catch { data = null; }
+        // Parse dene
+        let parsed = null;
+        try { parsed = JSON.parse(text); } catch {}
 
+        // Upstream hata ise body'yi aynen döndür
         if (!r.ok) {
             return new Response(
                 JSON.stringify({
                     ok: false,
                     error: "Upstream API error",
                     upstream_status: r.status,
-                    upstream_body: data ?? text.slice(0, 400),
+                    upstream_body: parsed ?? text.slice(0, 500),
                 }),
                 { status: 502, headers: { "content-type": "application/json; charset=utf-8" } }
             );
         }
 
-        // Normalize (EODHD alanları değişebilir, güvenli map)
-        const arr = Array.isArray(data) ? data : [];
+        // Upstream 200 ama JSON hata olabilir (EODHD bazen {error: "..."} döndürebilir)
+        if (parsed && !Array.isArray(parsed) && (parsed.error || parsed.message)) {
+            return new Response(
+                JSON.stringify({
+                    ok: false,
+                    error: "Upstream returned error object",
+                    upstream_body: parsed,
+                }),
+                { status: 502, headers: { "content-type": "application/json; charset=utf-8" } }
+            );
+        }
+
+        const arr = Array.isArray(parsed) ? parsed : [];
         const clean = arr.slice(0, limit).map((e) => ({
             date: e.date ?? e.datetime ?? null,
             country: e.country ?? null,
