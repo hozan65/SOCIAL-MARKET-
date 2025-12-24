@@ -3,7 +3,6 @@ import { account } from "/assets/appwrite.js";
 
 console.log("✅ auth-ui.js loaded");
 
-// Wait for header slot
 waitFor("#authSlot", 6000).then(init).catch((e) => {
     console.warn("❌ auth-ui: authSlot not found", e);
 });
@@ -21,9 +20,11 @@ function waitFor(selector, timeoutMs = 4000) {
     });
 }
 
+// prevent duplicate global listeners on rerender
+let settingsCtrl = null;
+
 async function init(slot) {
     slot.classList.add("authSlot");
-
     renderLoggedOut(slot);
 
     try {
@@ -37,6 +38,12 @@ async function init(slot) {
 function renderLoggedOut(slot) {
     localStorage.removeItem("sm_uid");
 
+    // cleanup listeners if any
+    if (settingsCtrl) {
+        settingsCtrl.abort();
+        settingsCtrl = null;
+    }
+
     slot.innerHTML = `
     <button class="authBtn" id="getStartedBtn">Get Started</button>
   `;
@@ -49,18 +56,25 @@ function renderLoggedOut(slot) {
 function renderLoggedIn(slot, user) {
     localStorage.setItem("sm_uid", user.$id);
 
+    // cleanup previous listeners
+    if (settingsCtrl) {
+        settingsCtrl.abort();
+        settingsCtrl = null;
+    }
+
     const name = escapeHtml(user?.name || "Profile");
 
-    // ✅ Logout yok. Yerine: Profile + Round Settings
+    // ✅ TOPBAR: Logout yok
     slot.innerHTML = `
     <div class="authWrap">
       <button class="authBtn" id="profileBtn">👤 ${name}</button>
 
-      <button class="smIconCircle" id="settingsBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Settings">
+      <button class="smIconCircle" id="authSettingsBtn" type="button"
+        aria-haspopup="true" aria-expanded="false" title="Settings">
         <span class="emoji">⚙️</span>
       </button>
 
-      <div class="settingsMenu" id="settingsMenu" aria-hidden="true">
+      <div class="settingsMenu" id="authSettingsMenu" aria-hidden="true">
         <div class="settingsRow">
           <span>Dark mode</span>
           <button type="button" id="themeToggle" class="toggleBtn">OFF</button>
@@ -73,10 +87,6 @@ function renderLoggedIn(slot, user) {
             <option value="en">EN</option>
           </select>
         </div>
-
-        <div class="settingsRow" style="border-top:1px solid var(--border);padding-top:10px;margin-top:6px">
-          <button class="dangerBtn" id="logoutRealBtn" type="button">Logout</button>
-        </div>
       </div>
     </div>
   `;
@@ -87,14 +97,15 @@ function renderLoggedIn(slot, user) {
     };
 
     // Settings open/close
-    const settingsBtn = slot.querySelector("#settingsBtn");
-    const settingsMenu = slot.querySelector("#settingsMenu");
+    const settingsBtn = slot.querySelector("#authSettingsBtn");
+    const settingsMenu = slot.querySelector("#authSettingsMenu");
 
     const open = () => {
         settingsMenu.classList.add("open");
         settingsMenu.setAttribute("aria-hidden", "false");
         settingsBtn.setAttribute("aria-expanded", "true");
     };
+
     const close = () => {
         settingsMenu.classList.remove("open");
         settingsMenu.setAttribute("aria-hidden", "true");
@@ -106,8 +117,12 @@ function renderLoggedIn(slot, user) {
         settingsMenu.classList.contains("open") ? close() : open();
     };
 
-    document.addEventListener("click", close);
-    settingsMenu.addEventListener("click", (e) => e.stopPropagation());
+    // ✅ attach document listeners once per render (no duplicates)
+    settingsCtrl = new AbortController();
+    const { signal } = settingsCtrl;
+
+    document.addEventListener("click", close, { signal });
+    settingsMenu.addEventListener("click", (e) => e.stopPropagation(), { signal });
 
     // Theme
     const THEME_KEY = "sm_theme";
@@ -144,16 +159,6 @@ function renderLoggedIn(slot, user) {
     langSelect.value = localStorage.getItem(LANG_KEY) || "tr";
     langSelect.onchange = () => localStorage.setItem(LANG_KEY, langSelect.value);
 
-    // ✅ Logout artık menünün içinde (istersen bunu da kaldırırız)
-    slot.querySelector("#logoutRealBtn").onclick = async () => {
-        try {
-            await account.deleteSession("current");
-        } catch {}
-        localStorage.removeItem("sm_uid");
-        renderLoggedOut(slot);
-    };
-
-    // basic styling inject (garanti yuvarlak + menü güzel dursun)
     injectAuthStylesOnce();
 }
 
@@ -164,15 +169,6 @@ function injectAuthStylesOnce() {
     st.id = "authUiStyles";
     st.textContent = `
     .authWrap{display:flex;gap:10px;align-items:center;justify-content:flex-end;position:relative}
-    .smIconCircle{
-      width:40px;height:40px;border-radius:999px;
-      display:flex;align-items:center;justify-content:center;
-      border:1px solid var(--border);
-      background:var(--card);
-      box-shadow: var(--softShadow);
-      cursor:pointer;
-    }
-    .smIconCircle .emoji{font-size:18px;line-height:1}
 
     .settingsMenu{
       position:absolute;right:0;top:48px;min-width:220px;
@@ -186,28 +182,25 @@ function injectAuthStylesOnce() {
       backdrop-filter: blur(10px);
     }
     .settingsMenu.open{display:block}
-    .settingsRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 4px;font-weight:800;color:var(--text)}
+
+    .settingsRow{
+      display:flex;align-items:center;justify-content:space-between;
+      gap:12px;padding:8px 4px;
+      font-weight:800;color:var(--text)
+    }
+
     .toggleBtn{
       padding:6px 10px;border-radius:999px;
       border:1px solid var(--border);
       background: var(--card);
       font-weight:900;cursor:pointer;color:var(--text);
     }
+
     .selectBtn{
       padding:6px 10px;border-radius:10px;
       border:1px solid var(--border);
       background: var(--card);
       font-weight:900;color:var(--text);
-    }
-    .dangerBtn{
-      width:100%;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid rgba(255,0,0,.25);
-      background: rgba(255,0,0,.08);
-      font-weight:900;
-      cursor:pointer;
-      color: var(--text);
     }
   `;
     document.head.appendChild(st);
