@@ -111,13 +111,14 @@ exports.handler = async (event) => {
             .from("analyses")
             .insert([
                 {
-                    author_id: user.uid,     // varsa kalsın
-                    author_uid: user.uid,    // ✅ NOT NULL olan kolon
+                    author_id: user.uid,
+                    author_uid: user.uid,
                     market,
                     category,
                     timeframe,
                     content,
-                    pairs,
+                    pair,      // ✅ ekle
+                    pairs,     // kalsın
                     image_path,
                 }
             ])
