@@ -1,61 +1,64 @@
 // netlify/functions/add_comment.js
-const { createClient } = require("@supabase/supabase-js");
-const authUser = require("./_auth_user");
+// FINAL: Appwrite JWT verify -> Supabase insert into public.post_comments
+// Includes CORS + OPTIONS
 
-function json(statusCode, body) {
+const { createClient } = require("@supabase/supabase-js");
+const { authUser } = require("./_auth_user");
+
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+function json(statusCode, bodyObj) {
     return {
         statusCode,
         headers: {
-            "Content-Type": "application/json; charset=utf-8",
+            "Content-Type": "application/json",
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(bodyObj),
     };
 }
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+function getBearer(event) {
+    const h = event.headers.authorization || event.headers.Authorization || "";
+    return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
+}
 
 exports.handler = async (event) => {
-    if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-    if (event.httpMethod !== "POST") return json(405, { ok: false, error: "Method not allowed" });
-
     try {
-        const { userId } = await authUser(event);
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+        if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        let body = {};
-        try { body = JSON.parse(event.body || "{}"); } catch {}
-        const post_id = body.post_id || body.postId;
+        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
+
+        const jwt = getBearer(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
+
+        const user = await authUser(jwt);
+
+        const body = JSON.parse(event.body || "{}");
+        const post_id = String(body.post_id || "").trim();
         const content = String(body.content || "").trim();
 
-        if (!post_id) return json(400, { ok: false, error: "post_id missing" });
-        if (!content) return json(400, { ok: false, error: "content empty" });
+        if (!post_id) return json(400, { error: "Missing post_id" });
+        if (!content) return json(400, { error: "Empty comment" });
 
-        const ins = await supabase
+        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+        const { data, error } = await sb
             .from("post_comments")
-            .insert({ post_id, user_id: userId, content })
+            .insert([{ post_id, user_id: user.uid, content }])
             .select("id, post_id, user_id, content, created_at")
             .single();
 
-        if (ins.error) return json(500, { ok: false, error: "Supabase insert failed", detail: ins.error });
+        if (error) throw error;
 
-        // return latest comments
-        const list = await supabase
-            .from("post_comments")
-            .select("id, user_id, content, created_at")
-            .eq("post_id", post_id)
-            .order("created_at", { ascending: true })
-            .limit(50);
-
-        if (list.error) return json(500, { ok: false, error: "Supabase load failed", detail: list.error });
-
-        return json(200, { ok: true, comment: ins.data, comments: list.data || [] });
+        return json(200, { ok: true, comment: data });
     } catch (e) {
-        return json(401, { ok: false, error: e?.message || "Unauthorized" });
+        console.error("add_comment error:", e);
+        return json(500, { error: e.message || "Server error" });
     }
 };
