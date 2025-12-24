@@ -5,43 +5,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     const mount = document.getElementById("headerMount");
     if (!mount) return;
 
-    // ===============================
-    // 0) THEME APPLY (early)
-    // ===============================
-    const THEME_KEY = "sm_theme"; // "dark" | "light"
-    const LANG_KEY = "sm_lang";   // "tr" | "en"
+    const THEME_KEY = "sm_theme";
+    const LANG_KEY = "sm_lang";
 
-    function applyTheme(theme) {
+    const applyTheme = (theme) => {
         const t = theme === "dark" ? "dark" : "light";
         document.documentElement.setAttribute("data-theme", t);
         document.documentElement.classList.toggle("dark", t === "dark");
-    }
+    };
 
-    function getTheme() {
+    const getTheme = () => {
         const saved = localStorage.getItem(THEME_KEY);
         if (saved === "dark" || saved === "light") return saved;
-        // default: light (istersen burada system theme'e bakarız)
         return "light";
-    }
+    };
 
-    function setTheme(theme) {
+    const setTheme = (theme) => {
         localStorage.setItem(THEME_KEY, theme);
         applyTheme(theme);
-    }
+    };
 
+    // apply theme early
     applyTheme(getTheme());
 
-    // ===============================
-    // 1) HEADER HTML LOAD (robust)
-    // ===============================
-    const candidates = [
-        "/components/header.html",
-        "./components/header.html",
-        "../components/header.html",
-    ];
-
-    let html = null;
-    let lastErr = null;
+    // load header.html (robust)
+    const candidates = ["/components/header.html", "./components/header.html", "../components/header.html"];
+    let html = null, lastErr = null;
 
     for (const url of candidates) {
         try {
@@ -53,7 +42,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             lastErr = e;
         }
     }
-
     if (!html) {
         console.error("❌ HEADER ERROR: header.html yüklenemedi", lastErr);
         return;
@@ -61,21 +49,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     mount.innerHTML = html;
 
-    // ===============================
-    // 2) ACTIVE MENU (feed/news/post etc.)
-    // ===============================
-    const path = location.pathname.replace(/\/+$/, ""); // sondaki / sil
-    let page = path.split("/")[1] || "";               // /feed -> feed
+    // ACTIVE MENU
+    const path = location.pathname.replace(/\/+$/, "");
+    let page = path.split("/")[1] || "";
     if (page.endsWith(".html")) page = page.replace(".html", "");
-    if (!page) page = "feed"; // root açılıyorsa
+    if (!page) page = "feed";
 
     mount.querySelectorAll("[data-page]").forEach((a) => {
         if ((a.dataset.page || "").trim() === page) a.classList.add("active");
     });
 
-    // ===============================
-    // 3) MOBILE MENU
-    // ===============================
+    // MOBILE MENU
     const btn = document.getElementById("hamburgerBtn");
     const menu = document.getElementById("mobileMenu");
     const backdrop = document.getElementById("menuBackdrop");
@@ -101,19 +85,32 @@ document.addEventListener("DOMContentLoaded", async () => {
             e.stopPropagation();
             menu.classList.contains("open") ? closeMenu() : openMenu();
         });
-
         backdrop.addEventListener("click", closeMenu);
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") closeMenu();
-        });
+        document.addEventListener("keydown", (e) => e.key === "Escape" && closeMenu());
     }
 
     // ===============================
-    // 4) SETTINGS (⚙️) + DARK MODE + LANGUAGE
+    // LOGOUT'U KESİN KALDIR
+    // (id/class/text/href ne olursa olsun)
     // ===============================
-    // header.html içinde yoksa otomatik ekler:
-    // - #settingsBtn
-    // - #settingsMenu
+    const killLogout = () => {
+        // 1) id/class ile
+        mount.querySelectorAll("#logoutBtn,[data-logout],.logoutBtn,.logout,.btn-logout").forEach((el) => el.remove());
+
+        // 2) link/button text "Logout" olanlar
+        mount.querySelectorAll("a,button").forEach((el) => {
+            const t = (el.textContent || "").trim().toLowerCase();
+            const href = (el.getAttribute("href") || "").toLowerCase();
+            if (t === "logout" || t === "çıkış" || t === "cikis" || href.includes("logout") || href.includes("cikis")) {
+                el.remove();
+            }
+        });
+    };
+    killLogout();
+
+    // ===============================
+    // SETTINGS (YUVARLAK EMOJI İÇİNDE)
+    // ===============================
     const rightArea =
         mount.querySelector("#headerRight") ||
         mount.querySelector(".headerRight") ||
@@ -121,28 +118,25 @@ document.addEventListener("DOMContentLoaded", async () => {
         mount.querySelector("header") ||
         mount;
 
-    // logout varsa kaldır
-    const oldLogout =
-        mount.querySelector("#logoutBtn") ||
-        mount.querySelector("[data-logout]") ||
-        mount.querySelector(".logoutBtn");
-    if (oldLogout) oldLogout.remove();
-
-    // settings button yoksa ekle
+    // settings button ekle / bul
     let settingsBtn = mount.querySelector("#settingsBtn");
     if (!settingsBtn) {
         settingsBtn = document.createElement("button");
         settingsBtn.id = "settingsBtn";
         settingsBtn.type = "button";
-        settingsBtn.className = "iconBtn settingsBtn";
+        settingsBtn.className = "smIconCircle"; // ✅ yuvarlak class
         settingsBtn.setAttribute("aria-haspopup", "true");
         settingsBtn.setAttribute("aria-expanded", "false");
         settingsBtn.title = "Settings";
-        settingsBtn.textContent = "⚙️";
+        settingsBtn.innerHTML = `<span class="emoji">⚙️</span>`;
         rightArea.appendChild(settingsBtn);
+    } else {
+        // varsa bile yuvarlak class bas
+        settingsBtn.classList.add("smIconCircle");
+        if (!settingsBtn.querySelector(".emoji")) settingsBtn.innerHTML = `<span class="emoji">⚙️</span>`;
     }
 
-    // settings menu yoksa ekle
+    // settings menu ekle / bul
     let settingsMenu = mount.querySelector("#settingsMenu");
     if (!settingsMenu) {
         settingsMenu = document.createElement("div");
@@ -164,103 +158,37 @@ document.addEventListener("DOMContentLoaded", async () => {
         rightArea.appendChild(settingsMenu);
     }
 
-    // küçük inline CSS (header.css'in yoksa bile menü görünür)
-    const styleId = "sm-settings-inline-style";
-    if (!document.getElementById(styleId)) {
-        const st = document.createElement("style");
-        st.id = styleId;
-        st.textContent = `
-      #settingsBtn{cursor:pointer}
-      .settingsMenu{
-        position:absolute; right:12px; top:56px;
-        min-width:200px;
-        background:rgba(255,255,255,.96);
-        border:1px solid rgba(0,0,0,.12);
-        border-radius:14px;
-        padding:10px;
-        box-shadow:0 12px 30px rgba(0,0,0,.12);
-        display:none;
-        z-index:9999;
-        backdrop-filter: blur(8px);
-      }
-      html.dark .settingsMenu{
-        background:rgba(18,18,18,.96);
-        border-color: rgba(255,255,255,.12);
-        box-shadow:0 12px 30px rgba(0,0,0,.45);
-      }
-      .settingsMenu.open{display:block}
-      .settingsRow{
-        display:flex; align-items:center; justify-content:space-between;
-        gap:12px; padding:8px 4px;
-        font-weight:700;
-      }
-      .toggleBtn{
-        padding:6px 10px; border-radius:999px;
-        border:1px solid rgba(0,0,0,.14);
-        background:rgba(0,0,0,.04);
-        font-weight:900; cursor:pointer;
-      }
-      html.dark .toggleBtn{
-        border-color: rgba(255,255,255,.14);
-        background: rgba(255,255,255,.06);
-        color:#fff;
-      }
-      .selectBtn{
-        padding:6px 10px; border-radius:10px;
-        border:1px solid rgba(0,0,0,.14);
-        background:rgba(0,0,0,.03);
-        font-weight:900;
-      }
-      html.dark .selectBtn{
-        border-color: rgba(255,255,255,.14);
-        background: rgba(255,255,255,.06);
-        color:#fff;
-      }
-    `;
-        document.head.appendChild(st);
-    }
-
-    function closeSettings() {
+    // menu open/close
+    const closeSettings = () => {
         settingsMenu.classList.remove("open");
         settingsBtn.setAttribute("aria-expanded", "false");
-    }
-    function openSettings() {
+    };
+    const openSettings = () => {
         settingsMenu.classList.add("open");
         settingsBtn.setAttribute("aria-expanded", "true");
-    }
+    };
 
     settingsBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         settingsMenu.classList.contains("open") ? closeSettings() : openSettings();
     });
-
-    document.addEventListener("click", () => closeSettings());
+    document.addEventListener("click", closeSettings);
     settingsMenu.addEventListener("click", (e) => e.stopPropagation());
 
     // theme toggle
     const themeToggle = settingsMenu.querySelector("#themeToggle");
-    function syncThemeBtn() {
-        const t = getTheme();
-        themeToggle.textContent = t === "dark" ? "ON" : "OFF";
-    }
+    const syncThemeBtn = () => (themeToggle.textContent = getTheme() === "dark" ? "ON" : "OFF");
     syncThemeBtn();
 
     themeToggle.addEventListener("click", () => {
-        const next = getTheme() === "dark" ? "light" : "dark";
-        setTheme(next);
+        setTheme(getTheme() === "dark" ? "light" : "dark");
         syncThemeBtn();
     });
 
     // language
     const langSelect = settingsMenu.querySelector("#langSelect");
-    const savedLang = localStorage.getItem(LANG_KEY) || "tr";
-    langSelect.value = savedLang;
+    langSelect.value = localStorage.getItem(LANG_KEY) || "tr";
+    langSelect.addEventListener("change", () => localStorage.setItem(LANG_KEY, langSelect.value));
 
-    langSelect.addEventListener("change", () => {
-        localStorage.setItem(LANG_KEY, langSelect.value);
-        // şimdilik sadece kaydediyoruz
-        // istersen burada sayfayı reload ya da i18n set ederiz
-    });
-
-    console.log("✅ Header fully initialized (robust load + settings)");
+    console.log("✅ Header fully initialized (logout removed + round settings)");
 });

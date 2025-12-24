@@ -51,111 +51,81 @@ body { overflow-y: scroll; }
 
 
 /* =========================
-   SETTINGS BUTTON + MENU
+   THEME TOKENS
 ========================= */
-.settingsWrap{ position:relative; display:inline-flex; align-items:center; margin-left:10px; }
-.settingsBtn{
-    height:40px;
-    padding:0 12px;
-    border-radius:12px;
-    border:1px solid rgba(0,0,0,.12);
-    background: rgba(255,255,255,.85);
-    cursor:pointer;
-    font-weight:900;
+:root{
+    --bg: #f6f9ff;
+    --panel: rgba(255,255,255,.86);
+    --card: rgba(255,255,255,.90);
+    --text: #0f172a;
+    --muted: rgba(15,23,42,.62);
+    --border: rgba(15,23,42,.10);
+    --shadow: 0 12px 30px rgba(2,8,23,.10);
+    --softShadow: 0 10px 22px rgba(2,8,23,.08);
 }
-.settingsBtn:hover{ transform: translateY(-1px); }
 
-.settingsMenu{
-    position:absolute;
-    top:48px;
-    right:0;
-    width:220px;
-    display:none;
-    border-radius:14px;
-    border:1px solid rgba(0,0,0,.12);
-    background: rgba(255,255,255,.95);
-    box-shadow: 0 18px 40px rgba(15,23,42,.18);
-    padding:10px;
-    z-index:9999;
+/* Dark */
+html[data-theme="dark"]{
+    --bg: #070b14;                 /* daha kaliteli (tam siyah değil) */
+    --panel: rgba(255,255,255,.06);
+    --card: rgba(255,255,255,.07);
+    --text: rgba(255,255,255,.92);
+    --muted: rgba(255,255,255,.62);
+    --border: rgba(255,255,255,.10);
+    --shadow: 0 18px 45px rgba(0,0,0,.45);
+    --softShadow: 0 14px 30px rgba(0,0,0,.35);
 }
-.settingsMenu.open{ display:block; }
 
-.settingsItem{
+/* global apply */
+body{
+    background: radial-gradient(1200px 700px at 20% -10%, rgba(107,179,255,.28), transparent 60%),
+    radial-gradient(1200px 700px at 85% 0%, rgba(132,94,247,.20), transparent 55%),
+    var(--bg) !important;
+    color: var(--text);
+}
+
+/* common panels/cards */
+.dashBox, .newsBox, .gainersBox, .card, .postCard, .panel, .dash2 > div{
+    background: var(--panel);
+    border: 1px solid var(--border);
+    box-shadow: var(--softShadow);
+    backdrop-filter: blur(10px);
+}
+
+/* inputs */
+input, select, textarea{
+    background: var(--card);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+/* headings */
+h1,h2,h3,h4{
+    color: var(--text);
+}
+.small, .muted, .subtext{
+    color: var(--muted);
+}
+/* Round emoji icon button */
+.smIconCircle{
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
     display:flex;
     align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    padding:10px;
-    border-radius:12px;
-}
-.settingsItem + .settingsItem{ margin-top:6px; }
-.settingsLabel{ font-weight:900; opacity:.85; }
-.settingsSelect{
-    height:34px;
-    border-radius:10px;
-    border:1px solid rgba(0,0,0,.12);
-    background:#fff;
-    padding:0 10px;
-    font-weight:800;
+    justify-content:center;
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--softShadow);
+    cursor:pointer;
+    transition: transform .12s ease, background .12s ease;
 }
 
-/* Toggle switch */
-.switch{ position:relative; display:inline-block; width:46px; height:26px; }
-.switch input{ display:none; }
-.slider{
-    position:absolute; cursor:pointer;
-    top:0; left:0; right:0; bottom:0;
-    background: rgba(0,0,0,.20);
-    border-radius:999px;
-    transition:.2s;
-}
-.slider:before{
-    content:"";
-    position:absolute;
-    height:20px; width:20px;
-    left:3px; top:3px;
-    background:white;
-    border-radius:999px;
-    transition:.2s;
-}
-.switch input:checked + .slider{
-    background: rgba(37,99,235,.55);
-}
-.switch input:checked + .slider:before{
-    transform: translateX(20px);
+.smIconCircle:hover{ transform: translateY(-1px); }
+.smIconCircle:active{ transform: translateY(0px) scale(.98); }
+
+.smIconCircle .emoji{
+    font-size: 18px;
+    line-height: 1;
 }
 
-/* =========================
-   DARK MODE (root class: html.dark)
-========================= */
-html.dark body{
-    background: #0b1220;
-    color: rgba(255,255,255,.92);
-}
-
-/* kutular */
-html.dark .dashBox,
-html.dark .post-card{
-    background: rgba(255,255,255,.06);
-    border-color: rgba(255,255,255,.10);
-    box-shadow: 0 18px 40px rgba(0,0,0,.35);
-}
-
-/* slider / input / buton */
-html.dark .settingsBtn,
-html.dark .settingsMenu,
-html.dark .gTab,
-html.dark .coinCard,
-html.dark .cryptoSearch,
-html.dark .commentInput,
-html.dark .commentSend,
-html.dark .post-actions button{
-    background: rgba(255,255,255,.08);
-    border-color: rgba(255,255,255,.12);
-    color: rgba(255,255,255,.92);
-}
-
-html.dark .newsSlider{
-    border-color: rgba(255,255,255,.12);
-    background: rgba(255,255,255,.06);
-}
