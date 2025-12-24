@@ -1,37 +1,70 @@
+.container{
+    max-width: var(--max);
+    margin: 0 auto;
+    padding: 0 24px 44px;
+}
+
+/* Buttons */
+.btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    padding:10px 14px;
+    border-radius:999px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor:pointer;
+    box-shadow: var(--softShadow);
+    transition: transform .12s ease, filter .12s ease, background .12s ease;
+}
+.btn:hover{ filter: brightness(1.02); }
+.btn:active{ transform: translateY(1px); }
+
+.btn.primary{
+    background: linear-gradient(135deg, rgba(37,99,235,.92), rgba(37,99,235,.78));
+    border-color: rgba(37,99,235,.45);
+    color:#fff;
+}
+.btn.primary:hover{
+    background: linear-gradient(135deg, rgba(29,78,216,.96), rgba(29,78,216,.80));
+}
+
 /* =========================
-   GLOBAL HEADER (TOPBAR) - GUARANTEED
+   HEADER
 ========================= */
 .topbar{
     position: sticky;
     top: 16px;
     z-index: 100;
 
+    max-width: var(--max);
+    width: calc(100% - 48px);
+    margin: 16px auto 0;
+    padding: 14px 22px;
+
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
     column-gap: 18px;
 
-    max-width: 1240px;
-    width: calc(100% - 48px);
-    margin: 16px auto 0;
-    padding: 14px 22px;
-
-    background: rgba(255,255,255,.86);
-    border: 1px solid rgba(0,0,0,.08);
+    background: var(--panel);
+    border: 1px solid var(--border);
     border-radius: 18px;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    backdrop-filter: blur(var(--blur));
+    box-shadow: var(--softShadow);
 }
 
 .topbar .logo{
-    justify-self: start;
+    justify-self:start;
     font-weight: 900;
     font-size: 16px;
     white-space: nowrap;
 }
 
 .topbar .menu{
-    justify-self: center;
+    justify-self:center;
     display:flex;
     align-items:center;
     gap:18px;
@@ -43,98 +76,81 @@
     font-size: 12px;
     font-weight: 900;
     letter-spacing: .14em;
-    opacity: .6;
+    opacity: .60;
     padding: 8px 12px;
     border-radius: 999px;
 }
 
 .topbar .menu a.active{
     opacity: 1;
-    color: #2563eb;
+    color: var(--brand);
     background: rgba(37,99,235,.10);
     border: 1px solid rgba(37,99,235,.22);
 }
 
-/* auth slot sağ */
+/* Right auth slot */
 #authSlot{
-    justify-self: end;
+    justify-self:end;
     display:flex;
     align-items:center;
     justify-content:flex-end;
-    gap:10px;
+    min-width: 220px;
 }
 
-/* hamburger (desktop gizli) */
+/* Hamburger */
 .hamburger{
     display:none;
-    border: 1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.92);
-    color: rgba(15,23,42,.92);
-    border-radius: 12px;
     width:42px;
     height:42px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor:pointer;
+    box-shadow: var(--softShadow);
 }
 
-/* mobile */
-@media (max-width: 980px){
-    .topbar{
-        display:flex;
-        justify-content:space-between;
-        gap:10px;
-
-        top: 0;
-        width: 100%;
-        max-width: none;
-        margin: 0;
-        border-radius: 0 0 18px 18px;
-        padding: 10px 12px;
-    }
-    .topbar .menu{ display:none; }
-    .hamburger{ display:inline-flex; align-items:center; justify-content:center; }
-}
-
-/* =========================
-   MOBILE MENU (FIX)
-   - Desktop: gizli
-   - Mobile: hamburger ile açılır
-========================= */
-
-/* Default (desktop dahil) */
-.mobileMenu{
-    display: none;
-}
-.backdrop{
-    display: none;
-}
+/* Mobile menu */
+.mobileMenu{ display:none; }
+.backdrop{ display:none; }
 
 /* Mobile */
 @media (max-width: 980px){
-    .hamburger{
-        display: inline-flex !important;
+    .container{ padding: 0 14px 44px; }
+
+    .topbar{
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        top: 0;
+        border-radius: 0 0 18px 18px;
+        padding: 10px 12px;
+        display:flex;
         align-items:center;
-        justify-content:center;
-        width:42px;
-        height:42px;
-        font-size:20px;
-        cursor:pointer;
+        justify-content:space-between;
+        gap:10px;
     }
 
+    .topbar .menu{ display:none; }
+
+    .hamburger{ display:inline-flex; align-items:center; justify-content:center; }
+
     .mobileMenu{
-        display: block;                 /* ✅ görünür ama kapalı mod */
+        display:block;
         position: fixed;
         top: 66px;
         left: 12px;
         right: 12px;
         padding: 10px;
-
         border-radius: 16px;
-        background: rgba(255,255,255,.96);
-        border: 1px solid rgba(0,0,0,.10);
-        box-shadow: 0 18px 40px rgba(15,23,42,.14);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(var(--blur));
 
         transform: translateY(-10px);
         opacity: 0;
-        pointer-events: none;           /* ✅ kapalı iken tıklanmaz */
+        pointer-events: none;
         transition: opacity .18s ease, transform .18s ease;
         z-index: 130;
     }
@@ -142,11 +158,28 @@
     .mobileMenu.open{
         opacity: 1;
         transform: translateY(0);
-        pointer-events: auto;           /* ✅ açılınca tıklanır */
+        pointer-events: auto;
+    }
+
+    .mobileMenu a{
+        display:block;
+        padding: 12px 12px;
+        border-radius: 12px;
+        font-weight: 900;
+        background: var(--card);
+        border: 1px solid var(--border);
+        margin-bottom: 8px;
+    }
+    .mobileMenu a:last-child{ margin-bottom:0; }
+
+    .mobileMenu a.active{
+        color: var(--brand);
+        background: rgba(37,99,235,.12);
+        border-color: rgba(37,99,235,.22);
     }
 
     .backdrop{
-        display: block;
+        display:block;
         position: fixed;
         inset: 0;
         background: rgba(15,23,42,.30);
@@ -160,4 +193,59 @@
         opacity: 1;
         pointer-events: auto;
     }
+}
+
+/* Auth UI (header right) – profile + settings */
+.authWrap{display:flex;gap:10px;align-items:center;justify-content:flex-end;position:relative}
+.authBtn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    border-radius:999px;
+    border:1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-weight: 900;
+    cursor:pointer;
+    box-shadow: var(--softShadow);
+    max-width: 220px;
+    white-space: nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+.smIconCircle{
+    width:40px;height:40px;border-radius:999px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--border);
+    background:var(--card);
+    box-shadow: var(--softShadow);
+    cursor:pointer;
+}
+.smIconCircle .emoji{font-size:18px;line-height:1}
+
+.settingsMenu{
+    position:absolute;right:0;top:48px;min-width:220px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px;
+    box-shadow: var(--shadow);
+    display:none;
+    z-index: 9999;
+    backdrop-filter: blur(var(--blur));
+}
+.settingsMenu.open{display:block}
+.settingsRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 4px;font-weight:800;color:var(--text)}
+.toggleBtn{
+    padding:6px 10px;border-radius:999px;
+    border:1px solid var(--border);
+    background: var(--card);
+    font-weight:900;cursor:pointer;color:var(--text);
+}
+.selectBtn{
+    padding:6px 10px;border-radius:10px;
+    border:1px solid var(--border);
+    background: var(--card);
+    font-weight:900;color:var(--text);
 }
