@@ -309,19 +309,6 @@
     color: rgba(15,23,42,.75);
 }
 
-/* ========== Econ calendar: full width card ========== */
-.fullRow{
-    width: 100%;
-    margin: 10px 0 40px;
-}
-.newsLikeCard{
-    width: 100%;
-    border-radius: 16px;
-    background: rgba(255,255,255,.85);
-    border: 1px solid rgba(0,0,0,.08);
-    box-shadow: 0 10px 30px rgba(15,23,42,.08);
-    overflow: hidden;
-}
 
 /* ========== SHOW MORE ========== */
 .postsMoreWrap{
@@ -457,23 +444,12 @@
 }
 
 
-/* ================= ECONOMIC CALENDAR ================= */
+.econTable{ width:100%; border-collapse:collapse; font-size:14px; }
+.econTable th{ text-align:left; padding:10px; background:rgba(0,0,0,.05); position:sticky; top:0; }
+.econTable td{ padding:10px; border-bottom:1px solid rgba(0,0,0,.08); vertical-align:top; }
+.econTable .eventCell{ min-width:380px; }
+.impact{ padding:3px 8px; border-radius:999px; font-weight:800; font-size:12px; background:rgba(0,0,0,.06); }
+.impact.high{ background:rgba(255,0,0,.12); }
+.impact.medium{ background:rgba(255,165,0,.16); }
+.impact.low{ background:rgba(0,128,0,.14); }
 
-.econ-calendar-box {
-    margin-top: 20px;
-}
-
-.econ-calendar-iframe {
-    width: 100%;
-    height: 620px;
-    border: none;
-    border-radius: 12px;
-    background: #ffffff;
-}
-
-/* Mobil */
-@media (max-width: 768px) {
-    .econ-calendar-iframe {
-        height: 520px;
-    }
-}

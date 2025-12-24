@@ -45,20 +45,23 @@
     <section class="posts" id="postsGrid"></section>
     <p class="feedMsg" id="feedMsg"></p>
 
-    <section class="dashBox fullRow econ-calendar-box">
-        <div class="dashHead">
-            <h3>Economic Calendar</h3>
-        </div>
-
+    <section class="dashBox fullRow">
+        <div class="dashHead"><h3>Economic Calendar</h3></div>
         <div class="dashBody">
-            <iframe
-                    src="https://www.fxverify.com/tools/economic-calendar"
-                    loading="lazy"
-                    referrerpolicy="no-referrer"
-                    class="econ-calendar-iframe">
-            </iframe>
+            <div id="econMsg" style="margin:8px 0; opacity:.8;"></div>
+            <div style="overflow:auto;">
+                <table class="econTable">
+                    <thead>
+                    <tr>
+                        <th>Date</th><th>Cur</th><th>Event</th><th>Impact</th><th>Actual</th><th>Forecast</th><th>Prev</th>
+                    </tr>
+                    </thead>
+                    <tbody id="econBody"></tbody>
+                </table>
+            </div>
         </div>
     </section>
+
 
 
 </main>
@@ -76,6 +79,7 @@
 <!-- 4) Feed (legacy → CDN kullanıyor, O YÜZDEN module YAPMA) -->
 <script src="/feed/feed.js"></script>
 
+<script src="/assets1/econ-calendar.js"></script>
 
 
 </body>
