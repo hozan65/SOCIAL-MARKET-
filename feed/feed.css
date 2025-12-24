@@ -502,3 +502,10 @@
     .feed-header h2{ font-size:24px; }
     .newsSlider{ min-height: 300px; }
 }
+
+/* ✅ HOTFIX: Eğer JS active atamazsa ilk slide görünsün */
+.newsSlider .newsSlide:first-child{
+    opacity:1 !important;
+    transform: scale(1) !important;
+    pointer-events:auto !important;
+}

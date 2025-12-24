@@ -2,6 +2,8 @@
   FEED.JS (NO MODULE / NO IMPORT)
   - Supabase CDN (READ ONLY)
   - Like / Comment / Follow: Netlify Functions (Appwrite JWT)
+  - News slider (Supabase news table)
+  - Top Crypto (CoinGecko public API)
 ========================= */
 
 console.log("✅ feed.js running");
@@ -19,8 +21,8 @@ const sb = window.supabase?.createClient
 // =========================
 // NETLIFY FUNCTIONS
 // =========================
-const FN_TOGGLE_LIKE   = "/.netlify/functions/toggle_like";
-const FN_ADD_COMMENT   = "/.netlify/functions/add_comment";
+const FN_TOGGLE_LIKE = "/.netlify/functions/toggle_like";
+const FN_ADD_COMMENT = "/.netlify/functions/add_comment";
 const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";
 
 // =========================
@@ -29,15 +31,19 @@ const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";
 const grid = document.getElementById("postsGrid");
 const msg = document.getElementById("feedMsg");
 const newsSlider = document.getElementById("feed-news-slider");
-const gainersTable = document.getElementById("gainersTable");
 
-function setMsg(t) {
-    if (msg) msg.textContent = t || "";
-}
+// TOP CRYPTO DOM (varsayım)
+const cryptoGrid = document.getElementById("cryptoGrid");     // (HTML'de olmalı)
+const cryptoMsg = document.getElementById("cryptoMsg");       // (opsiyonel)
+const cryptoTabs = document.querySelectorAll(".gTab[data-tab]");
 
 // =========================
 // HELPERS
 // =========================
+function setMsg(t) {
+    if (msg) msg.textContent = t || "";
+}
+
 function esc(str) {
     return String(str ?? "")
         .replaceAll("&", "&amp;")
@@ -57,6 +63,23 @@ function formatTime(ts) {
 function formatPairs(pairs) {
     if (Array.isArray(pairs)) return pairs.join(", ");
     return String(pairs ?? "");
+}
+
+function fmtUsd(n) {
+    const x = Number(n);
+    if (!isFinite(x)) return "-";
+    if (x >= 1) {
+        return x.toLocaleString(undefined, {
+            style: "currency",
+            currency: "USD",
+            maximumFractionDigits: 2,
+        });
+    }
+    return x.toLocaleString(undefined, {
+        style: "currency",
+        currency: "USD",
+        maximumFractionDigits: 6,
+    });
 }
 
 // =========================
@@ -134,19 +157,16 @@ async function fnPost(url, body) {
 // ✅ FUNCTIONS (correct payload keys)
 // =========================
 async function toggleLike(postId) {
-    // function expects: { post_id }
     return fnPost(FN_TOGGLE_LIKE, { post_id: String(postId) });
 }
 
 async function addComment(postId, text) {
-    // function expects: { post_id, content }
     const content = String(text || "").trim();
     if (!content) throw new Error("Empty comment");
     return fnPost(FN_ADD_COMMENT, { post_id: String(postId), content });
 }
 
 async function toggleFollow(targetUserId) {
-    // function expects: { following_id }
     if (!targetUserId) throw new Error("Author id missing");
     return fnPost(FN_TOGGLE_FOLLOW, { following_id: String(targetUserId) });
 }
@@ -359,7 +379,223 @@ async function loadFeedMore() {
 }
 
 // =========================
-// EVENTS
+// NEWS (Supabase -> Slider)
+// =========================
+async function fetchNews(limit = 6) {
+    if (!sb) throw new Error("Supabase CDN not loaded");
+
+    // ✅ Tablo/kolon farklıysa burayı değiştir
+    const { data, error } = await sb
+        .from("news")
+        .select("id, title, image_url, url, source, created_at")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+}
+
+function renderNewsSlide(n, active = false) {
+    const title = esc(n.title || "");
+    const img = esc(n.image_url || "");
+    const url = esc(n.url || "#");
+    const source = esc(n.source || "");
+    const time = formatTime(n.created_at);
+
+    return `
+    <div class="newsSlide ${active ? "active" : ""}" data-url="${url}">
+      ${
+        img
+            ? `<img class="newsSlideImg" src="${img}" alt="" loading="lazy">`
+            : `<div class="newsSlideSkeleton">NO IMAGE</div>`
+    }
+      <div class="newsOverlay">
+        <h4 class="newsTitle">${title}</h4>
+        <div class="newsMeta">${source ? source + " • " : ""}${time}</div>
+      </div>
+    </div>
+  `;
+}
+
+let newsTimer = null;
+
+function startNewsAutoRotate() {
+    if (!newsSlider) return;
+    const slides = Array.from(newsSlider.querySelectorAll(".newsSlide"));
+    if (slides.length <= 1) return;
+
+    let idx = 0;
+    clearInterval(newsTimer);
+    newsTimer = setInterval(() => {
+        slides[idx]?.classList.remove("active");
+        idx = (idx + 1) % slides.length;
+        slides[idx]?.classList.add("active");
+    }, 4500);
+}
+
+async function loadNews() {
+    if (!newsSlider) return;
+
+    newsSlider.innerHTML = `<div class="newsSlideSkeleton">Loading news…</div>`;
+
+    try {
+        const items = await fetchNews(6);
+        if (!items.length) {
+            newsSlider.innerHTML = `<div class="newsSlideSkeleton">No news yet.</div>`;
+            return;
+        }
+
+        newsSlider.innerHTML = items.map((n, i) => renderNewsSlide(n, i === 0)).join("");
+        startNewsAutoRotate();
+    } catch (err) {
+        console.error("❌ News error:", err);
+        newsSlider.innerHTML = `<div class="newsSlideSkeleton">News unavailable</div>`;
+    }
+}
+
+// Click slide -> open URL
+document.addEventListener("click", (e) => {
+    const slide = e.target.closest(".newsSlide");
+    if (!slide) return;
+    const url = slide.dataset.url;
+    if (url && url !== "#") window.open(url, "_blank", "noopener");
+});
+
+// =========================
+// TOP CRYPTO (CoinGecko)
+// =========================
+const CG = "https://api.coingecko.com/api/v3";
+const MEME_IDS = ["dogecoin","shiba-inu","pepe","dogwifcoin","bonk","floki"].join(",");
+
+function setCryptoMsg(t){
+    if (cryptoMsg) cryptoMsg.textContent = t || "";
+}
+
+function renderCoinCards(list){
+    if (!cryptoGrid) return;
+    cryptoGrid.innerHTML = (list || []).map((c) => {
+        const name = esc(c.name || "-");
+        const sym = esc(String(c.symbol || "").toUpperCase());
+        const img = esc(c.image || "");
+        const price = c.current_price != null ? fmtUsd(c.current_price) : "-";
+        const chgNum = Number(c.price_change_percentage_24h);
+        const chgText = isFinite(chgNum) ? `${chgNum.toFixed(2)}%` : "-";
+        const chgClass = !isFinite(chgNum) ? "" : (chgNum >= 0 ? "chgUp" : "chgDown");
+
+        return `
+      <div class="coinCard">
+        <div class="coinLeft">
+          ${img ? `<img class="coinIcon" src="${img}" alt="">` : `<div class="coinIcon"></div>`}
+          <div style="min-width:0">
+            <div class="coinName">${name}<span class="coinSym"> ${sym}</span></div>
+          </div>
+        </div>
+        <div class="coinRight">
+          <div class="coinPrice">${price}</div>
+          <div class="coinChg ${chgClass}">${chgText}</div>
+        </div>
+      </div>
+    `;
+    }).join("");
+}
+
+async function cgJson(url){
+    const r = await fetch(url, { headers: { accept: "application/json" }});
+    if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
+    return r.json();
+}
+
+async function loadTrending(){
+    if (!cryptoGrid) return;
+    setCryptoMsg("Loading trending...");
+
+    const j = await cgJson(`${CG}/search/trending`);
+    const coins = (j.coins || []).slice(0, 10);
+    const ids = coins.map(x => x?.item?.id).filter(Boolean).join(",");
+    if (!ids) { renderCoinCards([]); setCryptoMsg(""); return; }
+
+    const markets = await cgJson(`${CG}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`);
+    const map = new Map((markets || []).map(m => [m.id, m]));
+
+    const merged = coins.map(t => {
+        const id = t?.item?.id;
+        const m = map.get(id);
+        return {
+            name: t?.item?.name,
+            symbol: t?.item?.symbol,
+            image: t?.item?.large || t?.item?.thumb,
+            current_price: m?.current_price,
+            price_change_percentage_24h: m?.price_change_percentage_24h,
+        };
+    });
+
+    renderCoinCards(merged);
+    setCryptoMsg("");
+}
+
+async function loadGainers(){
+    if (!cryptoGrid) return;
+    setCryptoMsg("Loading gainers...");
+
+    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=24h`);
+    const sorted = (j || [])
+        .filter(x => typeof x.price_change_percentage_24h === "number")
+        .sort((a,b) => b.price_change_percentage_24h - a.price_change_percentage_24h)
+        .slice(0, 10);
+
+    renderCoinCards(sorted);
+    setCryptoMsg("");
+}
+
+async function loadMeme(){
+    if (!cryptoGrid) return;
+    setCryptoMsg("Loading meme coins...");
+
+    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(MEME_IDS)}&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h`);
+    renderCoinCards((j || []).slice(0, 10));
+    setCryptoMsg("");
+}
+
+async function loadVolume(){
+    if (!cryptoGrid) return;
+    setCryptoMsg("Loading top volume...");
+
+    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&order=volume_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`);
+    renderCoinCards(j || []);
+    setCryptoMsg("");
+}
+
+async function loadCryptoTab(tab){
+    try{
+        if (tab === "trending") return await loadTrending();
+        if (tab === "gainers") return await loadGainers();
+        if (tab === "meme") return await loadMeme();
+        if (tab === "volume") return await loadVolume();
+    } catch(e){
+        console.error("❌ crypto error:", e);
+        setCryptoMsg("Crypto unavailable");
+        if (cryptoGrid) cryptoGrid.innerHTML = "";
+    }
+}
+
+// tabs click
+function initCryptoTabs(){
+    if (!cryptoTabs?.length) return;
+    cryptoTabs.forEach(btn => {
+        btn.addEventListener("click", () => {
+            cryptoTabs.forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            loadCryptoTab(btn.dataset.tab);
+        });
+    });
+
+    // default
+    const active = document.querySelector('.gTab[data-tab].active') || cryptoTabs[0];
+    if (active) loadCryptoTab(active.dataset.tab);
+}
+
+// =========================
+// EVENTS (Like/Comment/Follow)
 // =========================
 document.addEventListener("click", async (e) => {
     // COMMENTS CLOSE
@@ -376,8 +612,7 @@ document.addEventListener("click", async (e) => {
         const postId = likeBtn.dataset.postId;
         likeBtn.disabled = true;
         try {
-            const res = await toggleLike(postId);
-            // res: { ok:true, liked:true/false }  (count'u DB'den okuyalım)
+            await toggleLike(postId);
             const c = await getLikeCount(postId);
             likeBtn.querySelector(".likeCount").textContent = String(c);
         } catch (err) {
@@ -473,8 +708,10 @@ document.addEventListener("submit", async (e) => {
 });
 
 // =========================
-// INIT (feed only)
+// INIT
 // =========================
 document.addEventListener("DOMContentLoaded", () => {
-    loadFeed(true);
+    loadNews();       // ✅ NEWS
+    initCryptoTabs(); // ✅ TOP CRYPTO
+    loadFeed(true);   // ✅ POSTS
 });
