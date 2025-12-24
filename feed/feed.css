@@ -447,7 +447,8 @@
 
 .econIframeWrap{
     width:100%;
-    overflow:hidden;
+    overflow:auto;      /* mobilde yatay scroll */
+    -webkit-overflow-scrolling: touch;
     border-radius:14px;
     border:1px solid rgba(0,0,0,.10);
     background:rgba(255,255,255,.85);
@@ -455,12 +456,13 @@
 
 .econIframe{
     width:100%;
+    min-width: 900px;   /* tablo daralmasın */
     height:560px;
     border:0;
 }
 
 @media(max-width:900px){
     .econIframe{
-        height:620px;
+        height:650px;
     }
 }
