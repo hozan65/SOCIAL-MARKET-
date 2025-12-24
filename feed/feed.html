@@ -48,15 +48,21 @@
     <div id="econCalendar" class="newsLikeCard fullRow"></div>
 </main>
 
+<!-- ✅ 1) Supabase CDN (EN ÜSTE) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- 2) Header -->
 <script src="/assets1/header.js"></script>
 
-<!-- Auth + JWT önce (module) -->
+<!-- 3) Auth + JWT (module) -->
 <script type="module" src="/assets/auth-ui.js"></script>
 <script type="module" src="/assets/jwt.js"></script>
 
-<!-- Feed'i de module yap: JWT hazır olduktan sonra kontrol edebilir -->
-<script type="module" src="/feed/feed.js"></script>
+<!-- 4) Feed (legacy → CDN kullanıyor, O YÜZDEN module YAPMA) -->
+<script src="/feed/feed.js"></script>
 
+<!-- 5) Econ calendar -->
 <script src="/assets1/econ-calendar.js"></script>
+
 </body>
 </html>
