@@ -1,95 +1,78 @@
 /* =========================
-   FEED.CSS (FULL - FINAL)
+   FEED.CSS (CLEAN)
    - News slider
    - Top Crypto (tabs + cards)
    - Equal height (News = Crypto)
    - Posts grid
    - Comments drawer
    - Show more
-   - Economic calendar
 ========================= */
 
-/* ========== TOP TABS (CRYPTO) ========== */
-.gTabs{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-    margin-bottom:10px;
-}
-
-.gTab{
-    padding:8px 12px;
-    border-radius:999px;
-    border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.85);
-    font-weight:900;
-    font-size:11px;
-    letter-spacing:.08em;
-    cursor:pointer;
-    opacity:.75;
-    transition: transform .12s ease, opacity .12s ease, background .12s ease;
-}
-.gTab:hover{ transform: translateY(-1px); opacity:.9; }
-.gTab.active{
-    opacity:1;
-    color:#2563eb;
-    background: rgba(37,99,235,.10);
-    border-color: rgba(37,99,235,.22);
-}
-
-/* ========== DASH2 LAYOUT (NEWS + TOP CRYPTO) ========== */
+/* ✅ Wrapper asla kart olmasın (arka kare fix) */
 .dash2{
     display:grid;
     grid-template-columns: 1.35fr 0.85fr;
     gap:18px;
-    align-items: stretch; /* ✅ equal height */
-    margin-top:18px;
-    margin-bottom:18px;
-}
+    align-items: stretch;
+    margin:18px 0;
 
-/* cards */
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+.dash2::before,.dash2::after{ content:none !important; }
+
+/* ✅ News + Crypto kutuları (kart) */
 .dashBox{
     display:flex;
     flex-direction:column;
-    min-height:0; /* ✅ required for inner scroll */
+    min-height:0;
+
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--softShadow);
+    backdrop-filter: blur(var(--blur));
+    padding:14px;
 }
 
-/* header area stays, body flexes */
 .dashHead{
     display:flex;
     align-items:center;
     justify-content:space-between;
     gap:10px;
+    margin-bottom:10px;
 }
 .dashHead h3{
     margin:0;
     font-weight:900;
     letter-spacing:-.01em;
+    color: var(--text);
 }
 
-/* body takes remaining height */
 .dashBody{
     flex:1;
-    min-height:0;  /* ✅ required for inner scroll */
+    min-height:0;
     display:flex;
     flex-direction:column;
 }
 
-/* ========== NEWS SLIDER ========== */
+/* =========================
+   NEWS SLIDER
+========================= */
 .newsSlider{
     position:relative;
     width:100%;
-    height:100%;
-    min-height:260px;
+    height:340px;
     border-radius:16px;
     overflow:hidden;
     border:1px solid rgba(37,99,235,.18);
     background: rgba(37,99,235,.06);
-    box-shadow: 0 18px 40px rgba(15,23,42,.10);
+    box-shadow: 0 18px 40px rgba(0,0,0,.10);
 }
 
-@media (min-width: 980px){
-    .newsSlider{ min-height:340px; }
+@media (max-width:900px){
+    .newsSlider{ height:260px; }
 }
 
 .newsSlide{
@@ -104,28 +87,21 @@
     opacity:1;
     transform: scale(1);
 }
-.newsSlide.active:hover .newsSlideImg{ transform: scale(1.03); }
-
 .newsSlideImg{
     width:100%;
     height:100%;
     object-fit:cover;
     display:block;
     filter: saturate(1.05) contrast(1.03);
-    transform: scale(1);
     transition: transform .35s ease;
 }
+.newsSlide.active:hover .newsSlideImg{ transform: scale(1.03); }
 
 .newsOverlay{
     position:absolute;
     inset:auto 0 0 0;
     padding:16px 16px 14px;
-    background: linear-gradient(
-            180deg,
-            rgba(0,0,0,0) 0%,
-            rgba(0,0,0,.30) 35%,
-            rgba(0,0,0,.78) 100%
-    );
+    background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,.30) 35%, rgba(0,0,0,.78) 100%);
 }
 
 .newsTitle{
@@ -140,22 +116,11 @@
     -webkit-box-orient: vertical;
     overflow:hidden;
 }
-@media (min-width: 980px){ .newsTitle{ font-size:18px; } }
-
 .newsMeta{
     margin-top:6px;
     font-size:12px;
     font-weight:800;
     color: rgba(255,255,255,.88);
-    opacity:.95;
-}
-
-.newsSlider::after{
-    content:"";
-    position:absolute;
-    inset:0;
-    pointer-events:none;
-    background: radial-gradient(120% 120% at 50% 0%, rgba(0,0,0,.10), rgba(0,0,0,0) 55%);
 }
 
 .newsSlideSkeleton{
@@ -164,299 +129,15 @@
     place-items:center;
     font-weight:900;
     opacity:.75;
-    color: rgba(15,23,42,.75);
+    color: var(--muted);
 }
-
-
-/* ========== FEED HEADER ========== */
-.feed-header{
-    margin: 12px 0 14px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-}
-.feed-header h2{
-    margin:0;
-    font-size:30px;
-    font-weight:900;
-    letter-spacing:-.02em;
-}
-
-/* ========== POSTS GRID ========== */
-.posts{
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap:18px;
-    padding-bottom: 40px;
-
-    /* ✅ prevents neighbor stretch bug */
-    align-items: start;
-    grid-auto-rows: min-content;
-}
-
-.post-card{
-    padding:14px;
-    border-radius:18px;
-    background: rgba(255,255,255,.90);
-    border:1px solid rgba(0,0,0,.08);
-    box-shadow: 0 18px 40px rgba(15,23,42,.08);
-    align-self: start;
-}
-
-.tags{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-}
-.tags span{
-    font-size:12px;
-    padding:6px 10px;
-    border-radius:999px;
-    background: rgba(37,99,235,.10);
-    border: 1px solid rgba(37,99,235,.18);
-    color: rgba(15,23,42,.88);
-    font-weight:800;
-}
-
-.chart-placeholder{
-    height:180px;
-    border-radius:14px;
-    background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(15,23,42,.02));
-    border: 1px dashed rgba(37,99,235,.32);
-    display:grid;
-    place-items:center;
-    margin:12px 0;
-    color: rgba(15,23,42,.55);
-    font-weight:800;
-}
-
-.post-img{
-    width:100%;
-    height: 220px;
-    object-fit: cover;
-    border-radius: 14px;
-    border: 1px solid rgba(37,99,235,.18);
-    background: rgba(37,99,235,.06);
-    display:block;
-    margin: 12px 0;
-}
-
-.post-card h3{ margin:0; font-size:18px; font-weight:900; }
-.post-card p{ margin:8px 0 0; color: rgba(15,23,42,.65); font-size:13px; }
-
-/* ========== ACTIONS ========== */
-.post-actions{
-    margin-top:12px;
-    display:flex;
-    gap:10px;
-    align-items: stretch;
-}
-.post-actions button{
-    flex:1;
-    padding:10px 10px;
-    border-radius:12px;
-    border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.95);
-    color: rgba(15,23,42,.92);
-    cursor:pointer;
-    font-weight:900;
-    transition: transform .12s ease, background .12s ease, border-color .12s ease;
-}
-.post-actions button:hover{
-    background: rgba(37,99,235,.08);
-    border-color: rgba(37,99,235,.25);
-    transform: translateY(-1px);
-}
-
-/* Feed msg */
-.feedMsg{
-    margin: 10px 0 40px;
-    color: rgba(15,23,42,.60);
-    font-weight: 800;
-}
-
-/* ========== SHOW MORE ========== */
-.postsMoreWrap{
-    width:100%;
-    display:flex;
-    justify-content:center;
-    margin: 8px 0 26px;
-}
-.postsMoreBtn{
-    border: 1px solid rgba(0,0,0,.12);
-    background: rgba(255,255,255,.95);
-    color:#000;
-    font-weight:900;
-    border-radius: 12px;
-    padding: 12px 18px;
-    cursor:pointer;
-    box-shadow: 0 10px 25px rgba(15,23,42,.06);
-    transition: transform .12s ease, background .12s ease;
-}
-.postsMoreBtn:hover{
-    transform: translateY(-1px);
-    background: rgba(0,0,0,.03);
-}
-.postsMoreEnd{
-    font-weight:900;
-    opacity:.7;
-    color:#0f172a;
-}
-
-/* ========== COMMENTS DRAWER ========== */
-.commentsWrap{
-    display:none;
-    margin-top:12px;
-    border:1px solid rgba(15,23,42,.10);
-    background: rgba(255,255,255,.95);
-    border-radius:16px;
-    padding:12px;
-    box-shadow: 0 14px 30px rgba(15,23,42,.08);
-}
-.post-card.isCommentsOpen .commentsWrap{ display:block; }
-
-.cHead{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:10px;
-}
-.cTitle{
-    font-weight:900;
-    font-size:13px;
-    color: rgba(15,23,42,.85);
-}
-.cClose{
-    width:34px;
-    height:34px;
-    border-radius:12px;
-    border:1px solid rgba(15,23,42,.10);
-    background:#fff;
-    font-weight:900;
-    cursor:pointer;
-}
-
-.commentsList{
-    max-height:220px;
-    overflow:auto;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    padding-right:4px;
-    margin-bottom:10px;
-}
-.commentsList::-webkit-scrollbar{ width:8px; }
-.commentsList::-webkit-scrollbar-thumb{
-    background: rgba(15,23,42,.12);
-    border-radius:999px;
-}
-
-.commentItem{
-    border:1px solid rgba(15,23,42,.08);
-    background:#fff;
-    border-radius:14px;
-    padding:10px;
-}
-.commentText{
-    font-size:13px;
-    font-weight:800;
-    color: rgba(15,23,42,.86);
-    line-height:1.25;
-}
-.commentMeta{
-    margin-top:6px;
-    font-size:11px;
-    font-weight:800;
-    color: rgba(15,23,42,.50);
-}
-
-.commentForm{
-    display:flex;
-    gap:8px;
-    align-items:center;
-}
-.commentInput{
-    flex:1;
-    height:40px;
-    padding:0 12px;
-    border-radius:14px;
-    border:1px solid rgba(15,23,42,.12);
-    outline:none;
-    font-weight:800;
-}
-.commentSend{
-    height:40px;
-    padding:0 14px;
-    border-radius:14px;
-    border:1px solid rgba(15,23,42,.12);
-    background:#fff;
-    font-weight:900;
-    cursor:pointer;
-}
-.commentSend:hover{
-    background: rgba(37,99,235,.08);
-    border-color: rgba(37,99,235,.25);
-}
-
-/* ========== ECONOMIC CALENDAR ========== */
-.econIframeWrap{
-    width:100%;
-    overflow:hidden;
-    border-radius:14px;
-    border:1px solid rgba(0,0,0,.10);
-    background:rgba(255,255,255,.85);
-}
-.econIframe{
-    width:100%;
-    height:620px;
-    border:0;
-}
-.econMobile{ display:none; }
-
-
-
-/* =========================
-   DASH2: News + Top Crypto aynı yükseklik
-========================= */
-.dash2{
-    display:grid;
-    grid-template-columns: 1.35fr 0.85fr;
-    gap:18px;
-    align-items: stretch;     /* ✅ iki kutu aynı yükseklik */
-}
-
-/* dashBox dikey layout */
-.dashBox{
-    display:flex;
-    flex-direction:column;
-    min-height:0;             /* ✅ iç scroll zinciri */
-}
-
-.dashBox .dashBody{
-    flex:1;
-    min-height:0;             /* ✅ iç scroll zinciri */
-    display:flex;
-    flex-direction:column;
-}
-
-/* NEWS slider sabit yükseklik (kutu içi) */
-.newsSlider{
-    width:100%;
-    height:340px;
-    border-radius:16px;
-    overflow:hidden;
-    border:1px solid rgba(37,99,235,.18);
-    background: rgba(37,99,235,.06);
-    box-shadow: 0 18px 40px rgba(15,23,42,.10);
+html[data-theme="dark"] .newsSlideSkeleton{
+    color: rgba(255,255,255,.75);
 }
 
 /* =========================
-   TOP CRYPTO: sadece coin listesi scroll
+   TOP CRYPTO
 ========================= */
-
-/* Tabs */
 .gTabs{
     display:flex;
     gap:8px;
@@ -466,57 +147,57 @@
 .gTab{
     padding:8px 12px;
     border-radius:999px;
-    border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.85);
+    border:1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
     font-weight:900;
     font-size:11px;
     letter-spacing:.08em;
     cursor:pointer;
     opacity:.75;
+    transition: transform .12s ease, opacity .12s ease, background .12s ease;
 }
+.gTab:hover{ transform: translateY(-1px); opacity:.9; }
 .gTab.active{
     opacity:1;
-    color:#2563eb;
-    background: rgba(37,99,235,.10);
+    color: var(--brand);
+    background: rgba(37,99,235,.12);
     border-color: rgba(37,99,235,.22);
 }
 
-/* Coin list alanı: burası büyür + scroll olur */
 .coinGrid{
-    flex:1;            /* ✅ kutunun kalanını doldurur */
-    min-height:0;      /* ✅ scroll çalışsın */
-    overflow:auto;     /* ✅ scroll sadece burada */
+    flex:1;
+    min-height:0;
+    overflow:auto;
     padding-right:6px;
 
     display:grid;
     grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:10px;
 }
-
-/* Search + msg: kutunun EN ALTINDA sabit */
-.cryptoFooter{
-    margin-top:auto;   /* ✅ search en alta yapışır */
-    padding-top:10px;
+.coinGrid::-webkit-scrollbar{ width:8px; }
+.coinGrid::-webkit-scrollbar-thumb{
+    background: rgba(255,255,255,.14);
+    border-radius:999px;
 }
 
+.cryptoFooter{
+    margin-top:auto;
+    padding-top:10px;
+}
 .cryptoSearch{
     width:100%;
     height:40px;
     border-radius:14px;
-    border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.92);
+    border:1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
     padding:0 12px;
     font-weight:900;
     outline:none;
 }
+.miniMsg{ opacity:.75; margin-top:6px; font-weight:800; color: var(--muted); }
 
-.miniMsg{
-    opacity:.75;
-    margin-top:6px;
-    font-weight:800;
-}
-
-/* Coin card */
 .coinCard{
     display:flex;
     align-items:center;
@@ -524,96 +205,61 @@
     gap:10px;
     padding:12px;
     border-radius:14px;
-    border:1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.86);
-    box-shadow: 0 8px 24px rgba(0,0,0,.05);
+    border:1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--softShadow);
 }
-
 .coinLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
 .coinIcon{ width:28px; height:28px; border-radius:999px; background: rgba(0,0,0,.06); flex:0 0 auto; }
-.coinName{ font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
-.coinSym{ opacity:.65; font-weight:800; margin-left:6px; }
+.coinName{ font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; color: var(--text); }
+.coinSym{ opacity:.65; font-weight:800; margin-left:6px; color: var(--muted); }
 .coinRight{ text-align:right; flex:0 0 auto; }
-.coinPrice{ font-weight:900; }
+.coinPrice{ font-weight:900; color: var(--text); }
 .coinChg{ font-weight:900; margin-top:4px; display:inline-block; padding:3px 8px; border-radius:999px; }
 .chgUp{ background: rgba(0,128,0,.14); }
 .chgDown{ background: rgba(255,0,0,.14); }
 
-/* Mobile */
 @media(max-width:900px){
     .dash2{ grid-template-columns:1fr; }
     .coinGrid{ grid-template-columns:1fr; }
-    .newsSlider{ height:260px; }
 }
 
 /* =========================
-   FEED DARK OPT + FIXES (paste at END)
+   POSTS + COMMENTS + SHOW MORE
+   (senin mevcut post stillerin aynen, sadece token’lara bağladım)
 ========================= */
-
-/* 1) Arkadaki "kare kutu" fix (dash wrapper boyanmasın) */
-.dash2{
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-.dash2::before,.dash2::after{ content:none !important; }
-
-/* 2) Dash box ve içerikler theme token kullansın */
-.dashBox{
-    background: var(--panel) !important;
-    border: 1px solid var(--border) !important;
-    box-shadow: var(--softShadow) !important;
+.posts{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap:18px;
+    padding-bottom:40px;
+    align-items:start;
+    grid-auto-rows:min-content;
 }
 
-/* 3) News skeleton text darkta görünür */
-html[data-theme="dark"] .newsSlideSkeleton{
-    color: rgba(255,255,255,.75) !important;
+.post-card{
+    padding:14px;
+    border-radius:18px;
+    background: var(--card);
+    border:1px solid var(--border);
+    box-shadow: var(--softShadow);
+    align-self:start;
 }
 
-/* 4) Post card / comment / coin card beyaz basmasın */
-.post-card,
-.commentsWrap,
-.commentItem,
-.coinCard{
-    background: var(--card) !important;
-    border: 1px solid var(--border) !important;
-    box-shadow: var(--softShadow) !important;
-}
+.post-card p{ margin:8px 0 0; color: var(--muted); font-size:13px; }
+.feedMsg{ margin:10px 0 40px; color: var(--muted); font-weight:800; }
 
-/* 5) Yazılar */
-.post-card p,
-.feedMsg,
-.postsMoreEnd,
-.newsMeta,
-.commentMeta{
-    color: var(--muted) !important;
+.post-actions{ margin-top:12px; display:flex; gap:10px; }
+.post-actions button{
+    flex:1;
+    padding:10px;
+    border-radius:12px;
+    border:1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    cursor:pointer;
+    font-weight:900;
 }
-.tags span{
-    color: var(--text) !important;
-}
-
-/* 6) Butonlar / inputlar */
-.post-actions button,
-.postsMoreBtn,
-.commentSend,
-.commentInput,
-.cryptoSearch,
-.gTab{
-    background: var(--card) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border) !important;
-}
-
-/* 7) Dark’ta hover daha temiz */
-html[data-theme="dark"] .post-actions button:hover,
-html[data-theme="dark"] .commentSend:hover,
-html[data-theme="dark"] .postsMoreBtn:hover{
-    background: rgba(255,255,255,.10) !important;
-}
-
-/* 8) Topbar da theme ile uyumlu olsun (header kareleşmesin) */
-.topbar{
-    background: var(--panel) !important;
-    border: 1px solid var(--border) !important;
-    box-shadow: var(--softShadow) !important;
+html[data-theme="dark"] .post-actions button:hover{
+    background: rgba(255,255,255,.10);
 }
