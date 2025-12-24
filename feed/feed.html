@@ -24,17 +24,21 @@
         </div>
 
         <div class="dashBox">
-            <div class="dashHead"><h3>Top Currencies</h3></div>
+            <div class="dashHead"><h3>Top Crypto</h3></div>
+
             <div class="dashBody">
                 <div class="gTabs">
-                    <button class="gTab active" data-tab="crypto" type="button">CRYPTO</button>
-                    <button class="gTab" data-tab="forex" type="button">FOREX</button>
-                    <button class="gTab" data-tab="metals" type="button">METALS</button>
-                    <button class="gTab" data-tab="indices" type="button">INDICES</button>
+                    <button class="gTab active" data-tab="trending" type="button">TRENDING</button>
+                    <button class="gTab" data-tab="gainers" type="button">TOP GAINERS</button>
+                    <button class="gTab" data-tab="meme" type="button">MEME COINS</button>
+                    <button class="gTab" data-tab="volume" type="button">TOP VOLUME</button>
                 </div>
-                <div id="gainersTable" class="gainersTable"></div>
+
+                <div id="cryptoGrid" class="coinGrid"></div>
+                <p id="cryptoMsg" class="miniMsg"></p>
             </div>
         </div>
+
     </section>
 
     <div class="feed-header">
