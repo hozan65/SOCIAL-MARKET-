@@ -35,13 +35,10 @@ async function init(slot) {
 }
 
 function renderLoggedOut(slot) {
-    // Ensure viewer id is cleared
     localStorage.removeItem("sm_uid");
 
     slot.innerHTML = `
-    <button class="authBtn" id="getStartedBtn">
-      Get Started
-    </button>
+    <button class="authBtn" id="getStartedBtn">Get Started</button>
   `;
 
     slot.querySelector("#getStartedBtn").onclick = () => {
@@ -50,26 +47,170 @@ function renderLoggedOut(slot) {
 }
 
 function renderLoggedIn(slot, user) {
-    // Store viewer id for non-module pages (feed.js, u.js)
     localStorage.setItem("sm_uid", user.$id);
 
     const name = escapeHtml(user?.name || "Profile");
+
+    // ✅ Logout yok. Yerine: Profile + Round Settings
     slot.innerHTML = `
-    <div style="display:flex;gap:10px;align-items:center;justify-content:flex-end">
+    <div class="authWrap">
       <button class="authBtn" id="profileBtn">👤 ${name}</button>
-      <button class="authLogout" id="logoutBtn">Logout</button>
+
+      <button class="smIconCircle" id="settingsBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Settings">
+        <span class="emoji">⚙️</span>
+      </button>
+
+      <div class="settingsMenu" id="settingsMenu" aria-hidden="true">
+        <div class="settingsRow">
+          <span>Dark mode</span>
+          <button type="button" id="themeToggle" class="toggleBtn">OFF</button>
+        </div>
+
+        <div class="settingsRow">
+          <span>Language</span>
+          <select id="langSelect" class="selectBtn">
+            <option value="tr">TR</option>
+            <option value="en">EN</option>
+          </select>
+        </div>
+
+        <div class="settingsRow" style="border-top:1px solid var(--border);padding-top:10px;margin-top:6px">
+          <button class="dangerBtn" id="logoutRealBtn" type="button">Logout</button>
+        </div>
+      </div>
     </div>
   `;
 
+    // Profile
     slot.querySelector("#profileBtn").onclick = () => {
         location.href = "/profile/profile.html";
     };
 
-    slot.querySelector("#logoutBtn").onclick = async () => {
-        try { await account.deleteSession("current"); } catch {}
+    // Settings open/close
+    const settingsBtn = slot.querySelector("#settingsBtn");
+    const settingsMenu = slot.querySelector("#settingsMenu");
+
+    const open = () => {
+        settingsMenu.classList.add("open");
+        settingsMenu.setAttribute("aria-hidden", "false");
+        settingsBtn.setAttribute("aria-expanded", "true");
+    };
+    const close = () => {
+        settingsMenu.classList.remove("open");
+        settingsMenu.setAttribute("aria-hidden", "true");
+        settingsBtn.setAttribute("aria-expanded", "false");
+    };
+
+    settingsBtn.onclick = (e) => {
+        e.stopPropagation();
+        settingsMenu.classList.contains("open") ? close() : open();
+    };
+
+    document.addEventListener("click", close);
+    settingsMenu.addEventListener("click", (e) => e.stopPropagation());
+
+    // Theme
+    const THEME_KEY = "sm_theme";
+    const themeToggle = slot.querySelector("#themeToggle");
+
+    const applyTheme = (theme) => {
+        const t = theme === "dark" ? "dark" : "light";
+        document.documentElement.setAttribute("data-theme", t);
+        document.documentElement.classList.toggle("dark", t === "dark");
+    };
+
+    const getTheme = () => {
+        const saved = localStorage.getItem(THEME_KEY);
+        return saved === "dark" ? "dark" : "light";
+    };
+
+    const syncTheme = () => {
+        const t = getTheme();
+        applyTheme(t);
+        themeToggle.textContent = t === "dark" ? "ON" : "OFF";
+    };
+
+    themeToggle.onclick = () => {
+        const next = getTheme() === "dark" ? "light" : "dark";
+        localStorage.setItem(THEME_KEY, next);
+        syncTheme();
+    };
+
+    syncTheme();
+
+    // Language
+    const LANG_KEY = "sm_lang";
+    const langSelect = slot.querySelector("#langSelect");
+    langSelect.value = localStorage.getItem(LANG_KEY) || "tr";
+    langSelect.onchange = () => localStorage.setItem(LANG_KEY, langSelect.value);
+
+    // ✅ Logout artık menünün içinde (istersen bunu da kaldırırız)
+    slot.querySelector("#logoutRealBtn").onclick = async () => {
+        try {
+            await account.deleteSession("current");
+        } catch {}
         localStorage.removeItem("sm_uid");
         renderLoggedOut(slot);
     };
+
+    // basic styling inject (garanti yuvarlak + menü güzel dursun)
+    injectAuthStylesOnce();
+}
+
+function injectAuthStylesOnce() {
+    if (document.getElementById("authUiStyles")) return;
+
+    const st = document.createElement("style");
+    st.id = "authUiStyles";
+    st.textContent = `
+    .authWrap{display:flex;gap:10px;align-items:center;justify-content:flex-end;position:relative}
+    .smIconCircle{
+      width:40px;height:40px;border-radius:999px;
+      display:flex;align-items:center;justify-content:center;
+      border:1px solid var(--border);
+      background:var(--card);
+      box-shadow: var(--softShadow);
+      cursor:pointer;
+    }
+    .smIconCircle .emoji{font-size:18px;line-height:1}
+
+    .settingsMenu{
+      position:absolute;right:0;top:48px;min-width:220px;
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:10px;
+      box-shadow: var(--shadow);
+      display:none;
+      z-index:9999;
+      backdrop-filter: blur(10px);
+    }
+    .settingsMenu.open{display:block}
+    .settingsRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 4px;font-weight:800;color:var(--text)}
+    .toggleBtn{
+      padding:6px 10px;border-radius:999px;
+      border:1px solid var(--border);
+      background: var(--card);
+      font-weight:900;cursor:pointer;color:var(--text);
+    }
+    .selectBtn{
+      padding:6px 10px;border-radius:10px;
+      border:1px solid var(--border);
+      background: var(--card);
+      font-weight:900;color:var(--text);
+    }
+    .dangerBtn{
+      width:100%;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,0,0,.25);
+      background: rgba(255,0,0,.08);
+      font-weight:900;
+      cursor:pointer;
+      color: var(--text);
+    }
+  `;
+    document.head.appendChild(st);
 }
 
 function escapeHtml(s) {
