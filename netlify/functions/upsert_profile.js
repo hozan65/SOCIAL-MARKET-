@@ -1,65 +1,85 @@
 // netlify/functions/upsert_profile.js
-import { createClient } from "@supabase/supabase-js";
-import { verifyAppwriteUser } from "./_verify.js";
+const { createClient } = require("@supabase/supabase-js");
+const { authUser } = require("./_auth_user");
 
-export default async (req) => {
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+function json(statusCode, bodyObj) {
+    return {
+        statusCode,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+        },
+        body: JSON.stringify(bodyObj),
+    };
+}
+
+function getBearer(event) {
+    const h = event.headers.authorization || event.headers.Authorization || "";
+    return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
+}
+
+const s = (v) => String(v ?? "").trim();
+const cleanUrl = (v) => {
+    const x = s(v);
+    if (!x) return "";
     try {
-        if (req.method !== "POST") {
-            return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
-        }
+        const u = new URL(x.startsWith("http") ? x : "https://" + x);
+        return u.toString();
+    } catch {
+        return "";
+    }
+};
 
-        // ✅ Appwrite JWT doğrula → userId al
-        const { userId } = await verifyAppwriteUser(req);
+exports.handler = async (event) => {
+    try {
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+        if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        // ✅ Body al
-        const body = await req.json();
+        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
 
-        const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+        const jwt = getBearer(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
 
-        const s = (v) => String(v ?? "").trim();
-        const n = (v) => {
-            const x = Number(v);
-            return Number.isFinite(x) ? x : 0;
-        };
+        // ✅ Appwrite JWT -> uid/email/name
+        const user = await authUser(jwt); // { uid, email, name }
 
-        // ✅ Server "userId"yi kesin olarak yazar (client yollasa bile ezilir)
+        const body = JSON.parse(event.body || "{}");
+
         const payload = {
-            appwrite_user_id: userId,
-            email: s(body.email),
-            name: s(body.name),
-            avatar_url: s(body.avatar_url),
+            appwrite_user_id: user.uid,
+            email: s(body.email || user.email),
+            name: s(body.name || user.name || user.email?.split("@")?.[0] || "user"),
+            avatar_url: cleanUrl(body.avatar_url),
 
-            skills: s(body.skills),
-            description: s(body.description),
             bio: s(body.bio),
+            website: cleanUrl(body.website),
 
-            x: s(body.x),
-            youtube: s(body.youtube),
-            facebook: s(body.facebook),
-            instagram: s(body.instagram),
-            website: s(body.website),
-
-            followers: n(body.followers),
-            following: n(body.following),
+            x: cleanUrl(body.x),
+            youtube: cleanUrl(body.youtube),
+            facebook: cleanUrl(body.facebook),
+            instagram: cleanUrl(body.instagram),
 
             updated_at: new Date().toISOString(),
         };
 
-        // ✅ Upsert (profiles.appwrite_user_id UNIQUE olmalı)
-        const { error } = await sb
-            .from("profiles")
-            .upsert(payload, { onConflict: "appwrite_user_id" });
+        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+        // ✅ profiles.appwrite_user_id UNIQUE olmalı
+        const { error } = await sb.from("profiles").upsert(payload, {
+            onConflict: "appwrite_user_id",
+        });
 
         if (error) throw error;
 
-        return new Response(JSON.stringify({ ok: true }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-        });
+        return json(200, { ok: true });
     } catch (e) {
-        return new Response(JSON.stringify({ error: e?.message || "unknown" }), {
-            status: 401,
-            headers: { "Content-Type": "application/json" },
-        });
+        console.error("upsert_profile error:", e);
+        return json(500, { error: e?.message || "Server error" });
     }
 };
