@@ -76,6 +76,7 @@ function getJWT() {
 
 async function fnPost(url, body) {
     const jwt = getJWT();
+
     const r = await fetch(url, {
         method: "POST",
         headers: {
@@ -93,14 +94,18 @@ async function fnPost(url, body) {
 async function toggleLike(postId) {
     return fnPost(FN_TOGGLE_LIKE, { post_id: String(postId) });
 }
+
 async function addComment(postId, text) {
     const content = String(text || "").trim();
     if (!content) throw new Error("Empty comment");
     return fnPost(FN_ADD_COMMENT, { post_id: String(postId), content });
 }
+
+/** ✅ FIX: field name must be following_uid (not following_id) */
 async function toggleFollow(targetUserId) {
-    if (!targetUserId) throw new Error("Author id missing");
-    return fnPost(FN_TOGGLE_FOLLOW, { following_id: String(targetUserId) });
+    const id = String(targetUserId || "").trim();
+    if (!id) throw new Error("Author id missing");
+    return fnPost(FN_TOGGLE_FOLLOW, { following_uid: id });
 }
 
 // =========================
@@ -181,7 +186,9 @@ function renderPost(row) {
           <button class="commentToggleBtn" data-post-id="${postId}" title="Comment">
             💬
           </button>
-          <button class="followBtn" data-user-id="${authorId}" title="Follow">
+
+          <!-- follow button (disable if author missing) -->
+          <button class="followBtn" data-user-id="${authorId}" title="Follow" ${authorId ? "" : "disabled"}>
             ➕
           </button>
         </div>
@@ -413,7 +420,9 @@ document.addEventListener("click", async (e) => {
     const closeBtn = e.target.closest(".cClose");
     if (closeBtn) {
         const postId = closeBtn.dataset.postId;
-        document.querySelector(`.post-card[data-post-id="${CSS.escape(postId)}"]`)?.classList.remove("isCommentsOpen");
+        document
+            .querySelector(`.post-card[data-post-id="${CSS.escape(postId)}"]`)
+            ?.classList.remove("isCommentsOpen");
         return;
     }
 
