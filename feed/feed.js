@@ -433,28 +433,37 @@ document.addEventListener("click", (e) => {
 // =========================
 // TOP CRYPTO (CoinGecko)
 // =========================
-const CG = "https://api.coingecko.com/api/v3";
-const MEME_IDS = ["dogecoin","shiba-inu","pepe","dogwifcoin","bonk","floki"].join(",");
+function shortLabel(c){
+    // 1) symbol her zaman ana label
+    const sym = String(c.symbol || "").toUpperCase().trim();
+    if (!sym) return "-";
 
-let cryptoActiveTab = "trending";
-let cryptoLastList = []; // search filter için cache
+    // 2) bazı stablecoin / saçma uzun adları göstermeyelim
+    // ikinci satırda (sub) max kısa olsun
+    const name = String(c.name || "").trim();
 
-function setCryptoMsg(t){
-    if (cryptoMsg) cryptoMsg.textContent = t || "";
+    // Örn: "Binance Bridged USDT" -> "USDT"
+    // Eğer isim symbol içeriyorsa sub göstermeyelim
+    const clean = name
+        .replace(/bridged|binance|wrapped|wormhole|portal|chain|token/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    // sub: çok uzunsa kes
+    const sub = clean && clean.toUpperCase() !== sym ? clean : "";
+    const subShort = sub.length > 12 ? (sub.slice(0, 12) + "…") : sub;
+
+    return { sym, sub: subShort };
 }
 
 function renderCoinCards(list){
-    cryptoLastList = Array.isArray(list) ? list : [];
-    applyCryptoFilter(); // search uygula
-}
-
-function drawCoins(list){
     if (!cryptoGrid) return;
+
     cryptoGrid.innerHTML = (list || []).map((c) => {
-        const name = esc(c.name || "-");
-        const sym = esc(String(c.symbol || "").toUpperCase());
+        const { sym, sub } = shortLabel(c);
         const img = esc(c.image || "");
         const price = c.current_price != null ? fmtUsd(c.current_price) : "-";
+
         const chgNum = Number(c.price_change_percentage_24h);
         const chgText = isFinite(chgNum) ? `${chgNum.toFixed(2)}%` : "-";
         const chgClass = !isFinite(chgNum) ? "" : (chgNum >= 0 ? "chgUp" : "chgDown");
@@ -463,9 +472,9 @@ function drawCoins(list){
       <div class="coinCard">
         <div class="coinLeft">
           ${img ? `<img class="coinIcon" src="${img}" alt="">` : `<div class="coinIcon"></div>`}
-          <div class="coinTxt">
-            <div class="coinName">${name}</div>
-            <div class="coinSym">${sym}</div>
+          <div style="min-width:0">
+            <div class="coinName"><span class="coinSym">${esc(sym)}</span></div>
+            ${sub ? `<div class="coinSub">${esc(sub)}</div>` : ``}
           </div>
         </div>
         <div class="coinRight">
@@ -476,6 +485,7 @@ function drawCoins(list){
     `;
     }).join("");
 }
+
 
 function applyCryptoFilter(){
     const q = String(cryptoSearch?.value || "").trim().toLowerCase();
