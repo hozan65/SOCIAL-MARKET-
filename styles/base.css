@@ -4,15 +4,14 @@ a{ color:inherit; text-decoration:none; }
 button,input,select,textarea{ font:inherit; }
 
 html{ scrollbar-gutter: stable; }
-body{ overflow-y: scroll; margin:0; }
-
 body{
+    overflow-y: scroll;
+    margin:0;
     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
     color: var(--text);
-    background: #eaf2ff;   /* ✅ AÇIK MAVİ */
+    background: #eaf2ff;
 }
 
-/* Dark mode varsa */
 html[data-theme="dark"] body{
-    background: #0b1220;   /* koyu mavi / lacivert */
+    background: #0b1220;
 }
