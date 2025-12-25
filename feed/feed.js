@@ -433,37 +433,16 @@ document.addEventListener("click", (e) => {
 // =========================
 // TOP CRYPTO (CoinGecko)
 // =========================
-function shortLabel(c){
-    // 1) symbol her zaman ana label
-    const sym = String(c.symbol || "").toUpperCase().trim();
-    if (!sym) return "-";
-
-    // 2) bazı stablecoin / saçma uzun adları göstermeyelim
-    // ikinci satırda (sub) max kısa olsun
-    const name = String(c.name || "").trim();
-
-    // Örn: "Binance Bridged USDT" -> "USDT"
-    // Eğer isim symbol içeriyorsa sub göstermeyelim
-    const clean = name
-        .replace(/bridged|binance|wrapped|wormhole|portal|chain|token/gi, "")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    // sub: çok uzunsa kes
-    const sub = clean && clean.toUpperCase() !== sym ? clean : "";
-    const subShort = sub.length > 12 ? (sub.slice(0, 12) + "…") : sub;
-
-    return { sym, sub: subShort };
-}
-
 function renderCoinCards(list){
     if (!cryptoGrid) return;
 
     cryptoGrid.innerHTML = (list || []).map((c) => {
-        const { sym, sub } = shortLabel(c);
-        const img = esc(c.image || "");
-        const price = c.current_price != null ? fmtUsd(c.current_price) : "-";
+        const symRaw = String(c.symbol || "").toUpperCase();
+        const sym = esc(symRaw) || "—";
 
+        const img = esc(c.image || c.thumb || c.large || "");
+
+        const price = c.current_price != null ? fmtUsd(c.current_price) : "-";
         const chgNum = Number(c.price_change_percentage_24h);
         const chgText = isFinite(chgNum) ? `${chgNum.toFixed(2)}%` : "-";
         const chgClass = !isFinite(chgNum) ? "" : (chgNum >= 0 ? "chgUp" : "chgDown");
@@ -472,11 +451,9 @@ function renderCoinCards(list){
       <div class="coinCard">
         <div class="coinLeft">
           ${img ? `<img class="coinIcon" src="${img}" alt="">` : `<div class="coinIcon"></div>`}
-          <div style="min-width:0">
-            <div class="coinName"><span class="coinSym">${esc(sym)}</span></div>
-            ${sub ? `<div class="coinSub">${esc(sub)}</div>` : ``}
-          </div>
+          <div class="coinSymbol">${sym}</div>
         </div>
+
         <div class="coinRight">
           <div class="coinPrice">${price}</div>
           <div class="coinChg ${chgClass}">${chgText}</div>
@@ -485,6 +462,27 @@ function renderCoinCards(list){
     `;
     }).join("");
 }
+
+async function cgJson(url){
+    const key = "cg_cache_" + url;
+    const cached = localStorage.getItem(key);
+
+    if (cached) {
+        try {
+            const obj = JSON.parse(cached);
+            if (Date.now() - obj.t < 60_000) return obj.v;
+        } catch {}
+    }
+
+    const r = await fetch(url, { headers: { accept: "application/json" }});
+    if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
+    const v = await r.json();
+
+    try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), v })); } catch {}
+    return v;
+}
+
+
 
 
 function applyCryptoFilter(){
