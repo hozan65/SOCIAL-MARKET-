@@ -124,138 +124,141 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
    TOP CRYPTO
 ========================= */
 /* =========================
-   TOP CRYPTO - FIX (OVERRIDE)
-   - 5 item sonra scroll
-   - sadece logo + SYMBOL görünür
+   TOP CRYPTO FIX (ICON + SYMBOL ONLY) + 5 rows scroll
 ========================= */
 
-/* Top crypto kutusunun yüksekliği News ile aynı kalsın */
 .topCryptoBox .dashBody{
-    height: 340px;          /* News slider yüksekliğin neyse aynı yap */
-    min-height: 340px;
     display:flex;
     flex-direction:column;
+    min-height:0;
 }
 
-/* Tabs düzgün dursun */
-.topCryptoBox .gTabs{
+/* Tabs daha temiz */
+.gTabs{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
     margin-bottom:10px;
 }
-
-.topCryptoBox .gTab{
+.gTab{
     padding:7px 10px;
     border-radius:999px;
-    border:1px solid rgba(15,23,42,.12);
-    background: rgba(255,255,255,.85);
+    border:1px solid var(--border);
+    background: var(--card);
     font-weight:900;
     font-size:11px;
     letter-spacing:.08em;
     cursor:pointer;
     opacity:.75;
 }
-.topCryptoBox .gTab.active{
+.gTab.active{
     opacity:1;
     color: var(--brand);
     background: rgba(37,99,235,.10);
     border-color: rgba(37,99,235,.22);
 }
 
-/* ✅ 5 satırdan sonra scroll: (satır yüksekliği ~60px) */
-#cryptoGrid.coinGrid{
-    margin-top:2px;
-    height: 300px;          /* 340 - tabs - footer; gerekirse 280/300 ayarla */
+/* ✅ 5 satırdan sonra scroll
+   coinCard yüksekliği ~62px olduğu için ~ 5*62 + boşluklar */
+.coinGrid{
     overflow:auto;
+    max-height: 360px;   /* ✅ 5 satır civarı */
     padding-right:6px;
 
-    display:flex;
-    flex-direction:column;
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:10px;
+
+    border-radius:16px;
+    background: transparent;     /* kutu arkasında ekstra kare olmasın */
 }
 
-/* card */
-#cryptoGrid .coinCard{
+/* kart düzgün */
+.coinCard{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:12px;
+    gap:10px;
 
     padding:10px 12px;
     border-radius:14px;
-    border:1px solid rgba(15,23,42,.10);
-    background: rgba(255,255,255,.92);
-    box-shadow: 0 10px 22px rgba(2,8,23,.06);
+    border:1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--softShadow);
 }
 
-/* sol taraf: logo + SYMBOL */
-#cryptoGrid .coinLeft{
+.coinLeft{
     display:flex;
     align-items:center;
     gap:10px;
     min-width:0;
 }
 
-#cryptoGrid .coinIcon{
+.coinIcon{
     width:28px;
     height:28px;
     border-radius:999px;
-    object-fit:cover;
-    background: rgba(15,23,42,.06);
+    background: rgba(0,0,0,.06);
     flex:0 0 auto;
 }
 
-#cryptoGrid .coinSymbol{
+.coinSymbol{
     font-weight:1000;
     letter-spacing:.06em;
-    font-size:12px;
-    color: var(--text);
-    text-transform:uppercase;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:90px;
 }
 
-/* sağ taraf: fiyat + yüzde */
-#cryptoGrid .coinRight{
+.coinRight{
     text-align:right;
     flex:0 0 auto;
 }
-#cryptoGrid .coinPrice{
+
+.coinPrice{
     font-weight:1000;
     font-size:12px;
-    color: var(--text);
 }
-#cryptoGrid .coinChg{
+
+.coinChg{
+    font-weight:1000;
     margin-top:4px;
     display:inline-block;
     padding:3px 8px;
     border-radius:999px;
-    font-weight:1000;
     font-size:11px;
 }
-#cryptoGrid .chgUp{ background: rgba(0,128,0,.14); }
-#cryptoGrid .chgDown{ background: rgba(255,0,0,.14); }
 
-/* footer en altta sabit */
-.topCryptoBox .cryptoFooter{
-    margin-top:auto;
-    padding-top:10px;
+.chgUp{ background: rgba(0,128,0,.14); }
+.chgDown{ background: rgba(255,0,0,.14); }
+
+/* Search footer sabit altta */
+.cryptoFooter{
+    margin-top:10px;
 }
-.topCryptoBox .cryptoSearch{
+
+.cryptoSearch{
     width:100%;
     height:40px;
     border-radius:14px;
-    border:1px solid rgba(15,23,42,.12);
-    background: rgba(255,255,255,.92);
+    border:1px solid var(--border);
+    background: var(--card);
     padding:0 12px;
     font-weight:900;
     outline:none;
 }
 
-/* dark uyum */
-html[data-theme="dark"] #cryptoGrid .coinCard{
-    background: var(--card);
-    border:1px solid var(--border);
-    box-shadow: var(--softShadow);
+.miniMsg{
+    opacity:.75;
+    margin-top:6px;
+    font-weight:800;
+    color: var(--muted);
+}
+
+/* Mobile */
+@media (max-width:900px){
+    .coinGrid{ grid-template-columns:1fr; max-height: 320px; }
 }
 
 
