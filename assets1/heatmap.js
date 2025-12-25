@@ -1,26 +1,36 @@
-// /assets1/fx-heatmap.js
-// TradingView style MATRIX heatmap using Binance 24h % change
-// Cell = rowChange - colChange (strength difference)
-// Refresh: 25s
+// /assets1/heatmap.js (SAFE + DEBUG + ALWAYS SHOW MESSAGE)
 
 (() => {
-    const wrap = document.getElementById("fxHeatWrap");
-    if (!wrap) return;
+    const grid = document.getElementById("heatmapGrid");
+    const msg = document.getElementById("heatmapMsg");
 
-    const msg = document.getElementById("fxHeatMsg");
-    const uniSel = document.getElementById("fxHeatUniverse");
+    const metricSel = document.getElementById("heatmapMetric");
+    const uniSel = document.getElementById("heatmapUniverse");
+    const search = document.getElementById("heatmapSearch");
+
+    // ====== hard fail if no grid ======
+    if (!grid) {
+        console.error("❌ heatmap: #heatmapGrid not found");
+        if (msg) msg.textContent = "❌ heatmapGrid not found (HTML id wrong)";
+        return;
+    }
 
     const REST_24H = "https://api.binance.com/api/v3/ticker/24hr";
     const REFRESH_MS = 25_000;
+    const LIMIT = 36;
 
     const MAJORS = [
         "BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT","ADAUSDT","DOGEUSDT",
-        "AVAXUSDT","LINKUSDT","DOTUSDT","TRXUSDT","TONUSDT","MATICUSDT","ATOMUSDT"
+        "AVAXUSDT","LINKUSDT","DOTUSDT","TRXUSDT","TONUSDT","MATICUSDT","ATOMUSDT",
+        "LTCUSDT","BCHUSDT","APTUSDT","SUIUSDT","OPUSDT","ARBUSDT"
     ];
 
-    const LIMIT_TOPVOL = 10;
-
+    let lastRows = [];
     let timer = null;
+
+    function setMsg(t){
+        if (msg) msg.textContent = t || "";
+    }
 
     const esc = (s) =>
         String(s ?? "")
@@ -30,10 +40,6 @@
             .replaceAll('"',"&quot;")
             .replaceAll("'","&#039;");
 
-    function setMsg(t){
-        if (msg) msg.textContent = t || "";
-    }
-
     function isUsdtSpot(sym){
         const s = String(sym || "");
         if (!s.endsWith("USDT")) return false;
@@ -42,118 +48,118 @@
         return true;
     }
 
+    function fmtK(n){
+        const x = Number(n);
+        if (!isFinite(x)) return "-";
+        if (x >= 1e9) return (x/1e9).toFixed(2) + "B";
+        if (x >= 1e6) return (x/1e6).toFixed(2) + "M";
+        if (x >= 1e3) return (x/1e3).toFixed(2) + "K";
+        return String(Math.round(x));
+    }
+
+    function colorForChange(pct){
+        const p = Number(pct);
+        if (!isFinite(p)) return { bg:"rgba(255,255,255,.04)", cls:"" };
+
+        const cap = 12; // 12% üstü aynı yoğunluk
+        const a = Math.min(Math.abs(p), cap) / cap;  // 0..1
+        const alpha = 0.10 + a * 0.40;               // 0.10..0.50
+
+        if (p >= 0) return { bg:`rgba(16,185,129,${alpha})`, cls:"hmGreen" };
+        return { bg:`rgba(239,68,68,${alpha})`, cls:"hmRed" };
+    }
+
+    function render(rows){
+        const metric = metricSel?.value || "change";
+        const q = String(search?.value || "").trim().toUpperCase();
+
+        const list = (rows || [])
+            .filter(r => !q || String(r.symbol || "").includes(q))
+            .slice(0, LIMIT);
+
+        if (!list.length){
+            grid.innerHTML = "";
+            setMsg("No matches.");
+            return;
+        }
+
+        grid.innerHTML = list.map(r => {
+            const sym = String(r.symbol || "");
+            const base = sym.replace("USDT","");
+
+            const change = Number(r.priceChangePercent);
+            const vol = Number(r.quoteVolume);
+
+            const c = colorForChange(change);
+
+            const badge =
+                metric === "volume"
+                    ? `Vol ${esc(fmtK(vol))}`
+                    : (isFinite(change) ? `${change.toFixed(2)}%` : "-");
+
+            const meta =
+                metric === "volume"
+                    ? (isFinite(change) ? `${change.toFixed(2)}% • 24h` : "24h")
+                    : `Vol ${esc(fmtK(vol))}`;
+
+            return `
+        <div class="hmTile ${c.cls}" style="background:${c.bg}">
+          <div class="hmTop">
+            <div class="hmSym">${esc(base)}</div>
+            <div class="hmBadge">${esc(badge)}</div>
+          </div>
+          <div class="hmMeta">${esc(meta)}</div>
+        </div>
+      `;
+        }).join("");
+
+        const now = new Date();
+        setMsg(`✅ Heatmap JS loaded • Updated ${now.toLocaleTimeString("tr-TR")}`);
+    }
+
     async function fetch24h(){
         const r = await fetch(REST_24H, { headers: { accept: "application/json" }});
-        if (!r.ok) throw new Error(`Binance ${r.status}`);
+        if (!r.ok) throw new Error(`Binance REST ${r.status}`);
         return r.json();
     }
 
-    // intensity mapping like TV: clamp around 0..1.2%
-    function cellStyle(v){
-        const x = Number(v);
-        if (!isFinite(x)) return { bg:"rgba(255,255,255,.04)", color:"#fff" };
-
-        // intensity: 0..1 from abs value (cap 1.2)
-        const cap = 1.2;
-        const t = Math.min(Math.abs(x), cap) / cap;  // 0..1
-        const alpha = 0.08 + t * 0.55;               // 0.08..0.63
-
-        if (x >= 0) return { bg:`rgba(16,185,129,${alpha})`, color:"#071a12" };
-        return { bg:`rgba(239,68,68,${alpha})`, color:"#1a0609" };
-    }
-
     function pickUniverse(all){
-        const u = uniSel?.value || "majors";
+        const u = uniSel?.value || "top_volume";
+
         const rows = (all || [])
             .filter(x => isUsdtSpot(x?.symbol))
             .map(x => ({
-                sym: String(x.symbol || ""),
-                chg: Number(x.priceChangePercent),
-                vol: Number(x.quoteVolume),
+                symbol: String(x.symbol || ""),
+                priceChangePercent: Number(x.priceChangePercent),
+                quoteVolume: Number(x.quoteVolume),
             }));
 
-        if (u === "top_volume"){
-            return rows
-                .sort((a,b) => (b.vol||0) - (a.vol||0))
-                .slice(0, LIMIT_TOPVOL)
-                .map(x => x.sym);
+        if (u === "top_mcap_like"){
+            const set = new Set(MAJORS);
+            const majors = rows.filter(r => set.has(r.symbol));
+            if (majors.length >= LIMIT) return majors.slice(0, LIMIT);
+
+            const rest = rows
+                .filter(r => !set.has(r.symbol))
+                .sort((a,b)=> (b.quoteVolume||0) - (a.quoteVolume||0));
+
+            return majors.concat(rest).slice(0, LIMIT);
         }
 
-        return [...MAJORS];
-    }
-
-    function renderMatrix(symbols, changeMap){
-        const bases = symbols.map(s => s.replace("USDT",""));
-
-        let thead = `<thead><tr>`;
-        thead += `<th class="fxCorner"> </th>`;
-        for (const b of bases){
-            thead += `<th>${esc(b)}</th>`;
-        }
-        thead += `</tr></thead>`;
-
-        let tbody = `<tbody>`;
-        for (let i=0; i<bases.length; i++){
-            const rowSym = symbols[i];
-            const rowBase = bases[i];
-            const rowChg = changeMap.get(rowSym);
-
-            tbody += `<tr>`;
-            tbody += `<th class="fxRowHead">${esc(rowBase)}</th>`;
-
-            for (let j=0; j<bases.length; j++){
-                if (i === j){
-                    tbody += `<td class="fxDiag">—</td>`;
-                    continue;
-                }
-
-                const colSym = symbols[j];
-                const colChg = changeMap.get(colSym);
-
-                // strength difference
-                const v = (Number(rowChg) - Number(colChg));
-                const ok = isFinite(v);
-                const txt = ok ? (v > 0 ? `+${v.toFixed(2)}%` : `${v.toFixed(2)}%`) : "-";
-
-                const st = cellStyle(v);
-                tbody += `<td class="fxCell" style="background:${st.bg}; color:${st.color};">${esc(txt)}</td>`;
-            }
-
-            tbody += `</tr>`;
-        }
-        tbody += `</tbody>`;
-
-        wrap.innerHTML = `<table class="fxHeatTable">${thead}${tbody}</table>`;
+        return rows
+            .sort((a,b)=> (b.quoteVolume||0) - (a.quoteVolume||0))
+            .slice(0, LIMIT);
     }
 
     async function load(){
         try{
-            setMsg("");
             const all = await fetch24h();
-
-            const symbols = pickUniverse(all);
-
-            const map = new Map();
-            for (const x of all || []){
-                const sym = String(x?.symbol || "");
-                if (!symbols.includes(sym)) continue;
-                map.set(sym, Number(x?.priceChangePercent));
-            }
-
-            // eksik varsa 0 yazma, hücrede - çıkmasın
-            const missing = symbols.filter(s => !map.has(s));
-            if (missing.length){
-                console.warn("Missing symbols:", missing);
-            }
-
-            renderMatrix(symbols, map);
-
-            const now = new Date();
-            setMsg(`Updated: ${now.toLocaleString("tr-TR", { timeStyle:"short", dateStyle:"short" })}`);
+            lastRows = pickUniverse(all);
+            render(lastRows);
         }catch(e){
-            console.error(e);
-            wrap.innerHTML = "";
-            setMsg("Heatmap unavailable");
+            console.error("❌ heatmap failed:", e);
+            grid.innerHTML = "";
+            setMsg("❌ Heatmap failed: " + (e?.message || "unknown"));
         }
     }
 
@@ -168,7 +174,9 @@
         timer = null;
     }
 
+    metricSel?.addEventListener("change", () => render(lastRows));
     uniSel?.addEventListener("change", () => start());
+    search?.addEventListener("input", () => render(lastRows));
 
     document.addEventListener("visibilitychange", () => {
         if (document.hidden) stop();
