@@ -4,44 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Login | Social Market</title>
-
-    <link rel="stylesheet" href="/styles/variables.css">
-    <link rel="stylesheet" href="/styles/base.css">
-    <link rel="stylesheet" href="/styles/layout.css">
-
-    <style>
-        .btnRow{display:flex;gap:10px;margin-top:10px}
-        .btnRow .btn{width:50%}
-    </style>
+    <link rel="stylesheet" href="/auth/auth.css?v=1">
 </head>
 
 <body>
-<main class="container" style="max-width:420px;margin-top:80px">
-    <h1 style="font-weight:900;margin-bottom:8px">Welcome 👋</h1>
-    <p style="margin-bottom:24px;color:var(--muted)">Login or create your account</p>
+<main class="authCenter">
+    <h1>Welcome 👋</h1>
+    <p class="muted">Login or create your account</p>
 
-    <form id="authForm" class="soft" style="padding:20px" autocomplete="on">
-        <input id="email" type="email" placeholder="Email" required
-               style="width:100%;margin-bottom:12px;padding:12px">
+    <div class="authTabs">
+        <button type="button" class="authTab active" id="tabLogin">Login</button>
+        <button type="button" class="authTab" id="tabRegister">Register</button>
+    </div>
 
-        <input id="password" type="password" placeholder="Password" required
-               style="width:100%;margin-bottom:6px;padding:12px">
+    <form id="authForm" class="soft" autocomplete="on">
+        <input id="email" type="email" placeholder="Email" required>
+        <input id="password" type="password" placeholder="Password" required>
 
         <div class="btnRow">
-            <button class="btn primary" id="loginBtn" type="button">Login</button>
-            <button class="btn" id="registerBtn" type="button">Register</button>
+            <button class="btn primary" id="submitBtn" type="button">Login</button>
         </div>
 
-        <p id="msg" style="margin-top:12px;color:var(--muted);font-weight:800;"></p>
+        <p id="msg" class="msg"></p>
     </form>
 
-    <div style="margin:18px 0;text-align:center;font-weight:800;opacity:.6">OR</div>
+    <div class="orLine">OR</div>
 
-    <button id="googleBtn" class="btn" type="button" style="width:100%">
+    <button id="googleBtn" class="btn googleBtn" type="button">
         Continue with Google
     </button>
 </main>
 
-<script type="module" src="/auth/login.js"></script>
+<script type="module" src="/auth/login.js?v=1"></script>
 </body>
 </html>

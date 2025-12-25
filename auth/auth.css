@@ -1,85 +1,150 @@
-:root {
-    --bg: #0b0f1a;
-    --card: #121a2b;
-    --text: #e9eefc;
-    --muted: #9aa6c3;
-    --btn: #2a64ff;
-    --btnHover: #1f54e6;
-    --border: rgba(255,255,255,0.08);
+/* /auth/auth.css  — ONLY LOGIN/REGISTER PAGE (Social Market) */
+
+:root{
+    --bg:#0b0f1a;
+    --card: rgba(18,26,43,.92);
+    --text:#e9eefc;
+    --muted:#9aa6c3;
+    --btn:#2a64ff;
+    --btnHover:#1f54e6;
+    --border: rgba(255,255,255,0.10);
+    --shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
 
-* { box-sizing: border-box; }
-body {
-    margin: 0;
+*{ box-sizing:border-box; }
+
+body{
+    margin:0;
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    background: radial-gradient(1200px 600px at 50% 0%, rgba(42,100,255,0.25), transparent 70%),
-    var(--bg);
     color: var(--text);
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
+    min-height:100vh;
+    background:
+            radial-gradient(1200px 600px at 50% 0%, rgba(42,100,255,0.25), transparent 70%),
+            var(--bg);
 }
 
-.wrap { width: 100%; padding: 24px; }
-.card {
-    max-width: 420px;
-    margin: 0 auto;
-    background: rgba(18,26,43,0.9);
+.authCenter{
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    padding:24px;
+    gap:14px;
+}
+
+h1{
+    margin:0;
+    font-size:26px;
+    font-weight:900;
+}
+
+.muted{
+    margin:0 0 6px;
+    color: var(--muted);
+    font-weight:800;
+    text-align:center;
+}
+
+/* Tabs (Switch) */
+.authTabs{
+    width:min(420px, 100%);
+    display:flex;
+    gap:10px;
+    margin-bottom: 2px;
+}
+.authTab{
+    flex:1;
+    height:42px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+    font-weight:1000;
+    cursor:pointer;
+}
+.authTab.active{
+    background: rgba(255,255,255,0.14);
+    border-color: rgba(42,100,255,0.35);
+}
+
+/* Card */
+.soft{
+    width: min(420px, 100%);
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: 16px;
-    padding: 22px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    padding: 20px;
+    box-shadow: var(--shadow);
 }
 
-h1 { margin: 0 0 8px; font-size: 26px; }
-.muted { margin: 0 0 18px; color: var(--muted); }
-
-.btn {
-    width: 100%;
-    padding: 12px 14px;
-    border: none;
-    border-radius: 12px;
-    background: var(--btn);
-    color: white;
-    font-weight: 600;
-    cursor: pointer;
+/* Inputs */
+input{
+    width:100%;
+    padding:12px;
+    margin-bottom:12px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.12);
+    background: rgba(0,0,0,0.20);
+    color: var(--text);
+    outline:none;
 }
-.btn:hover { background: var(--btnHover); }
-
-.msg {
-    margin-top: 14px;
-    color: var(--muted);
-    min-height: 18px;
-    font-size: 14px;
-}
-
-/* ===== AUTH BUTTON (GET STARTED) ===== */
-.authBtn{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-
-    padding:10px 16px;
-    border-radius:999px;
-
-    background:#2563eb;          /* sade mavi */
-    color:#fff;
+input::placeholder{
+    color: rgba(233,238,252,0.55);
     font-weight:800;
-    font-size:13px;
-    letter-spacing:.02em;
-
-    border:none;
-    cursor:pointer;
-
-    transition: background .15s ease, transform .12s ease;
 }
 
-.authBtn:hover{
-    background:#1d4ed8;
+input:focus{
+    border-color: rgba(42,100,255,0.55);
+    box-shadow: 0 0 0 3px rgba(42,100,255,0.18);
+}
+
+/* Buttons */
+.btn{
+    height:44px;
+    border:none;
+    border-radius:12px;
+    background: rgba(255,255,255,0.10);
+    color: var(--text);
+    font-weight:900;
+    cursor:pointer;
+    transition: transform .12s ease, filter .12s ease, background .12s ease;
+}
+.btn:hover{
+    filter: brightness(.98);
     transform: translateY(-1px);
 }
+.btn:active{ transform: translateY(0); }
 
-.authBtn:active{
-    transform: translateY(0);
+.btn.primary{
+    background: var(--btn);
+    color:#fff;
+}
+.btn.primary:hover{ background: var(--btnHover); }
+
+/* Submit row */
+.btnRow{ display:flex; gap:10px; margin-top:6px; }
+.btnRow .btn{ width:100%; }
+
+/* OR line */
+.orLine{
+    margin: 4px 0;
+    text-align:center;
+    font-weight:900;
+    opacity:.65;
 }
 
+/* Message */
+.msg, #msg{
+    margin-top:12px;
+    min-height:18px;
+    color: var(--muted);
+    font-weight:800;
+    text-align:left;
+}
+
+/* Google button width fix */
+.googleBtn{
+    width: min(420px, 100%);
+    display:block;
+}
