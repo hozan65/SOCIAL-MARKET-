@@ -121,10 +121,10 @@
 html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
 
 /* =========================
-   TOP CRYPTO
-========================= */
-/* =========================
-   TOP CRYPTO FIX (ICON + SYMBOL ONLY) + 5 rows scroll
+   TOP CRYPTO (FINAL FIX)
+   - Fast icons (img) + no layout shift
+   - Smooth scroll area
+   - CSS + JS uyumlu (coinGrid / coinCard / coinIcon)
 ========================= */
 
 .topCryptoBox .dashBody{
@@ -133,13 +133,16 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     min-height:0;
 }
 
-/* Tabs daha temiz */
+/* =========================
+   Tabs
+========================= */
 .gTabs{
     display:flex;
     gap:8px;
     flex-wrap:wrap;
     margin-bottom:10px;
 }
+
 .gTab{
     padding:7px 10px;
     border-radius:999px;
@@ -150,7 +153,12 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     letter-spacing:.08em;
     cursor:pointer;
     opacity:.75;
+    user-select:none;
+    transition: .15s ease;
 }
+
+.gTab:hover{ opacity:.9; }
+
 .gTab.active{
     opacity:1;
     color: var(--brand);
@@ -158,22 +166,40 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     border-color: rgba(37,99,235,.22);
 }
 
-/* ✅ 5 satırdan sonra scroll
-   coinCard yüksekliği ~62px olduğu için ~ 5*62 + boşluklar */
+/* =========================
+   Grid + Scroll
+   Not: 2 kolon olduğu için "5 row" birebir hesaplanmaz.
+   Burada amaç: ekranda ~6-8 coin görünsün, sonrası scroll.
+========================= */
 .coinGrid{
+    /* scroll */
     overflow:auto;
-    max-height: 360px;   /* ✅ 5 satır civarı */
+    max-height: 360px;
     padding-right:6px;
 
+    /* grid */
     display:grid;
     grid-template-columns:repeat(2, minmax(0, 1fr));
     gap:10px;
 
     border-radius:16px;
-    background: transparent;     /* kutu arkasında ekstra kare olmasın */
+    background: transparent;
+    min-height:0; /* flex container içinde önemli */
 }
 
-/* kart düzgün */
+/* scrollbar (chromium) */
+.coinGrid::-webkit-scrollbar{ width:8px; }
+.coinGrid::-webkit-scrollbar-thumb{
+    background: rgba(255,255,255,.14);
+    border-radius:999px;
+}
+.coinGrid::-webkit-scrollbar-track{
+    background: transparent;
+}
+
+/* =========================
+   Card
+========================= */
 .coinCard{
     display:flex;
     align-items:center;
@@ -185,8 +211,12 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     border:1px solid var(--border);
     background: var(--card);
     box-shadow: var(--softShadow);
+
+    /* kart yüksekliği sabit -> scroll hesabı daha stabil */
+    min-height: 62px;
 }
 
+/* left */
 .coinLeft{
     display:flex;
     align-items:center;
@@ -194,46 +224,71 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     min-width:0;
 }
 
+/* ✅ coinIcon hem DIV hem IMG ile uyumlu */
 .coinIcon{
     width:28px;
     height:28px;
     border-radius:999px;
-    background: rgba(0,0,0,.06);
-    flex:0 0 auto;
+
+    /* img için */
+    display:block;
+    object-fit:cover;
+
+    /* geç gelince zıplamasın */
+    flex:0 0 28px;
+
+    /* placeholder arkaplan */
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.10);
 }
 
+/* symbol */
 .coinSymbol{
-    font-weight:1000;
+    font-weight:900;
     letter-spacing:.06em;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    max-width:90px;
+    max-width:110px;
 }
 
+/* right */
 .coinRight{
     text-align:right;
     flex:0 0 auto;
 }
 
 .coinPrice{
-    font-weight:1000;
+    font-weight:900;
     font-size:12px;
+    line-height:1.1;
 }
 
 .coinChg{
-    font-weight:1000;
+    font-weight:900;
     margin-top:4px;
     display:inline-block;
     padding:3px 8px;
     border-radius:999px;
     font-size:11px;
+    line-height:1;
+    border:1px solid transparent;
 }
 
-.chgUp{ background: rgba(0,128,0,.14); }
-.chgDown{ background: rgba(255,0,0,.14); }
+.chgUp{
+    background: rgba(16,185,129,.14);
+    border-color: rgba(16,185,129,.22);
+}
 
-/* Search footer sabit altta */
+.chgDown{
+    background: rgba(239,68,68,.14);
+    border-color: rgba(239,68,68,.22);
+}
+
+/* =========================
+   Footer (Search)
+   Search kaldırırsan bu classlar kalsa da sorun yok
+========================= */
 .cryptoFooter{
     margin-top:10px;
 }
@@ -249,6 +304,11 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     outline:none;
 }
 
+.cryptoSearch:focus{
+    border-color: rgba(37,99,235,.35);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.14);
+}
+
 .miniMsg{
     opacity:.75;
     margin-top:6px;
@@ -256,9 +316,15 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     color: var(--muted);
 }
 
-/* Mobile */
+/* =========================
+   Mobile
+========================= */
 @media (max-width:900px){
-    .coinGrid{ grid-template-columns:1fr; max-height: 320px; }
+    .coinGrid{
+        grid-template-columns:1fr;
+        max-height: 320px;
+    }
+    .coinSymbol{ max-width: 180px; }
 }
 
 

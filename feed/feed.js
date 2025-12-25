@@ -3,7 +3,6 @@
   - Supabase CDN (READ ONLY)
   - Like / Comment / Follow: Netlify Functions (Appwrite JWT)
   - News slider (Supabase news table)
-  - Top Crypto (CoinGecko public API)
 ========================= */
 
 console.log("✅ feed.js running");
@@ -32,11 +31,6 @@ const grid = document.getElementById("postsGrid");
 const msg = document.getElementById("feedMsg");
 const newsSlider = document.getElementById("feed-news-slider");
 
-const cryptoGrid = document.getElementById("cryptoGrid");
-const cryptoMsg = document.getElementById("cryptoMsg");
-const cryptoSearch = document.getElementById("cryptoSearch");
-const cryptoTabs = document.querySelectorAll(".gTab[data-tab]");
-
 // =========================
 // HELPERS
 // =========================
@@ -63,23 +57,6 @@ function formatTime(ts) {
 function formatPairs(pairs) {
     if (Array.isArray(pairs)) return pairs.join(", ");
     return String(pairs ?? "");
-}
-
-function fmtUsd(n) {
-    const x = Number(n);
-    if (!isFinite(x)) return "-";
-    if (x >= 1) {
-        return x.toLocaleString(undefined, {
-            style: "currency",
-            currency: "USD",
-            maximumFractionDigits: 2,
-        });
-    }
-    return x.toLocaleString(undefined, {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 6,
-    });
 }
 
 function shortText(s, max = 140) {
@@ -154,7 +131,7 @@ async function loadComments(postId, limit = 30) {
 }
 
 // =========================
-// RENDER POST (NEW LAYOUT)
+// RENDER POST
 // =========================
 function renderPost(row) {
     const market = esc(row.market);
@@ -171,7 +148,7 @@ function renderPost(row) {
 
     const cover = image
         ? `<a class="post-cover" href="#" data-open-post="${postId}">
-         <img class="post-img" src="${esc(image)}" alt="chart" loading="lazy">
+         <img class="post-img" src="${esc(image)}" alt="chart" loading="lazy" decoding="async">
        </a>`
         : `<div class="post-cover noimg">
          <div class="chart-placeholder">NO IMAGE</div>
@@ -227,12 +204,11 @@ function renderPost(row) {
   </article>`;
 }
 
-// open post click (şimdilik kapalı link; istersen /post/detail.html'e yönlendiririz)
+// open post click (şimdilik kapalı)
 document.addEventListener("click", (e) => {
     const a = e.target.closest("[data-open-post]");
     if (!a) return;
     e.preventDefault();
-    // location.href = `/post/post.html?id=${encodeURIComponent(a.dataset.openPost)}`
 });
 
 // =========================
@@ -252,9 +228,9 @@ async function hydrateNewPosts(justAddedRows) {
 }
 
 // =========================
-// POSTS SHOW MORE (5 by 5)
+// POSTS SHOW MORE (6 by 6)
 // =========================
-const POSTS_STEP = 6; // 2 tık daha dolu görünsün
+const POSTS_STEP = 6;
 let postsPage = 0;
 let postsBusy = false;
 let postsHasMore = true;
@@ -376,7 +352,7 @@ function renderNewsSlide(n, active = false) {
     <div class="newsSlide ${active ? "active" : ""}" data-url="${url}">
       ${
         img
-            ? `<img class="newsSlideImg" src="${img}" alt="" loading="lazy">`
+            ? `<img class="newsSlideImg" src="${img}" alt="" loading="lazy" decoding="async">`
             : `<div class="newsSlideSkeleton">NO IMAGE</div>`
     }
       <div class="newsOverlay">
@@ -431,188 +407,6 @@ document.addEventListener("click", (e) => {
 });
 
 // =========================
-// TOP CRYPTO (CoinGecko)
-// =========================
-function renderCoinCards(list){
-    if (!cryptoGrid) return;
-
-    cryptoGrid.innerHTML = (list || []).map((c) => {
-        const symRaw = String(c.symbol || "").toUpperCase();
-        const sym = esc(symRaw) || "—";
-
-        const img = esc(c.image || c.thumb || c.large || "");
-
-        const price = c.current_price != null ? fmtUsd(c.current_price) : "-";
-        const chgNum = Number(c.price_change_percentage_24h);
-        const chgText = isFinite(chgNum) ? `${chgNum.toFixed(2)}%` : "-";
-        const chgClass = !isFinite(chgNum) ? "" : (chgNum >= 0 ? "chgUp" : "chgDown");
-
-        return `
-      <div class="coinCard">
-        <div class="coinLeft">
-          ${img ? `<img class="coinIcon" src="${img}" alt="">` : `<div class="coinIcon"></div>`}
-          <div class="coinSymbol">${sym}</div>
-        </div>
-
-        <div class="coinRight">
-          <div class="coinPrice">${price}</div>
-          <div class="coinChg ${chgClass}">${chgText}</div>
-        </div>
-      </div>
-    `;
-    }).join("");
-}
-
-async function cgJson(url){
-    const key = "cg_cache_" + url;
-    const cached = localStorage.getItem(key);
-
-    if (cached) {
-        try {
-            const obj = JSON.parse(cached);
-            if (Date.now() - obj.t < 60_000) return obj.v;
-        } catch {}
-    }
-
-    const r = await fetch(url, { headers: { accept: "application/json" }});
-    if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
-    const v = await r.json();
-
-    try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), v })); } catch {}
-    return v;
-}
-
-
-
-
-function applyCryptoFilter(){
-    const q = String(cryptoSearch?.value || "").trim().toLowerCase();
-    if (!q) return drawCoins(cryptoLastList);
-
-    const filtered = cryptoLastList.filter(x => {
-        const n = String(x?.name || "").toLowerCase();
-        const s = String(x?.symbol || "").toLowerCase();
-        return n.includes(q) || s.includes(q);
-    });
-    drawCoins(filtered);
-}
-
-async function cgJson(url){
-    const r = await fetch(url, { headers: { accept: "application/json" }});
-    if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
-    return r.json();
-}
-
-async function loadTrending(){
-    if (!cryptoGrid) return;
-    setCryptoMsg("Loading trending...");
-
-    const j = await cgJson(`${CG}/search/trending`);
-    const coins = (j.coins || []).slice(0, 10);
-    const ids = coins.map(x => x?.item?.id).filter(Boolean).join(",");
-    if (!ids) { renderCoinCards([]); setCryptoMsg(""); return; }
-
-    const markets = await cgJson(`${CG}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`);
-    const map = new Map((markets || []).map(m => [m.id, m]));
-
-    const merged = coins.map(t => {
-        const id = t?.item?.id;
-        const m = map.get(id);
-        return {
-            name: t?.item?.name,
-            symbol: t?.item?.symbol,
-            image: t?.item?.large || t?.item?.thumb,
-            current_price: m?.current_price,
-            price_change_percentage_24h: m?.price_change_percentage_24h,
-        };
-    });
-
-    renderCoinCards(merged);
-    setCryptoMsg("");
-}
-
-async function loadGainers(){
-    if (!cryptoGrid) return;
-    setCryptoMsg("Loading gainers...");
-
-    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=150&page=1&sparkline=false&price_change_percentage=24h`);
-    const sorted = (j || [])
-        .filter(x => typeof x.price_change_percentage_24h === "number")
-        .sort((a,b) => b.price_change_percentage_24h - a.price_change_percentage_24h)
-        .slice(0, 10);
-
-    renderCoinCards(sorted);
-    setCryptoMsg("");
-}
-
-async function loadLosers(){
-    if (!cryptoGrid) return;
-    setCryptoMsg("Loading losers...");
-
-    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=150&page=1&sparkline=false&price_change_percentage=24h`);
-    const sorted = (j || [])
-        .filter(x => typeof x.price_change_percentage_24h === "number")
-        .sort((a,b) => a.price_change_percentage_24h - b.price_change_percentage_24h)
-        .slice(0, 10);
-
-    renderCoinCards(sorted);
-    setCryptoMsg("");
-}
-
-async function loadMeme(){
-    if (!cryptoGrid) return;
-    setCryptoMsg("Loading meme coins...");
-
-    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(MEME_IDS)}&order=market_cap_desc&per_page=20&page=1&sparkline=false&price_change_percentage=24h`);
-    renderCoinCards((j || []).slice(0, 10));
-    setCryptoMsg("");
-}
-
-async function loadVolume(){
-    if (!cryptoGrid) return;
-    setCryptoMsg("Loading top volume...");
-
-    const j = await cgJson(`${CG}/coins/markets?vs_currency=usd&order=volume_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`);
-    renderCoinCards(j || []);
-    setCryptoMsg("");
-}
-
-async function loadCryptoTab(tab){
-    cryptoActiveTab = tab;
-
-    try{
-        if (tab === "trending") return await loadTrending();
-        if (tab === "gainers") return await loadGainers();
-        if (tab === "losers") return await loadLosers();
-        if (tab === "volume") return await loadVolume();
-        if (tab === "meme") return await loadMeme();
-    } catch(e){
-        console.error("❌ crypto error:", e);
-        setCryptoMsg("Crypto unavailable");
-        if (cryptoGrid) cryptoGrid.innerHTML = "";
-    }
-}
-
-function initCryptoTabs(){
-    if (!cryptoTabs?.length) return;
-
-    cryptoTabs.forEach(btn => {
-        btn.addEventListener("click", () => {
-            cryptoTabs.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            loadCryptoTab(btn.dataset.tab);
-        });
-    });
-
-    const active = document.querySelector('.gTab[data-tab].active') || cryptoTabs[0];
-    if (active) loadCryptoTab(active.dataset.tab);
-
-    if (cryptoSearch) {
-        cryptoSearch.addEventListener("input", applyCryptoFilter);
-    }
-}
-
-// =========================
 // EVENTS (Like/Comment/Follow)
 // =========================
 document.addEventListener("click", async (e) => {
@@ -646,7 +440,7 @@ document.addEventListener("click", async (e) => {
         if (!card) return;
 
         const isOpen = card.classList.contains("isCommentsOpen");
-        document.querySelectorAll(".post-card.isCommentsOpen").forEach(x => x.classList.remove("isCommentsOpen"));
+        document.querySelectorAll(".post-card.isCommentsOpen").forEach((x) => x.classList.remove("isCommentsOpen"));
 
         if (!isOpen) {
             card.classList.add("isCommentsOpen");
@@ -654,12 +448,16 @@ document.addEventListener("click", async (e) => {
                 const list = await loadComments(postId);
                 const box = card.querySelector(`.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentsList`);
                 if (box) {
-                    box.innerHTML = list.map(c => `
+                    box.innerHTML = list
+                        .map(
+                            (c) => `
             <div class="commentItem">
               <div class="commentText">${esc(c.content)}</div>
               <div class="commentMeta">${esc(formatTime(c.created_at))}</div>
             </div>
-          `).join("");
+          `
+                        )
+                        .join("");
                     box.scrollTop = box.scrollHeight;
                 }
             } catch (err) {
@@ -706,12 +504,16 @@ document.addEventListener("submit", async (e) => {
         const list = await loadComments(postId);
         const box = card?.querySelector(`.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentsList`);
         if (box) {
-            box.innerHTML = list.map(c => `
+            box.innerHTML = list
+                .map(
+                    (c) => `
         <div class="commentItem">
           <div class="commentText">${esc(c.content)}</div>
           <div class="commentMeta">${esc(formatTime(c.created_at))}</div>
         </div>
-      `).join("");
+      `
+                )
+                .join("");
             box.scrollTop = box.scrollHeight;
         }
     } catch (err) {
@@ -726,6 +528,5 @@ document.addEventListener("submit", async (e) => {
 // =========================
 document.addEventListener("DOMContentLoaded", () => {
     loadNews();
-    initCryptoTabs();
     loadFeed(true);
 });
