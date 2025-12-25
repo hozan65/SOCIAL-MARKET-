@@ -82,6 +82,22 @@
         </div>
     </section>
 
+
+    <!-- ================= TEXT NEWS FEED (Matriks style) ================= -->
+    <section class="dashBox dashNoBox fullRow textNewsBox">
+        <div class="dashHead">
+            <h3>Forex News</h3>
+            <a class="textNewsMore" href="/news/news.html">Read more →</a>
+        </div>
+
+        <div class="dashBody">
+            <div id="textNewsGrid" class="textNewsGrid"></div>
+            <div id="textNewsEmpty" class="textNewsEmpty" style="display:none;">No news yet.</div>
+        </div>
+    </section>
+
+
+
     <!-- ================= ECON CALENDAR ================= -->
     <section class="dashBox dashNoBox fullRow econWrap">
         <div class="dashHead">
@@ -121,8 +137,13 @@
 <script type="module" src="/assets/auth-ui.js"></script>
 <script type="module" src="/assets/jwt.js"></script>
 
+<!-- Page JS -->
 <script src="/feed/feed.js"></script>
 <script src="/assets1/crypto-tabs.js"></script>
 <script src="/assets1/heatmap.js"></script>
+
+<!-- ✅ Text News Feed (Matriks-style) -->
+<script src="/assets1/text-news.js"></script>
+
 </body>
 </html>
