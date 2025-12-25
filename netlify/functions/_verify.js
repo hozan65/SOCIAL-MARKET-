@@ -1,16 +1,20 @@
-import { Client, Account } from "node-appwrite";
+// ✅ Named export: getBearer
+export function getBearer(eventOrReq) {
+    // Netlify Function event (event.headers.authorization)
+    const h1 =
+        eventOrReq?.headers?.authorization ||
+        eventOrReq?.headers?.Authorization ||
+        "";
 
-export async function verifyAppwriteUser(req) {
-    const auth = req.headers.get("authorization") || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-    if (!token) throw new Error("Login required");
+    // Fetch Request object (req.headers.get("authorization"))
+    const h2 =
+        typeof eventOrReq?.headers?.get === "function"
+            ? eventOrReq.headers.get("authorization") || eventOrReq.headers.get("Authorization") || ""
+            : "";
 
-    const aw = new Client()
-        .setEndpoint(process.env.APPWRITE_ENDPOINT)
-        .setProject(process.env.APPWRITE_PROJECT_ID)
-        .setJWT(token);
+    const header = String(h1 || h2 || "").trim();
 
-    const account = new Account(aw);
-    const user = await account.get(); // invalid token -> throws
-    return { userId: user.$id };
+    // "Bearer xxx"
+    const m = header.match(/^Bearer\s+(.+)$/i);
+    return m ? m[1].trim() : "";
 }
