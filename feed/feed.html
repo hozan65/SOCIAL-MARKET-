@@ -38,6 +38,31 @@
 
                 <div id="cryptoGrid" class="coinGrid"></div>
 
+                <div class="dashBox heatmapBox">
+                    <div class="dashHead heatmapHead">
+                        <h3>Heat Map</h3>
+
+                        <div class="heatmapControls">
+                            <select id="heatmapMetric" class="heatmapSelect">
+                                <option value="change">24h % Change</option>
+                                <option value="volume">Quote Volume</option>
+                            </select>
+
+                            <select id="heatmapUniverse" class="heatmapSelect">
+                                <option value="top_volume">Top by Volume</option>
+                                <option value="top_mcap_like">Top “Majors”</option>
+                            </select>
+
+                            <input id="heatmapSearch" class="heatmapSearch" placeholder="Search (BTC, ETH...)" />
+                        </div>
+                    </div>
+
+                    <div class="dashBody">
+                        <div id="heatmapGrid" class="heatmapGrid"></div>
+                        <div id="heatmapMsg" class="heatmapMsg"></div>
+                    </div>
+                </div>
+
             </div>
         </div>
     </section>
@@ -88,6 +113,7 @@
 
 <script src="/feed/feed.js"></script>
 <script src="/assets1/crypto-tabs.js"></script>
+<script src="/assets1/heatmap.js"></script>
 
 
 </body>
