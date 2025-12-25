@@ -1,28 +1,17 @@
-// /assets1/crypto-tabs.js
-// ✅ Realtime price via Binance WebSocket
-// ✅ Tabs: TRENDING / TOP GAINERS / TOP LOSERS / TOP VOLUME (24h stats)
-// ✅ UI: sadece icon + SYMBOL + price + % (name yok)
-// ✅ Search: BTC, ETH, SOL...
+// /assets1/crypto-tabs.js (SILENT + FAST ICONS + NO SEARCH REQUIRED)
 
 (() => {
     const grid = document.getElementById("cryptoGrid");
-    const msg = document.getElementById("cryptoMsg");
-    const search = document.getElementById("cryptoSearch");
+    const msg = document.getElementById("cryptoMsg");     // varsa kullanır (ama artık yazmayacağız)
+    const search = document.getElementById("cryptoSearch"); // SİLİNSE BİLE sorun yok
     const tabBtns = Array.from(document.querySelectorAll(".gTab[data-tab]"));
-
     if (!grid) return;
 
-    // ============ CONFIG ============
-    // Bu liste: hangi coinler gösterilsin (default/trending fallback)
-    const DEFAULT_LIST = [
-        "BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT",
-        "DOGEUSDT","ADAUSDT","AVAXUSDT","LINKUSDT","MATICUSDT"
-    ];
-
-    // Binance REST: 24h ticker listesi
+    // ====== CONFIG ======
+    const DEFAULT_LIST = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ADAUSDT","AVAXUSDT","LINKUSDT","MATICUSDT"];
     const REST_24H = "https://api.binance.com/api/v3/ticker/24hr";
 
-    // Coin iconları (istersen çoğaltırız)
+    // HIZLI çözüm: ikonlar coingecko'dan, ama lazy kapalı (daha hızlı gelir)
     const ICON = {
         BTCUSDT: "https://assets.coingecko.com/coins/images/1/large/bitcoin.png",
         ETHUSDT: "https://assets.coingecko.com/coins/images/279/large/ethereum.png",
@@ -36,7 +25,7 @@
         MATICUSDT:"https://assets.coingecko.com/coins/images/4713/large/polygon.png",
     };
 
-    // ============ HELPERS ============
+    // ====== helpers ======
     const esc = (s) =>
         String(s ?? "")
             .replaceAll("&","&amp;")
@@ -45,8 +34,6 @@
             .replaceAll('"',"&quot;")
             .replaceAll("'","&#039;");
 
-    function setMsg(t){ if (msg) msg.textContent = t || ""; }
-
     function fmtUsd(x){
         const n = Number(x);
         if (!isFinite(n)) return "-";
@@ -54,26 +41,32 @@
         return n.toLocaleString(undefined,{style:"currency",currency:"USD",maximumFractionDigits:6});
     }
 
-    // ============ STATE ============
+    // Artık ekranda "Loading/Reconnecting" istemiyorsun:
+    function setMsg(_) {
+        // istersen console'a:
+        // if (_) console.log("[crypto]", _);
+        if (msg) msg.textContent = ""; // hep boş kalsın
+    }
+
+    // ====== state ======
     let activeTab = (document.querySelector(".gTab[data-tab].active")?.dataset.tab) || "trending";
-    let activeSymbols = [...DEFAULT_LIST]; // current top 10 list
-    const state = new Map(); // SYMBOL -> { price, chg24, vol }
+    let activeSymbols = [...DEFAULT_LIST];
+    const state = new Map(); // sym -> {price, chg24, vol}
 
     let ws = null;
     let renderRaf = 0;
 
-    // ============ RENDER ============
     function render(){
-        const q = String(search?.value || "").trim().toUpperCase();
+        const q = String(search?.value || "").trim().toUpperCase(); // search yoksa ""
 
-        const html = (activeSymbols || [])
+        grid.innerHTML = (activeSymbols || [])
             .filter(sym => !q || sym.includes(q))
             .map(sym => {
                 const d = state.get(sym) || {};
                 const base = sym.replace("USDT",""); // BTC
                 const img = ICON[sym] || "";
-                const price = d.price != null ? fmtUsd(d.price) : "-";
 
+                const price = d.price != null ? fmtUsd(d.price) : "-";
                 const chgNum = Number(d.chg24);
                 const chgText = isFinite(chgNum) ? `${chgNum.toFixed(2)}%` : "-";
                 const cls = isFinite(chgNum) ? (chgNum >= 0 ? "chgUp" : "chgDown") : "";
@@ -81,9 +74,13 @@
                 return `
           <div class="coinCard">
             <div class="coinLeft">
-              ${img ? `<img class="coinIcon" src="${esc(img)}" alt="${esc(base)}" loading="lazy">` : `<div class="coinIcon"></div>`}
+              ${img
+                    ? `<img class="coinIcon" src="${esc(img)}" alt="${esc(base)}">`
+                    : `<div class="coinIcon"></div>`
+                }
               <div class="coinSymbol">${esc(base)}</div>
             </div>
+
             <div class="coinRight">
               <div class="coinPrice">${price}</div>
               <div class="coinChg ${cls}">${chgText}</div>
@@ -91,8 +88,6 @@
           </div>
         `;
             }).join("");
-
-        grid.innerHTML = html;
     }
 
     function scheduleRender(){
@@ -105,7 +100,7 @@
 
     if (search) search.addEventListener("input", render);
 
-    // ============ BINANCE REST (top lists) ============
+    // ====== REST top list ======
     async function fetch24h(){
         const r = await fetch(REST_24H, { headers: { accept: "application/json" }});
         if (!r.ok) throw new Error(`Binance REST ${r.status}`);
@@ -113,7 +108,6 @@
     }
 
     function isUsdtSpotRow(x){
-        // Sadece USDT çiftleri + leverage tokenları ele
         const sym = String(x?.symbol || "");
         if (!sym.endsWith("USDT")) return false;
         if (sym.includes("UPUSDT") || sym.includes("DOWNUSDT") || sym.includes("BULLUSDT") || sym.includes("BEARUSDT")) return false;
@@ -121,13 +115,12 @@
     }
 
     async function buildTopList(tab){
-        // tab: trending | gainers | losers | volume
-        setMsg("Loading...");
-        const list = await fetch24h();
+        setMsg(""); // sessiz
 
+        const list = await fetch24h();
         const rows = (list || []).filter(isUsdtSpotRow);
 
-        // map state basic (chg24/vol) (price WS ile daha canlı gelecek)
+        // state seed
         for (const r of rows) {
             const sym = r.symbol;
             const chg24 = Number(r.priceChangePercent);
@@ -141,42 +134,24 @@
             });
         }
 
-        let picked;
-
+        let picked = [];
         if (tab === "gainers") {
-            picked = rows
-                .filter(r => isFinite(Number(r.priceChangePercent)))
-                .sort((a,b) => Number(b.priceChangePercent) - Number(a.priceChangePercent))
-                .slice(0, 10)
-                .map(r => r.symbol);
+            picked = rows.sort((a,b)=>Number(b.priceChangePercent)-Number(a.priceChangePercent)).slice(0,10).map(r=>r.symbol);
         } else if (tab === "losers") {
-            picked = rows
-                .filter(r => isFinite(Number(r.priceChangePercent)))
-                .sort((a,b) => Number(a.priceChangePercent) - Number(b.priceChangePercent))
-                .slice(0, 10)
-                .map(r => r.symbol);
+            picked = rows.sort((a,b)=>Number(a.priceChangePercent)-Number(b.priceChangePercent)).slice(0,10).map(r=>r.symbol);
         } else if (tab === "volume") {
-            picked = rows
-                .filter(r => isFinite(Number(r.quoteVolume)))
-                .sort((a,b) => Number(b.quoteVolume) - Number(a.quoteVolume))
-                .slice(0, 10)
-                .map(r => r.symbol);
+            picked = rows.sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).slice(0,10).map(r=>r.symbol);
         } else {
-            // "trending": gerçek trending yok (CoinGecko gibi değil), fallback: marketcap yok, o yüzden volume + change mix gibi davranıyoruz
-            picked = rows
-                .filter(r => isFinite(Number(r.quoteVolume)))
-                .sort((a,b) => Number(b.quoteVolume) - Number(a.quoteVolume))
-                .slice(0, 10)
-                .map(r => r.symbol);
+            // trending fallback: volume top
+            picked = rows.sort((a,b)=>Number(b.quoteVolume)-Number(a.quoteVolume)).slice(0,10).map(r=>r.symbol);
         }
 
         activeSymbols = picked.length ? picked : [...DEFAULT_LIST];
-        setMsg("");
         render();
-        reconnectWS(); // yeni top 10 için ws yeniden bağlan
+        reconnectWS();
     }
 
-    // ============ BINANCE WS (realtime) ============
+    // ====== WS realtime ======
     function makeWsUrl(symbols){
         const streams = (symbols || []).map(s => `${String(s).toLowerCase()}@ticker`).join("/");
         return `wss://stream.binance.com:9443/stream?streams=${streams}`;
@@ -191,20 +166,15 @@
         closeWS();
         if (!activeSymbols?.length) return;
 
-        const url = makeWsUrl(activeSymbols);
+        ws = new WebSocket(makeWsUrl(activeSymbols));
 
-        setMsg("Connecting...");
-        ws = new WebSocket(url);
-
-        ws.onopen = () => setMsg("");
         ws.onmessage = (ev) => {
             try{
                 const payload = JSON.parse(ev.data);
                 const d = payload?.data;
-                const sym = String(d?.s || "").toUpperCase(); // BTCUSDT
+                const sym = String(d?.s || "").toUpperCase();
                 if (!sym) return;
 
-                // c: last price, P: 24h change percent, q: quote volume
                 const price = Number(d?.c);
                 const chg24 = Number(d?.P);
                 const vol = Number(d?.q);
@@ -220,11 +190,9 @@
             } catch {}
         };
 
-        ws.onerror = () => setMsg("Realtime error");
+        // sessiz reconnect
         ws.onclose = () => {
-            // auto reconnect
             if (document.hidden) return;
-            setMsg("Reconnecting...");
             setTimeout(() => {
                 if (!document.hidden) reconnectWS();
             }, 1200);
@@ -232,32 +200,25 @@
     }
 
     document.addEventListener("visibilitychange", () => {
-        if (document.hidden) {
-            closeWS();
-        } else {
-            reconnectWS();
-        }
+        if (document.hidden) closeWS();
+        else reconnectWS();
     });
 
-    // ============ TAB EVENTS ============
+    // tabs
     function setActiveTab(tab){
         activeTab = tab;
         tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
         buildTopList(tab).catch(err => {
             console.error(err);
-            setMsg("Crypto unavailable");
             activeSymbols = [...DEFAULT_LIST];
             render();
             reconnectWS();
         });
     }
 
-    tabBtns.forEach(btn => {
-        btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
-    });
+    tabBtns.forEach(btn => btn.addEventListener("click", () => setActiveTab(btn.dataset.tab)));
 
-    // ============ INIT ============
-    // ilk load
+    // init
     setActiveTab(activeTab);
 
 })();
