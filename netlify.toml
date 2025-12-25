@@ -1,7 +1,10 @@
 [build]
-command = "npm install"
+command = ""
 publish = "."
 
 [functions]
 directory = "netlify/functions"
 node_bundler = "esbuild"
+
+[functions."news_ingest"]
+schedule = "*/5 * * * *"
