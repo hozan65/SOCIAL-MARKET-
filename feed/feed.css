@@ -553,10 +553,10 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
 }
 
 /* =========================
-   HEAT MAP (Binance)
+   CRYPTO MATRIX HEATMAP (TV style)
 ========================= */
 
-.heatmapHead{
+.fxHeatHead{
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -564,14 +564,14 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     flex-wrap:wrap;
 }
 
-.heatmapControls{
+.fxHeatControls{
     display:flex;
     gap:8px;
+    align-items:center;
     flex-wrap:wrap;
-    align-items:center;
 }
 
-.heatmapSelect{
+.fxHeatSelect{
     height:34px;
     border-radius:12px;
     border:1px solid var(--border);
@@ -581,97 +581,81 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     outline:none;
 }
 
-.heatmapSearch{
-    height:34px;
-    width:180px;
-    border-radius:12px;
+.fxHeatWrap{
+    overflow:auto;
+    border-radius:16px;
     border:1px solid var(--border);
     background: var(--card);
-    padding:0 10px;
+    max-height: 520px;
+}
+
+/* tablo */
+.fxHeatTable{
+    border-collapse:separate;
+    border-spacing:0;
+    width:max-content;          /* yatay scroll düzgün */
+    min-width:100%;
     font-weight:900;
-    outline:none;
 }
 
-.heatmapSearch:focus,
-.heatmapSelect:focus{
-    border-color: rgba(37,99,235,.35);
-    box-shadow: 0 0 0 3px rgba(37,99,235,.14);
-}
-
-.heatmapGrid{
-    display:grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap:10px;
-    min-height: 120px;
-}
-
-@media (max-width:1200px){
-    .heatmapGrid{ grid-template-columns: repeat(5, minmax(0, 1fr)); }
-}
-@media (max-width:900px){
-    .heatmapGrid{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (max-width:520px){
-    .heatmapGrid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-.hmTile{
-    position:relative;
-    border-radius:14px;
-    border:1px solid rgba(255,255,255,.10);
-    background: rgba(255,255,255,.04);
-    padding:10px;
-    overflow:hidden;
-    box-shadow: var(--softShadow);
-    cursor:pointer;
-    transition: transform .12s ease, filter .12s ease;
-    user-select:none;
-}
-
-.hmTile:hover{
-    transform: translateY(-1px);
-    filter: brightness(1.03);
-}
-
-.hmTop{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:8px;
-    margin-bottom:6px;
-}
-
-.hmSym{
-    font-weight:1000;
-    letter-spacing:.06em;
-    font-size:12px;
+.fxHeatTable th,
+.fxHeatTable td{
+    padding:10px 12px;
+    border-bottom:1px solid rgba(255,255,255,.06);
+    border-right:1px solid rgba(255,255,255,.06);
+    text-align:center;
     white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
+    font-size:12px;
 }
 
-.hmBadge{
-    font-weight:1000;
-    font-size:11px;
-    padding:3px 8px;
-    border-radius:999px;
-    background: rgba(0,0,0,.22);
-    border:1px solid rgba(255,255,255,.14);
+/* sticky header */
+.fxHeatTable thead th{
+    position:sticky;
+    top:0;
+    z-index:3;
+    background: rgba(20,22,28,.92);
+    backdrop-filter: blur(8px);
 }
 
-.hmMeta{
-    opacity:.9;
-    font-weight:900;
-    font-size:11px;
+/* sticky first column */
+.fxHeatTable .fxRowHead{
+    position:sticky;
+    left:0;
+    z-index:2;
+    background: rgba(20,22,28,.92);
+    backdrop-filter: blur(8px);
+    text-align:left;
 }
 
-.heatmapMsg{
+/* top-left corner cell */
+.fxHeatTable .fxCorner{
+    position:sticky;
+    top:0;
+    left:0;
+    z-index:4;
+    background: rgba(20,22,28,.96);
+}
+
+/* diagonal */
+.fxDiag{
+    background: rgba(255,255,255,.04);
+    color: rgba(255,255,255,.35);
+}
+
+/* value cell */
+.fxCell{
+    border-radius:10px;
+}
+
+/* küçük meta */
+.fxHeatMsg{
     margin-top:10px;
     font-weight:900;
     opacity:.75;
     color: var(--muted);
 }
 
-/* Renkler JS inline style ile geliyor ama sınırlar burada */
-.hmGreen{ border-color: rgba(16,185,129,.30); }
-.hmRed{ border-color: rgba(239,68,68,.30); }
+/* scrollbar (chromium) */
+.fxHeatWrap::-webkit-scrollbar{ height:10px; width:10px; }
+.fxHeatWrap::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.14); border-radius:999px; }
+.fxHeatWrap::-webkit-scrollbar-track{ background: transparent; }

@@ -15,7 +15,11 @@
 <div id="headerMount"></div>
 
 <main class="container">
+
+    <!-- ================= DASH TOP ================= -->
     <section class="dash2">
+
+        <!-- NEWS -->
         <div class="dashBox dashNoBox">
             <div class="dashHead"><h3>News</h3></div>
             <div class="dashBody">
@@ -23,6 +27,7 @@
             </div>
         </div>
 
+        <!-- TOP CRYPTO -->
         <div class="dashBox dashNoBox topCryptoBox">
             <div class="dashHead">
                 <h3>Top Crypto</h3>
@@ -37,44 +42,48 @@
                 </div>
 
                 <div id="cryptoGrid" class="coinGrid"></div>
-
-                <div class="dashBox heatmapBox">
-                    <div class="dashHead heatmapHead">
-                        <h3>Heat Map</h3>
-
-                        <div class="heatmapControls">
-                            <select id="heatmapMetric" class="heatmapSelect">
-                                <option value="change">24h % Change</option>
-                                <option value="volume">Quote Volume</option>
-                            </select>
-
-                            <select id="heatmapUniverse" class="heatmapSelect">
-                                <option value="top_volume">Top by Volume</option>
-                                <option value="top_mcap_like">Top “Majors”</option>
-                            </select>
-
-                            <input id="heatmapSearch" class="heatmapSearch" placeholder="Search (BTC, ETH...)" />
-                        </div>
-                    </div>
-
-                    <div class="dashBody">
-                        <div id="heatmapGrid" class="heatmapGrid"></div>
-                        <div id="heatmapMsg" class="heatmapMsg"></div>
-                    </div>
-                </div>
-
             </div>
         </div>
+
     </section>
 
+    <!-- ================= FEED HEADER ================= -->
     <div class="feed-header">
         <h2>Market Analysis Feed</h2>
         <a class="btn primary" href="/post/post.html">New Analysis</a>
     </div>
 
+    <!-- ================= HEAT MAP (ANALYSES ALTINDA) ================= -->
+    <section class="dashBox dashNoBox heatmapBox fullRow">
+        <div class="dashHead heatmapHead">
+            <h3>Heat Map</h3>
+
+            <div class="heatmapControls">
+                <select id="heatmapMetric" class="heatmapSelect">
+                    <option value="change">24h % Change</option>
+                    <option value="volume">Quote Volume</option>
+                </select>
+
+                <select id="heatmapUniverse" class="heatmapSelect">
+                    <option value="top_volume">Top by Volume</option>
+                    <option value="top_mcap_like">Top “Majors”</option>
+                </select>
+
+                <input id="heatmapSearch" class="heatmapSearch" placeholder="Search (BTC, ETH...)" />
+            </div>
+        </div>
+
+        <div class="dashBody">
+            <div id="heatmapGrid" class="heatmapGrid"></div>
+            <div id="heatmapMsg" class="heatmapMsg"></div>
+        </div>
+    </section>
+
+    <!-- ================= POSTS ================= -->
     <section class="posts" id="postsGrid"></section>
     <p class="feedMsg" id="feedMsg"></p>
 
+    <!-- ================= ECON CALENDAR ================= -->
     <section class="dashBox dashNoBox fullRow econWrap">
         <div class="dashHead">
             <h3>Economic Calendar</h3>
@@ -102,8 +111,10 @@
             ></iframe>
         </div>
     </section>
+
 </main>
 
+<!-- ================= SCRIPTS ================= -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script src="/assets1/header.js"></script>
@@ -114,7 +125,6 @@
 <script src="/feed/feed.js"></script>
 <script src="/assets1/crypto-tabs.js"></script>
 <script src="/assets1/heatmap.js"></script>
-
 
 </body>
 </html>
