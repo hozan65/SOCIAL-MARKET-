@@ -1,226 +1,263 @@
 // /assets1/crypto-tabs.js
-// ✅ Top Crypto: CoinGecko
-// ✅ Tabs + Search + 3s refresh + 3s cache
-// ✅ Cards: ICON + SYMBOL only
-// ✅ Works with your HTML ids:
-//    #cryptoGrid, #cryptoMsg, #cryptoSearch, .gTab[data-tab]
+// ✅ Realtime price via Binance WebSocket
+// ✅ Tabs: TRENDING / TOP GAINERS / TOP LOSERS / TOP VOLUME (24h stats)
+// ✅ UI: sadece icon + SYMBOL + price + % (name yok)
+// ✅ Search: BTC, ETH, SOL...
 
 (() => {
-    const cryptoGrid = document.getElementById("cryptoGrid");
-    const cryptoMsg = document.getElementById("cryptoMsg");
-    const cryptoSearch = document.getElementById("cryptoSearch");
-    const cryptoTabs = Array.from(document.querySelectorAll(".gTab[data-tab]"));
+    const grid = document.getElementById("cryptoGrid");
+    const msg = document.getElementById("cryptoMsg");
+    const search = document.getElementById("cryptoSearch");
+    const tabBtns = Array.from(document.querySelectorAll(".gTab[data-tab]"));
 
-    if (!cryptoGrid || !cryptoTabs.length) return;
+    if (!grid) return;
 
-    const CG = "https://api.coingecko.com/api/v3";
-    const REFRESH_MS = 3000;     // ✅ 3 saniye
-    const CACHE_MS = 3000;       // ✅ 3 saniye cache
+    // ============ CONFIG ============
+    // Bu liste: hangi coinler gösterilsin (default/trending fallback)
+    const DEFAULT_LIST = [
+        "BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT",
+        "DOGEUSDT","ADAUSDT","AVAXUSDT","LINKUSDT","MATICUSDT"
+    ];
 
-    let activeTab = (document.querySelector('.gTab[data-tab].active')?.dataset.tab) || "trending";
-    let timer = null;
-    let lastList = [];          // arama filtresi için son liste
+    // Binance REST: 24h ticker listesi
+    const REST_24H = "https://api.binance.com/api/v3/ticker/24hr";
 
-    // ---------- helpers ----------
+    // Coin iconları (istersen çoğaltırız)
+    const ICON = {
+        BTCUSDT: "https://assets.coingecko.com/coins/images/1/large/bitcoin.png",
+        ETHUSDT: "https://assets.coingecko.com/coins/images/279/large/ethereum.png",
+        SOLUSDT: "https://assets.coingecko.com/coins/images/4128/large/solana.png",
+        XRPUSDT: "https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png",
+        BNBUSDT: "https://assets.coingecko.com/coins/images/825/large/bnb-icon2_2x.png",
+        DOGEUSDT:"https://assets.coingecko.com/coins/images/5/large/dogecoin.png",
+        ADAUSDT: "https://assets.coingecko.com/coins/images/975/large/cardano.png",
+        AVAXUSDT:"https://assets.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png",
+        LINKUSDT:"https://assets.coingecko.com/coins/images/877/large/chainlink-new-logo.png",
+        MATICUSDT:"https://assets.coingecko.com/coins/images/4713/large/polygon.png",
+    };
+
+    // ============ HELPERS ============
     const esc = (s) =>
         String(s ?? "")
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
+            .replaceAll("&","&amp;")
+            .replaceAll("<","&lt;")
+            .replaceAll(">","&gt;")
+            .replaceAll('"',"&quot;")
+            .replaceAll("'","&#039;");
 
-    function setCryptoMsg(t) {
-        if (cryptoMsg) cryptoMsg.textContent = t || "";
+    function setMsg(t){ if (msg) msg.textContent = t || ""; }
+
+    function fmtUsd(x){
+        const n = Number(x);
+        if (!isFinite(n)) return "-";
+        if (n >= 1) return n.toLocaleString(undefined,{style:"currency",currency:"USD",maximumFractionDigits:2});
+        return n.toLocaleString(undefined,{style:"currency",currency:"USD",maximumFractionDigits:6});
     }
 
-    function fmtUsd(n) {
-        const x = Number(n);
-        if (!isFinite(x)) return "-";
-        if (x >= 1) {
-            return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
-        }
-        return x.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 6 });
+    // ============ STATE ============
+    let activeTab = (document.querySelector(".gTab[data-tab].active")?.dataset.tab) || "trending";
+    let activeSymbols = [...DEFAULT_LIST]; // current top 10 list
+    const state = new Map(); // SYMBOL -> { price, chg24, vol }
+
+    let ws = null;
+    let renderRaf = 0;
+
+    // ============ RENDER ============
+    function render(){
+        const q = String(search?.value || "").trim().toUpperCase();
+
+        const html = (activeSymbols || [])
+            .filter(sym => !q || sym.includes(q))
+            .map(sym => {
+                const d = state.get(sym) || {};
+                const base = sym.replace("USDT",""); // BTC
+                const img = ICON[sym] || "";
+                const price = d.price != null ? fmtUsd(d.price) : "-";
+
+                const chgNum = Number(d.chg24);
+                const chgText = isFinite(chgNum) ? `${chgNum.toFixed(2)}%` : "-";
+                const cls = isFinite(chgNum) ? (chgNum >= 0 ? "chgUp" : "chgDown") : "";
+
+                return `
+          <div class="coinCard">
+            <div class="coinLeft">
+              ${img ? `<img class="coinIcon" src="${esc(img)}" alt="${esc(base)}" loading="lazy">` : `<div class="coinIcon"></div>`}
+              <div class="coinSymbol">${esc(base)}</div>
+            </div>
+            <div class="coinRight">
+              <div class="coinPrice">${price}</div>
+              <div class="coinChg ${cls}">${chgText}</div>
+            </div>
+          </div>
+        `;
+            }).join("");
+
+        grid.innerHTML = html;
     }
 
-    // ✅ 3 sn cache
-    async function cgJson(url) {
-        const key = "cg_cache_" + url;
-        const cached = localStorage.getItem(key);
-        if (cached) {
-            try {
-                const obj = JSON.parse(cached);
-                if (Date.now() - obj.t < CACHE_MS) return obj.v;
-            } catch {}
-        }
-
-        const r = await fetch(url, { headers: { accept: "application/json" } });
-        if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
-        const v = await r.json();
-
-        try { localStorage.setItem(key, JSON.stringify({ t: Date.now(), v })); } catch {}
-        return v;
+    function scheduleRender(){
+        if (renderRaf) return;
+        renderRaf = requestAnimationFrame(() => {
+            renderRaf = 0;
+            render();
+        });
     }
 
-    // ICON + SYMBOL only
-    function renderCoinCards(list) {
-        lastList = Array.isArray(list) ? list : [];
+    if (search) search.addEventListener("input", render);
 
-        const q = String(cryptoSearch?.value || "").trim().toLowerCase();
+    // ============ BINANCE REST (top lists) ============
+    async function fetch24h(){
+        const r = await fetch(REST_24H, { headers: { accept: "application/json" }});
+        if (!r.ok) throw new Error(`Binance REST ${r.status}`);
+        return r.json();
+    }
 
-        const filtered = !q
-            ? lastList
-            : lastList.filter(c => {
-                const sym = String(c.symbol || "").toLowerCase();
-                const id = String(c.id || "").toLowerCase();
-                const name = String(c.name || "").toLowerCase();
-                return sym.includes(q) || id.includes(q) || name.includes(q);
+    function isUsdtSpotRow(x){
+        // Sadece USDT çiftleri + leverage tokenları ele
+        const sym = String(x?.symbol || "");
+        if (!sym.endsWith("USDT")) return false;
+        if (sym.includes("UPUSDT") || sym.includes("DOWNUSDT") || sym.includes("BULLUSDT") || sym.includes("BEARUSDT")) return false;
+        return true;
+    }
+
+    async function buildTopList(tab){
+        // tab: trending | gainers | losers | volume
+        setMsg("Loading...");
+        const list = await fetch24h();
+
+        const rows = (list || []).filter(isUsdtSpotRow);
+
+        // map state basic (chg24/vol) (price WS ile daha canlı gelecek)
+        for (const r of rows) {
+            const sym = r.symbol;
+            const chg24 = Number(r.priceChangePercent);
+            const vol = Number(r.quoteVolume);
+            const last = Number(r.lastPrice);
+            const old = state.get(sym) || {};
+            state.set(sym, {
+                price: isFinite(old.price) ? old.price : (isFinite(last) ? last : old.price),
+                chg24: isFinite(chg24) ? chg24 : old.chg24,
+                vol: isFinite(vol) ? vol : old.vol
             });
-
-        cryptoGrid.innerHTML = filtered.map((c) => {
-            const sym = esc(String(c.symbol || "").toUpperCase()) || "—";
-            const img = esc(c.image || "");
-            const price = c.current_price != null ? fmtUsd(c.current_price) : "-";
-
-            const chgNum = Number(c.price_change_percentage_24h);
-            const chgText = isFinite(chgNum) ? `${chgNum.toFixed(2)}%` : "-";
-            const chgClass = !isFinite(chgNum) ? "" : (chgNum >= 0 ? "chgUp" : "chgDown");
-
-            return `
-        <div class="coinCard" title="${sym}">
-          <div class="coinLeft">
-            ${img ? `<img class="coinIcon" src="${img}" alt="${sym}" loading="lazy">` : `<div class="coinIcon"></div>`}
-            <div class="coinSymbol">${sym}</div>
-          </div>
-
-          <div class="coinRight">
-            <div class="coinPrice">${price}</div>
-            <div class="coinChg ${chgClass}">${chgText}</div>
-          </div>
-        </div>
-      `;
-        }).join("");
-    }
-
-    // ---------- loaders ----------
-    async function loadTrending() {
-        setCryptoMsg("Loading trending...");
-        const j = await cgJson(`${CG}/search/trending`);
-
-        const coins = (j?.coins || []).slice(0, 10);
-        const ids = coins.map(x => x?.item?.id).filter(Boolean).join(",");
-
-        if (!ids) { renderCoinCards([]); setCryptoMsg(""); return; }
-
-        const markets = await cgJson(
-            `${CG}/coins/markets?vs_currency=usd&ids=${encodeURIComponent(ids)}&order=market_cap_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`
-        );
-
-        // coins order korunur
-        const map = new Map((markets || []).map(m => [m.id, m]));
-        const merged = coins.map(t => {
-            const id = t?.item?.id;
-            const m = map.get(id) || {};
-            return {
-                id,
-                symbol: t?.item?.symbol,
-                image: t?.item?.thumb || t?.item?.large,
-                current_price: m.current_price,
-                price_change_percentage_24h: m.price_change_percentage_24h,
-            };
-        });
-
-        renderCoinCards(merged);
-        setCryptoMsg("");
-    }
-
-    async function loadGainers() {
-        setCryptoMsg("Loading gainers...");
-
-        // 200 al -> en çok artan 10 seç (daha iyi)
-        const j = await cgJson(
-            `${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=200&page=1&sparkline=false&price_change_percentage=24h`
-        );
-
-        const sorted = (j || [])
-            .filter(x => typeof x.price_change_percentage_24h === "number")
-            .sort((a, b) => b.price_change_percentage_24h - a.price_change_percentage_24h)
-            .slice(0, 10);
-
-        renderCoinCards(sorted);
-        setCryptoMsg("");
-    }
-
-    async function loadLosers() {
-        setCryptoMsg("Loading losers...");
-
-        const j = await cgJson(
-            `${CG}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=200&page=1&sparkline=false&price_change_percentage=24h`
-        );
-
-        const sorted = (j || [])
-            .filter(x => typeof x.price_change_percentage_24h === "number")
-            .sort((a, b) => a.price_change_percentage_24h - b.price_change_percentage_24h)
-            .slice(0, 10);
-
-        renderCoinCards(sorted);
-        setCryptoMsg("");
-    }
-
-    async function loadVolume() {
-        setCryptoMsg("Loading volume...");
-        const j = await cgJson(
-            `${CG}/coins/markets?vs_currency=usd&order=volume_desc&per_page=10&page=1&sparkline=false&price_change_percentage=24h`
-        );
-        renderCoinCards(j || []);
-        setCryptoMsg("");
-    }
-
-    async function loadActiveTab() {
-        try {
-            if (activeTab === "trending") return await loadTrending();
-            if (activeTab === "gainers") return await loadGainers();
-            if (activeTab === "losers")  return await loadLosers();
-            if (activeTab === "volume")  return await loadVolume();
-        } catch (e) {
-            console.error("❌ crypto error:", e);
-            setCryptoMsg("Crypto unavailable");
-            cryptoGrid.innerHTML = "";
         }
+
+        let picked;
+
+        if (tab === "gainers") {
+            picked = rows
+                .filter(r => isFinite(Number(r.priceChangePercent)))
+                .sort((a,b) => Number(b.priceChangePercent) - Number(a.priceChangePercent))
+                .slice(0, 10)
+                .map(r => r.symbol);
+        } else if (tab === "losers") {
+            picked = rows
+                .filter(r => isFinite(Number(r.priceChangePercent)))
+                .sort((a,b) => Number(a.priceChangePercent) - Number(b.priceChangePercent))
+                .slice(0, 10)
+                .map(r => r.symbol);
+        } else if (tab === "volume") {
+            picked = rows
+                .filter(r => isFinite(Number(r.quoteVolume)))
+                .sort((a,b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+                .slice(0, 10)
+                .map(r => r.symbol);
+        } else {
+            // "trending": gerçek trending yok (CoinGecko gibi değil), fallback: marketcap yok, o yüzden volume + change mix gibi davranıyoruz
+            picked = rows
+                .filter(r => isFinite(Number(r.quoteVolume)))
+                .sort((a,b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+                .slice(0, 10)
+                .map(r => r.symbol);
+        }
+
+        activeSymbols = picked.length ? picked : [...DEFAULT_LIST];
+        setMsg("");
+        render();
+        reconnectWS(); // yeni top 10 için ws yeniden bağlan
     }
 
-    // ---------- auto refresh ----------
-    function start() {
-        stop();
-        timer = setInterval(loadActiveTab, REFRESH_MS);
-    }
-    function stop() {
-        if (timer) clearInterval(timer);
-        timer = null;
+    // ============ BINANCE WS (realtime) ============
+    function makeWsUrl(symbols){
+        const streams = (symbols || []).map(s => `${String(s).toLowerCase()}@ticker`).join("/");
+        return `wss://stream.binance.com:9443/stream?streams=${streams}`;
     }
 
-    // ---------- events ----------
-    cryptoTabs.forEach(btn => {
-        btn.addEventListener("click", () => {
-            cryptoTabs.forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
-            activeTab = btn.dataset.tab || "trending";
-            loadActiveTab();
-        });
-    });
-
-    if (cryptoSearch) {
-        cryptoSearch.addEventListener("input", () => renderCoinCards(lastList));
+    function closeWS(){
+        try { ws?.close(); } catch {}
+        ws = null;
     }
 
-    // ---------- init ----------
-    loadActiveTab();
-    start();
+    function reconnectWS(){
+        closeWS();
+        if (!activeSymbols?.length) return;
 
-    // sayfa gizlenince gereksiz refresh yapma
+        const url = makeWsUrl(activeSymbols);
+
+        setMsg("Connecting...");
+        ws = new WebSocket(url);
+
+        ws.onopen = () => setMsg("");
+        ws.onmessage = (ev) => {
+            try{
+                const payload = JSON.parse(ev.data);
+                const d = payload?.data;
+                const sym = String(d?.s || "").toUpperCase(); // BTCUSDT
+                if (!sym) return;
+
+                // c: last price, P: 24h change percent, q: quote volume
+                const price = Number(d?.c);
+                const chg24 = Number(d?.P);
+                const vol = Number(d?.q);
+
+                const old = state.get(sym) || {};
+                state.set(sym, {
+                    price: isFinite(price) ? price : old.price,
+                    chg24: isFinite(chg24) ? chg24 : old.chg24,
+                    vol: isFinite(vol) ? vol : old.vol,
+                });
+
+                scheduleRender();
+            } catch {}
+        };
+
+        ws.onerror = () => setMsg("Realtime error");
+        ws.onclose = () => {
+            // auto reconnect
+            if (document.hidden) return;
+            setMsg("Reconnecting...");
+            setTimeout(() => {
+                if (!document.hidden) reconnectWS();
+            }, 1200);
+        };
+    }
+
     document.addEventListener("visibilitychange", () => {
-        if (document.hidden) stop();
-        else { loadActiveTab(); start(); }
+        if (document.hidden) {
+            closeWS();
+        } else {
+            reconnectWS();
+        }
     });
+
+    // ============ TAB EVENTS ============
+    function setActiveTab(tab){
+        activeTab = tab;
+        tabBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+        buildTopList(tab).catch(err => {
+            console.error(err);
+            setMsg("Crypto unavailable");
+            activeSymbols = [...DEFAULT_LIST];
+            render();
+            reconnectWS();
+        });
+    }
+
+    tabBtns.forEach(btn => {
+        btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+    });
+
+    // ============ INIT ============
+    // ilk load
+    setActiveTab(activeTab);
 
 })();
