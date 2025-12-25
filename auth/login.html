@@ -3,59 +3,45 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Profile | Social Market</title>
+    <title>Login | Social Market</title>
 
     <link rel="stylesheet" href="/styles/variables.css">
     <link rel="stylesheet" href="/styles/base.css">
     <link rel="stylesheet" href="/styles/layout.css">
-    <link rel="stylesheet" href="/profile/profile.css">
 
-    <!-- Supabase CDN (DB için) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        .btnRow{display:flex;gap:10px;margin-top:10px}
+        .btnRow .btn{width:50%}
+    </style>
 </head>
+
 <body>
+<main class="container" style="max-width:420px;margin-top:80px">
+    <h1 style="font-weight:900;margin-bottom:8px">Welcome 👋</h1>
+    <p style="margin-bottom:24px;color:var(--muted)">Login or create your account</p>
 
-<div id="headerMount"></div>
+    <form id="authForm" class="soft" style="padding:20px" autocomplete="on">
+        <input id="email" type="email" placeholder="Email" required
+               style="width:100%;margin-bottom:12px;padding:12px">
 
-<main class="container profilePage">
-    <section class="profileCard">
-        <div class="pTop">
-            <img id="pAvatar" class="pAvatar" alt="avatar"/>
+        <input id="password" type="password" placeholder="Password" required
+               style="width:100%;margin-bottom:6px;padding:12px">
 
-            <div class="pMid">
-                <div class="pNameRow">
-                    <h1 id="pUsername" class="pUsername">User</h1>
-                    <span id="pEmail" class="pHandle"></span>
-                </div>
-
-                <div id="pBio" class="pBio"></div>
-
-                <div class="pStats">
-                    <div class="stat">
-                        <div class="label">Followers</div>
-                        <div id="statFollowers" class="value">0</div>
-                    </div>
-                    <div class="stat">
-                        <div class="label">Following</div>
-                        <div id="statFollowing" class="value">0</div>
-                    </div>
-                    <div class="stat">
-                        <div class="label">Posts</div>
-                        <div id="statPosts" class="value">0</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="pRight">
-                <button id="logoutBtn" class="btn danger">Logout</button>
-            </div>
+        <div class="btnRow">
+            <button class="btn primary" id="loginBtn" type="button">Login</button>
+            <button class="btn" id="registerBtn" type="button">Register</button>
         </div>
-    </section>
+
+        <p id="msg" style="margin-top:12px;color:var(--muted);font-weight:800;"></p>
+    </form>
+
+    <div style="margin:18px 0;text-align:center;font-weight:800;opacity:.6">OR</div>
+
+    <button id="googleBtn" class="btn" type="button" style="width:100%">
+        Continue with Google
+    </button>
 </main>
 
-<script src="/assets1/header.js"></script>
-
-<!-- ✅ module -->
-<script type="module" src="/profile/profile.js"></script>
+<script type="module" src="/auth/login.js"></script>
 </body>
 </html>
