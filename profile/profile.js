@@ -1,5 +1,9 @@
+// /profile/profile.js  (MODULE)
 import { account } from "/assets/appwrite.js";
 
+// =========================
+// SUPABASE (CDN global)
+// =========================
 const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
 
@@ -7,6 +11,9 @@ const sb = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
+// =========================
+// DOM helpers
+// =========================
 const el = (id) => document.getElementById(id);
 
 const pAvatar = el("pAvatar");
@@ -34,80 +41,102 @@ const saveEdit = el("saveEdit");
 const postsGrid = el("postsGrid");
 const pMsg = el("pMsg");
 
+// (opsiyonel) followers/following tıklama kutuları eklersen çalışır
+const followersBox = el("followersBox");
+const followingBox = el("followingBox");
+
+// =========================
+// Utils
+// =========================
 const fmtDate = (iso) => {
     try {
         const d = new Date(iso);
-        return d.toLocaleDateString("tr-TR", { year:"numeric", month:"short", day:"2-digit" });
-    } catch { return "—"; }
+        return d.toLocaleDateString("tr-TR", { year: "numeric", month: "short", day: "2-digit" });
+    } catch {
+        return "—";
+    }
 };
 
-function initials(name){
-    const s = (name || "").trim();
+function initials(name) {
+    const s = String(name || "").trim();
     if (!s) return "SM";
-    const parts = s.split(/\s+/).slice(0,2);
-    return parts.map(x=>x[0]?.toUpperCase()).join("") || "SM";
+    const parts = s.split(/\s+/).slice(0, 2);
+    return parts.map((x) => (x[0] || "").toUpperCase()).join("") || "SM";
 }
 
-function safeUrl(u){
-    const s = (u || "").trim();
+function safeUrl(u) {
+    const s = String(u || "").trim();
     if (!s) return "";
     if (s.startsWith("http://") || s.startsWith("https://")) return s;
     return "https://" + s;
 }
 
-async function getMe(){
-    try { return await account.get(); } catch { return null; }
+// =========================
+// Auth
+// =========================
+async function getMe() {
+    try {
+        return await account.get();
+    } catch {
+        return null;
+    }
 }
 
-function getTargetUid(me){
+function getTargetUid(me) {
     const url = new URL(location.href);
     const uid = url.searchParams.get("uid");
     return uid || me?.$id || null;
 }
 
-async function loadProfileRow(userId){
+// =========================
+// Supabase reads
+// =========================
+async function loadProfileRow(userId) {
     if (!sb) return null;
     const { data, error } = await sb
         .from("profiles")
         .select("user_id, username, display_name, bio, link, avatar_url, created_at")
         .eq("user_id", userId)
         .maybeSingle();
+
     if (error) console.warn("profiles read error:", error);
     return data || null;
 }
 
-async function countPosts(userId){
+async function countPosts(userId) {
     if (!sb) return 0;
-    // ⚠️ Post tablon: analyses (sende feed bu tabloyu kullanıyordu)
     const { count, error } = await sb
         .from("analyses")
         .select("id", { count: "exact", head: true })
         .eq("author_id", userId);
+
     if (error) console.warn("post count error:", error);
     return count || 0;
 }
 
-async function countFollowers(userId){
+async function countFollowers(userId) {
     if (!sb) return 0;
     const { count, error } = await sb
         .from("follows")
         .select("follower_id", { count: "exact", head: true })
         .eq("following_id", userId);
+
     if (error) console.warn("followers count error:", error);
     return count || 0;
 }
 
-async function countFollowing(userId){
+async function countFollowing(userId) {
     if (!sb) return 0;
     const { count, error } = await sb
         .from("follows")
         .select("following_id", { count: "exact", head: true })
         .eq("follower_id", userId);
+
     if (error) console.warn("following count error:", error);
     return count || 0;
 }
 
-async function isFollowing(meId, targetId){
+async function isFollowing(meId, targetId) {
     if (!sb || !meId || !targetId) return false;
     if (meId === targetId) return false;
 
@@ -117,11 +146,12 @@ async function isFollowing(meId, targetId){
         .eq("follower_id", meId)
         .eq("following_id", targetId)
         .limit(1);
+
     if (error) console.warn("isFollowing error:", error);
     return Array.isArray(data) && data.length > 0;
 }
 
-async function loadPosts(userId){
+async function loadPosts(userId) {
     if (!sb) return [];
     const { data, error } = await sb
         .from("analyses")
@@ -129,27 +159,33 @@ async function loadPosts(userId){
         .eq("author_id", userId)
         .order("created_at", { ascending: false })
         .limit(12);
+
     if (error) console.warn("load posts error:", error);
     return data || [];
 }
 
-function renderPosts(list){
+// =========================
+// Render
+// =========================
+function renderPosts(list) {
     postsGrid.innerHTML = "";
-    if (!list?.length){
+
+    if (!list || list.length === 0) {
         pMsg.textContent = "No posts yet.";
         return;
     }
-    pMsg.textContent = "";
 
+    pMsg.textContent = "";
     const frag = document.createDocumentFragment();
-    for (const it of list){
+
+    for (const it of list) {
         const card = document.createElement("div");
         card.className = "pPost";
 
-        if (it.image_path){
+        if (it.image_path) {
             const img = document.createElement("img");
             img.className = "pPostImg";
-            img.src = it.image_path; // sende public path ise
+            img.src = it.image_path;
             img.alt = "post";
             card.appendChild(img);
         }
@@ -170,51 +206,62 @@ function renderPosts(list){
         card.appendChild(body);
         frag.appendChild(card);
     }
+
     postsGrid.appendChild(frag);
 }
 
-function setFollowUI(following){
+function setFollowUI(following) {
     followBtn.textContent = following ? "Following" : "Follow";
     followBtn.classList.toggle("primary", !following);
 }
 
-async function main(){
+// =========================
+// Main
+// =========================
+async function main() {
+    // 0) Supabase CDN var mı?
+    if (!sb) {
+        pMsg.textContent = "Supabase client not found (CDN missing).";
+        console.warn("Supabase CDN missing. Add supabase-js CDN script to profile page or global.");
+        return;
+    }
+
+    // 1) Auth
     const me = await getMe();
-    if (!me){
-        // login değilse auth sayfasına at
+    if (!me) {
         location.href = "/auth/login.html";
         return;
     }
 
     const myId = me.$id;
     const targetId = getTargetUid(me);
+    const isMe = targetId === myId;
 
-    // Profil sahibi ben miyim?
-    const isMe = (targetId === myId);
-
-    // Appwrite basic
-    const displayName = me.name || me.email?.split("@")[0] || "User";
-
-    // Supabase profile row
+    // 2) Read profile row
     const row = await loadProfileRow(targetId);
 
-    const name = isMe
-        ? (row?.display_name || me.name || displayName)
-        : (row?.display_name || row?.username || "User");
+    // 3) Basic render
+    const name =
+        row?.display_name ||
+        me?.name ||
+        me?.email?.split("@")[0] ||
+        "User";
 
     pName.textContent = name;
-    pUser.textContent = row?.username ? `@${row.username}` : `@user`;
+    pUser.textContent = row?.username ? `@${row.username}` : "@user";
     pAvatar.textContent = initials(name);
 
-    // Meta & Joined
-    const joinedIso = isMe ? me.$createdAt : (row?.created_at || me.$createdAt);
+    // meta
     pMeta.textContent = isMe ? (me.email || "") : "";
+
+    // joined
+    const joinedIso = row?.created_at || me?.$createdAt;
     joined.textContent = fmtDate(joinedIso);
 
-    // Bio & link
+    // bio/link
     pBio.textContent = row?.bio || "No bio yet.";
     const link = safeUrl(row?.link || "");
-    if (link){
+    if (link) {
         pLink.style.display = "inline-block";
         pLink.href = link;
         pLink.textContent = link.replace(/^https?:\/\//, "");
@@ -222,23 +269,23 @@ async function main(){
         pLink.style.display = "none";
     }
 
-    // Counts
-    const [pc, fc, fg] = await Promise.all([
-        countPostsuf(countPosts(targetId)),
+    // 4) Counts + posts
+    const [pc, fc, fg, posts, following] = await Promise.all([
+        countPosts(targetId),
         countFollowers(targetId),
         countFollowing(targetId),
-    ]).catch(async () => [await countPosts(targetId), await countFollowers(targetId), await countFollowing(targetId)]);
+        loadPosts(targetId),
+        isMe ? Promise.resolve(false) : isFollowing(myId, targetId),
+    ]);
 
     postCount.textContent = String(pc || 0);
     followerCount.textContent = String(fc || 0);
     followingCount.textContent = String(fg || 0);
 
-    // Posts
-    const posts = await loadPosts(targetId);
     renderPosts(posts);
 
-    // Buttons
-    if (isMe){
+    // 5) Buttons
+    if (isMe) {
         editBtn.style.display = "inline-flex";
         followBtn.style.display = "none";
         msgBtn.style.display = "none";
@@ -247,13 +294,11 @@ async function main(){
         followBtn.style.display = "inline-flex";
         msgBtn.style.display = "inline-flex";
 
-        const following = await isFollowing(myId, targetId);
         setFollowUI(following);
 
         followBtn.onclick = async () => {
-            // ⚠️ Burada insert/delete için Netlify Function öneriyorum.
-            // Şimdilik UI toggle (test).
-            const nowFollowing = (followBtn.textContent !== "Following");
+            // ⚠️ DB insert/delete için Netlify function gerekli (RLS)
+            const nowFollowing = followBtn.textContent !== "Following";
             setFollowUI(nowFollowing);
             alert("Follow/Unfollow backend için Netlify function ekleyeceğiz.");
         };
@@ -263,7 +308,7 @@ async function main(){
         };
     }
 
-    // Edit profile (bio/link)
+    // 6) Edit
     editBtn.onclick = () => {
         editWrap.style.display = "block";
         bioInput.value = row?.bio || "";
@@ -275,15 +320,15 @@ async function main(){
     };
 
     saveEdit.onclick = async () => {
-        // ⚠️ RLS nedeniyle frontend insert/update çoğu zaman hata verir.
-        // En güvenlisi: Netlify function + service_role ile upsert.
+        // ⚠️ RLS yüzünden DB update için Netlify function önerilir.
         // Şimdilik sadece UI güncellemesi:
         const newBio = (bioInput.value || "").trim();
         const newLink = (linkInput.value || "").trim();
 
         pBio.textContent = newBio || "No bio yet.";
+
         const link2 = safeUrl(newLink);
-        if (link2){
+        if (link2) {
             pLink.style.display = "inline-block";
             pLink.href = link2;
             pLink.textContent = link2.replace(/^https?:\/\//, "");
@@ -294,10 +339,15 @@ async function main(){
         editWrap.style.display = "none";
         alert("Kaydetme için Netlify function ekleyeceğiz (RLS).");
     };
-}
 
-// küçük helper (Promise.all bug önlemek için)
-function countuf(p){ return p; }
+    // 7) Followers/Following click (istersen HTML'e id ekle)
+    followersBox?.addEventListener("click", () => {
+        alert("Followers listesi: bir sonraki adım modal açacağız.");
+    });
+    followingBox?.addEventListener("click", () => {
+        alert("Following listesi: bir sonraki adım modal açacağız.");
+    });
+}
 
 main().catch((e) => {
     console.error(e);
