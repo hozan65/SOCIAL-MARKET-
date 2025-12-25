@@ -1,6 +1,6 @@
 // /auth/login.js (MODULE)
 // ✅ Appwrite login/register/google
-// ✅ After login: store sm_uid + sm_jwt (for Netlify Functions)
+// ✅ After login: store sm_uid + sm_name + sm_email + sm_jwt
 
 import { account, ID } from "/assets/appwrite.js";
 
@@ -18,24 +18,28 @@ function setMsg(t) {
 
 function getCreds() {
     const email = document.getElementById("email")?.value?.trim() || "";
-    const password = document.getElementById("password")?.value || ""; // ✅ trim yok
+    const password = document.getElementById("password")?.value || ""; // trim yok
     return { email, password };
 }
 
 form?.addEventListener("submit", (e) => e.preventDefault());
 
 async function afterLogin() {
-    // 1) get user and store uid
+    // 1) get user and store uid + name/email
     const user = await account.get();
+
     localStorage.setItem("sm_uid", user.$id);
 
+    // ✅ Profilde isim çıkması için:
+    const name = user.name || user.email?.split("@")[0] || "User";
+    localStorage.setItem("sm_name", name);
+    localStorage.setItem("sm_email", user.email || "");
+
     // 2) create/store JWT for Netlify Functions
-    // (functions use Authorization: Bearer <jwt>)
     try {
         const jwtObj = await account.createJWT();
         if (jwtObj?.jwt) localStorage.setItem("sm_jwt", jwtObj.jwt);
     } catch (e) {
-        // if jwt fails for any reason, clear so we don't use stale
         localStorage.removeItem("sm_jwt");
         throw e;
     }
@@ -107,7 +111,5 @@ registerBtn.onclick = async () => {
 googleBtn.onclick = () => {
     const success = location.origin + "/feed/feed.html";
     const failure = location.origin + "/auth/login.html";
-
-    // OAuth redirect
     account.createOAuth2Session("google", success, failure);
 };

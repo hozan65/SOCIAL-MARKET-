@@ -99,7 +99,7 @@ function renderLoggedIn(slot, user) {
 
     // Profile
     slot.querySelector("#profileBtn").onclick = () => {
-        location.href = "/profile/profile.html";
+        location.href = "../profile/index.html";
     };
 
     // Settings open/close
