@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/styles/base.css">
     <link rel="stylesheet" href="/styles/layout.css">
     <link rel="stylesheet" href="/feed/feed.css">
+    <link rel="stylesheet" href="/textnews/textnews.css">
 </head>
 
 <body>
@@ -83,18 +84,20 @@
     </section>
 
 
-    <!-- ================= TEXT NEWS FEED (Matriks style) ================= -->
-    <section class="dashBox dashNoBox fullRow textNewsBox">
+    <!-- ===== TEXT NEWS (MANUAL CSV) ===== -->
+
+    <section class="dashBox dashNoBox fullRow">
         <div class="dashHead">
-            <h3>Forex News</h3>
-            <a class="textNewsMore" href="/news/news.html">Read more →</a>
+            <h3>News</h3>
+            <a href="/textnews/textnews-list.html">All News →</a>
         </div>
 
         <div class="dashBody">
             <div id="textNewsGrid" class="textNewsGrid"></div>
-            <div id="textNewsEmpty" class="textNewsEmpty" style="display:none;">No news yet.</div>
         </div>
     </section>
+
+
 
 
 
@@ -143,7 +146,8 @@
 <script src="/assets1/heatmap.js"></script>
 
 <!-- ✅ Text News Feed (Matriks-style) -->
-<script src="/assets1/text-news.js"></script>
+<script src="/textnews/textnews-feed.js"></script>
+
 
 </body>
 </html>

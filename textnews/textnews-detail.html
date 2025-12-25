@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>News</title>
+    <link rel="stylesheet" href="/styles/variables.css">
+    <link rel="stylesheet" href="/styles/base.css">
+    <link rel="stylesheet" href="/styles/layout.css">
+    <link rel="stylesheet" href="/textnews/textnews.css">
+</head>
+<body>
+
+<div id="headerMount"></div>
+
+<main class="container">
+    <section class="dashBox dashNoBox fullRow">
+        <div class="dashHead"><h3 id="tnTitle">News</h3></div>
+        <div class="dashBody">
+            <div><b>Source:</b> <span id="tnSource"></span></div>
+            <div><b>Date:</b> <span id="tnDate"></span></div>
+            <hr>
+            <article id="tnContent" class="tnArticle"></article>
+        </div>
+    </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/assets1/header.js"></script>
+<script src="/textnews/textnews-detail.js"></script>
+</body>
+</html>
