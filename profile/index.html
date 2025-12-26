@@ -1,6 +1,3 @@
-<!-- =========================
-/profile/index.html  (FULL)
-========================= -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -8,19 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Profile | Social Market</title>
 
+    <!-- Site genel CSS -->
     <link rel="stylesheet" href="/styles/variables.css">
     <link rel="stylesheet" href="/styles/base.css">
     <link rel="stylesheet" href="/styles/layout.css">
 
+    <!-- Profile -->
     <link rel="stylesheet" href="/profile/profile.css?v=2">
 </head>
 
 <body>
+<!-- Global header mount (sende varsa) -->
 <div id="headerMount"></div>
 
 <main class="container">
-
-    <!-- ================= PROFILE CARD ================= -->
     <section class="pCard">
 
         <div class="pTop">
@@ -47,25 +45,21 @@
             <a class="pLink" id="pLink" href="#" target="_blank" rel="noreferrer" style="display:none;"></a>
         </div>
 
+        <!-- ✅ Stat’lar tıklanabilir: Followers / Following modal açar -->
         <div class="pStats">
-            <div class="stat">
+            <div class="stat" id="openPosts">
                 <div class="statNum" id="postCount">0</div>
                 <div class="statLbl">Posts</div>
             </div>
-
-            <!-- ✅ clickable -->
-            <div class="stat isClick" id="openFollowers">
+            <div class="stat isClickable" id="openFollowers" title="See followers">
                 <div class="statNum" id="followerCount">0</div>
                 <div class="statLbl">Followers</div>
             </div>
-
-            <!-- ✅ clickable -->
-            <div class="stat isClick" id="openFollowing">
+            <div class="stat isClickable" id="openFollowing" title="See following">
                 <div class="statNum" id="followingCount">0</div>
                 <div class="statLbl">Following</div>
             </div>
-
-            <div class="stat">
+            <div class="stat" id="openJoined">
                 <div class="statNum" id="joined">—</div>
                 <div class="statLbl">Joined</div>
             </div>
@@ -88,30 +82,9 @@
                 <button class="btn primary" id="saveEdit">Save</button>
             </div>
         </div>
-
-        <!-- ================= FOLLOW LIST MODAL ================= -->
-        <div class="fModal" id="fModal" style="display:none;">
-            <div class="fOverlay" id="fOverlay"></div>
-
-            <div class="fPanel" role="dialog" aria-modal="true" aria-label="Followers/Following">
-                <div class="fTopbar">
-                    <div class="fTitle" id="fTitle">Followers</div>
-                    <button class="fClose" id="fClose" type="button">✕</button>
-                </div>
-
-                <div class="fTabs" id="fTabs" style="display:none;">
-                    <button class="fTab" id="tabFollowers" type="button">Followers</button>
-                    <button class="fTab" id="tabFollowing" type="button">Following</button>
-                </div>
-
-                <div class="fList" id="fList"></div>
-                <div class="fEmpty" id="fEmpty" style="display:none;">No users</div>
-            </div>
-        </div>
-
     </section>
 
-    <!-- ================= POSTS GRID ================= -->
+    <!-- Posts grid -->
     <section class="postsSec">
         <div class="postsHead">
             <h2>Posts</h2>
@@ -120,11 +93,24 @@
         <div id="postsGrid" class="postsGrid"></div>
         <p id="pMsg" class="pMsg"></p>
     </section>
-
 </main>
+
+<!-- ✅ FOLLOW MODAL (SEKMESİZ) -->
+<div id="followModal" class="fModal" style="display:none;">
+    <div class="fBackdrop" data-close="1"></div>
+
+    <div class="fBox" role="dialog" aria-modal="true" aria-labelledby="fTitle">
+        <div class="fTop">
+            <div id="fTitle" class="fTitle">Followers</div>
+            <button class="fClose" id="fCloseBtn" type="button">✕</button>
+        </div>
+
+        <div id="fList" class="fList"></div>
+        <div id="fEmpty" class="fEmpty" style="display:none;">No users</div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script type="module" src="/profile/profile.js?v=2"></script>
-
 </body>
 </html>

@@ -1,6 +1,4 @@
-// =========================
-// /profile/profile.js (FULL)
-// =========================
+// /profile/profile.js (MODULE)
 import { account } from "/assets/appwrite.js";
 
 /* =========================
@@ -44,35 +42,21 @@ const saveEdit = $("saveEdit");
 const postsGrid = $("postsGrid");
 const pMsg = $("pMsg");
 
-/* ✅ modal DOM */
 const openFollowers = $("openFollowers");
 const openFollowing = $("openFollowing");
 
-const fModal = $("fModal");
-const fOverlay = $("fOverlay");
-const fClose = $("fClose");
+/* ===== Follow Modal (NO TABS) ===== */
+const followModal = $("followModal");
+const fCloseBtn = $("fCloseBtn");
 const fTitle = $("fTitle");
 const fList = $("fList");
 const fEmpty = $("fEmpty");
-
-const fTabs = $("fTabs");
-const tabFollowers = $("tabFollowers");
-const tabFollowing = $("tabFollowing");
 
 /* =========================
    Helpers
 ========================= */
 function setMsg(t) {
     if (pMsg) pMsg.textContent = t || "";
-}
-
-function esc(str) {
-    return String(str ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
 }
 
 function initials(name) {
@@ -90,11 +74,7 @@ function initials(name) {
 function fmtDate(iso) {
     try {
         const d = new Date(iso);
-        return d.toLocaleDateString("tr-TR", {
-            year: "numeric",
-            month: "short",
-            day: "2-digit",
-        });
+        return d.toLocaleDateString("tr-TR", { year: "numeric", month: "short", day: "2-digit" });
     } catch {
         return "—";
     }
@@ -147,7 +127,7 @@ async function countPosts(userId) {
     return count || 0;
 }
 
-// ✅ follows kolonları: follower_uid / following_uid
+// follows kolonları: follower_uid / following_uid
 async function countFollowers(userId) {
     const { count, error } = await sb
         .from("follows")
@@ -195,58 +175,54 @@ async function loadPosts(userId) {
     return data || [];
 }
 
-/* =========================
-   Follow lists (NEW)
-========================= */
-async function loadFollowerIds(targetId, limit = 200) {
+/* ===== FOLLOW LIST READS (NO TABS) ===== */
+async function listFollowers(targetId, limit = 50) {
     const { data, error } = await sb
         .from("follows")
-        .select("follower_uid")
+        .select("follower_uid, created_at")
         .eq("following_uid", targetId)
+        .order("created_at", { ascending: false })
         .limit(limit);
 
     if (error) {
-        console.warn("loadFollowerIds error:", error);
+        console.warn("listFollowers error:", error);
         return [];
     }
-    return (data || [])
-        .map((x) => String(x.follower_uid || "").trim())
-        .filter(Boolean);
+    return data || [];
 }
 
-async function loadFollowingIds(targetId, limit = 200) {
+async function listFollowing(targetId, limit = 50) {
     const { data, error } = await sb
         .from("follows")
-        .select("following_uid")
+        .select("following_uid, created_at")
         .eq("follower_uid", targetId)
+        .order("created_at", { ascending: false })
         .limit(limit);
 
     if (error) {
-        console.warn("loadFollowingIds error:", error);
+        console.warn("listFollowing error:", error);
         return [];
     }
-    return (data || [])
-        .map((x) => String(x.following_uid || "").trim())
-        .filter(Boolean);
+    return data || [];
 }
 
-/* Load profiles map for ids */
-async function loadProfilesMap(userIds) {
-    const ids = Array.from(
-        new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean))
-    );
+/**
+ * profiles hydrate
+ * table: profiles (user_id, username, avatar_url)
+ */
+const PROFILES_TABLE = "profiles";
+async function loadProfiles(userIds) {
+    const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
     if (!ids.length) return new Map();
+    if (!sb) return new Map();
 
     try {
         const { data, error } = await sb
-            .from("profiles")
-            .select("user_id, username, display_name, avatar_url")
+            .from(PROFILES_TABLE)
+            .select("user_id, username, avatar_url, display_name")
             .in("user_id", ids);
 
-        if (error) {
-            console.warn("loadProfilesMap error:", error);
-            return new Map();
-        }
+        if (error) return new Map();
 
         const m = new Map();
         (data || []).forEach((p) => {
@@ -254,8 +230,7 @@ async function loadProfilesMap(userIds) {
             if (k) m.set(k, p);
         });
         return m;
-    } catch (e) {
-        console.warn("loadProfilesMap exception:", e);
+    } catch {
         return new Map();
     }
 }
@@ -277,9 +252,10 @@ function renderPosts(list) {
     for (const it of list) {
         const card = document.createElement("div");
         card.className = "pPost";
-        card.onclick = () => {
-            location.href = `/view/view.html?id=${encodeURIComponent(it.id)}`;
-        };
+
+        card.addEventListener("click", () => {
+            window.location.href = `/view/view.html?id=${encodeURIComponent(it.id)}`;
+        });
 
         if (it.image_path) {
             const img = document.createElement("img");
@@ -310,86 +286,7 @@ function renderPosts(list) {
 }
 
 /* =========================
-   Render Follow Modal List
-========================= */
-function renderFollowList(ids, profilesMap) {
-    if (!fList) return;
-
-    fList.innerHTML = "";
-    fEmpty.style.display = ids.length ? "none" : "block";
-    if (!ids.length) return;
-
-    const frag = document.createDocumentFragment();
-
-    for (const uid of ids) {
-        const p = profilesMap?.get(uid);
-        const display =
-            (p?.display_name || "").trim() ||
-            (p?.username ? `@${p.username}` : "") ||
-            uid;
-
-        const handle = p?.username ? `@${p.username}` : uid;
-        const avatar = (p?.avatar_url || "").trim();
-        const init = initials(display);
-
-        const item = document.createElement("div");
-        item.className = "fItem";
-
-        const left = document.createElement("div");
-        left.className = "fLeft";
-
-        const av = document.createElement("div");
-        av.className = "fAv";
-        if (avatar) {
-            av.innerHTML = `<img src="${esc(avatar)}" alt="">`;
-        } else {
-            av.textContent = init.slice(0, 1);
-        }
-
-        const names = document.createElement("div");
-        names.className = "fNames";
-        names.innerHTML = `
-      <div class="fDisplay">${esc(display)}</div>
-      <div class="fHandle">${esc(handle)}</div>
-    `;
-
-        left.appendChild(av);
-        left.appendChild(names);
-
-        const go = document.createElement("a");
-        go.className = "fGo";
-        go.href = `/profile/index.html?uid=${encodeURIComponent(uid)}`;
-        go.textContent = "View";
-
-        item.appendChild(left);
-        item.appendChild(go);
-
-        frag.appendChild(item);
-    }
-
-    fList.appendChild(frag);
-}
-
-/* =========================
-   Modal open/close
-========================= */
-function openModal(title) {
-    fTitle.textContent = title;
-    fModal.style.display = "block";
-    document.body.style.overflow = "hidden";
-}
-function closeModal() {
-    fModal.style.display = "none";
-    document.body.style.overflow = "";
-}
-fOverlay?.addEventListener("click", closeModal);
-fClose?.addEventListener("click", closeModal);
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && fModal?.style.display !== "none") closeModal();
-});
-
-/* =========================
-   Call toggle_follow function
+   Toggle Follow (Netlify)
 ========================= */
 async function toggleFollow(targetUid) {
     const jwt = localStorage.getItem("sm_jwt") || "";
@@ -406,16 +303,65 @@ async function toggleFollow(targetUid) {
 
     const text = await res.text();
     let data = {};
-    try {
-        data = text ? JSON.parse(text) : {};
-    } catch {
-        data = { error: text };
-    }
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
 
-    if (!res.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
-    }
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
     return data; // { ok:true, following:true/false }
+}
+
+/* =========================
+   Follow Modal (NO TABS)
+========================= */
+function openFollowModal(title) {
+    if (!followModal) return;
+    fTitle.textContent = title;
+    fList.innerHTML = "";
+    fEmpty.style.display = "none";
+    followModal.style.display = "block";
+    document.body.style.overflow = "hidden";
+}
+
+function closeFollowModal() {
+    if (!followModal) return;
+    followModal.style.display = "none";
+    document.body.style.overflow = "";
+}
+
+function renderFollowList(userIds, profilesMap) {
+    fList.innerHTML = "";
+
+    if (!userIds.length) {
+        fEmpty.style.display = "block";
+        return;
+    }
+    fEmpty.style.display = "none";
+
+    const frag = document.createDocumentFragment();
+
+    userIds.forEach((uid) => {
+        const p = profilesMap?.get(uid);
+        const name = p?.display_name || p?.username || uid;
+        const handle = p?.username ? `@${p.username}` : uid;
+        const initialsTxt = (String(name).trim()[0] || "U").toUpperCase();
+
+        const row = document.createElement("div");
+        row.className = "fItem";
+
+        row.innerHTML = `
+      <div class="fLeft">
+        <div class="fAvatar">${initialsTxt}</div>
+        <div style="min-width:0">
+          <div class="fName">${name}</div>
+          <div class="fSub">${handle}</div>
+        </div>
+      </div>
+      <button class="fBtn" data-uid="${uid}" type="button">View</button>
+    `;
+
+        frag.appendChild(row);
+    });
+
+    fList.appendChild(frag);
 }
 
 /* =========================
@@ -436,7 +382,7 @@ async function main() {
 
     const myId = me.$id;
 
-    // ✅ URL: /profile/index.html?uid=HEDEF_UID
+    // URL: /profile/index.html?uid=HEDEF_UID
     const targetUidFromUrl = new URL(location.href).searchParams.get("uid");
     const targetId = targetUidFromUrl || myId;
     const isMe = !targetUidFromUrl || targetUidFromUrl === myId;
@@ -486,48 +432,6 @@ async function main() {
 
     renderPosts(posts);
 
-    // Followers/Following modal handlers
-    openFollowers?.addEventListener("click", async () => {
-        try {
-            openModal("Followers");
-            fTabs.style.display = "flex";
-            tabFollowers.classList.add("active");
-            tabFollowing.classList.remove("active");
-            fList.innerHTML = "";
-            fEmpty.style.display = "none";
-
-            const ids = await loadFollowerIds(targetId);
-            const map = await loadProfilesMap(ids);
-            renderFollowList(ids, map);
-        } catch (e) {
-            console.error(e);
-            fList.innerHTML = "";
-            fEmpty.style.display = "block";
-        }
-    });
-
-    openFollowing?.addEventListener("click", async () => {
-        try {
-            openModal("Following");
-            fTabs.style.display = "flex";
-            tabFollowing.classList.add("active");
-            tabFollowers.classList.remove("active");
-            fList.innerHTML = "";
-            fEmpty.style.display = "none";
-
-            const ids = await loadFollowingIds(targetId);
-            const map = await loadProfilesMap(ids);
-            renderFollowList(ids, map);
-        } catch (e) {
-            console.error(e);
-            fList.innerHTML = "";
-            fEmpty.style.display = "block";
-        }
-    });
-
-    tabFollowers?.addEventListener("click", () => openFollowers?.click());
-    tabFollowing?.addEventListener("click", () => openFollowing?.click());
-
     // Buttons show/hide
     if (isMe) {
         editBtn.style.display = "inline-flex";
@@ -560,11 +464,32 @@ async function main() {
             }
         };
 
-        msgBtn.onclick = () =>
-            alert("Message sistemi sonra (conversations/messages tabloları).");
+        msgBtn.onclick = () => alert("Message sistemi sonra.");
     }
 
-    // Edit drawer (UI)
+    // ✅ Followers click -> Followers modal (NO TABS)
+    openFollowers?.addEventListener("click", async () => {
+        openFollowModal("Followers");
+
+        const rows = await listFollowers(targetId, 50);
+        const ids = rows.map((x) => String(x.follower_uid || "").trim()).filter(Boolean);
+
+        const profiles = await loadProfiles(ids);
+        renderFollowList(ids, profiles);
+    });
+
+    // ✅ Following click -> Following modal (NO TABS)
+    openFollowing?.addEventListener("click", async () => {
+        openFollowModal("Following");
+
+        const rows = await listFollowing(targetId, 50);
+        const ids = rows.map((x) => String(x.following_uid || "").trim()).filter(Boolean);
+
+        const profiles = await loadProfiles(ids);
+        renderFollowList(ids, profiles);
+    });
+
+    // Edit drawer (şimdilik UI)
     editBtn.onclick = () => {
         editWrap.style.display = "block";
         bioInput.value = row?.bio || "";
@@ -579,6 +504,7 @@ async function main() {
         const newBio = (bioInput.value || "").trim();
         const newLink = (linkInput.value || "").trim();
 
+        // UI güncelle
         pBio.textContent = newBio || "No bio yet.";
 
         const link2 = safeUrl(newLink);
@@ -594,6 +520,23 @@ async function main() {
         alert("Bio/Link DB’ye kaydetmek için upsert_profile function ekleyeceğiz.");
     };
 }
+
+/* =========================
+   Modal Events
+========================= */
+fCloseBtn?.addEventListener("click", closeFollowModal);
+
+followModal?.addEventListener("click", (e) => {
+    if (e.target?.dataset?.close) closeFollowModal();
+});
+
+fList?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".fBtn");
+    if (!btn) return;
+    const uid = btn.dataset.uid;
+    if (!uid) return;
+    window.location.href = `/profile/index.html?uid=${encodeURIComponent(uid)}`;
+});
 
 main().catch((e) => {
     console.error(e);
