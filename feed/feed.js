@@ -4,7 +4,8 @@
   - Like / Follow: Netlify Functions (Appwrite JWT)
   - News slider (Supabase news table)
   - NEW:
-    ✅ Post click -> /view/view.html?id=POST_ID
+    ✅ Post card: TradingView-like
+    ✅ Whole card click -> /view/view.html?id=POST_ID (buttons 제외)
     ✅ Follow state hydrate on refresh (Supabase check + localStorage fallback)
 ========================= */
 
@@ -62,10 +63,26 @@ function formatPairs(pairs) {
     return String(pairs ?? "");
 }
 
-function shortText(s, max = 120) {
-    const t = String(s ?? "").trim();
-    if (t.length <= max) return t;
-    return t.slice(0, max).trim() + "…";
+// ✅ FEED’de açıklama 1 satır olacak (ellips)
+function oneLineText(s) {
+    return String(s ?? "").trim();
+}
+
+// image_path bazen full url, bazen sadece path olur
+function resolveImageUrl(image_path) {
+    const p = String(image_path ?? "").trim();
+    if (!p) return "";
+    if (p.startsWith("http://") || p.startsWith("https://")) return p;
+
+    // storage public bucket varsayımı:
+    // analyses image bucket adın farklıysa burayı değiştir
+    return `${SUPABASE_URL}/storage/v1/object/public/analysis-images/${p}`;
+}
+
+function openPost(postId) {
+    const id = String(postId || "").trim();
+    if (!id) return;
+    window.location.href = `/view/view.html?id=${encodeURIComponent(id)}`;
 }
 
 // =========================
@@ -191,12 +208,21 @@ async function isFollowingUser(targetUserId) {
 }
 
 // =========================
-// RENDER POST (TradingView-like)
+// RENDER POST (TradingView-like) ✅ senin istediğin
+// - Resim hafif oval
+// - Pair / Market / TF / Date
+// - Açıklama 1 satır + "Show more" (yazı)
+// - Like + Follow altta
+// - Feed’de comments yok
 // =========================
 function renderPost(row) {
-    const postId = esc(row.id);
-    const authorId = esc(row.author_id || "");
-    const img = esc(row.image_path || "");
+    const postIdRaw = String(row.id || "").trim();
+    const authorIdRaw = String(row.author_id || "").trim();
+
+    const postId = esc(postIdRaw);
+    const authorId = esc(authorIdRaw);
+
+    const imgUrl = resolveImageUrl(row.image_path);
     const pairsText = esc(formatPairs(row.pairs));
     const created = esc(formatTime(row.created_at));
 
@@ -204,27 +230,43 @@ function renderPost(row) {
     const category = esc(row.category || "");
     const timeframe = esc(row.timeframe || "");
 
-    const content = esc(shortText(row.content, 120));
+    const contentRaw = oneLineText(row.content);
+    const content = esc(contentRaw);
+
+    const metaLine =
+        `${market}${market && category ? " • " : ""}${category}` +
+        `${(market || category) && timeframe ? " • " : ""}${timeframe}`;
 
     return `
   <article class="tvCard" data-post-id="${postId}">
-    <a class="tvMedia" href="/view/view.html?id=${postId}" aria-label="Open post">
+    <div class="tvMedia">
       ${
-        img
-            ? `<img src="${img}" alt="" loading="lazy" decoding="async">`
+        imgUrl
+            ? `<img src="${esc(imgUrl)}" alt="" loading="lazy" decoding="async">`
             : `<div class="tvNoImg">NO IMAGE</div>`
     }
-    </a>
+    </div>
 
     <div class="tvBody">
       <div class="tvTitle">${pairsText || "PAIR"}</div>
-      <div class="tvMeta">${market}${market && category ? " • " : ""}${category}${(market||category) && timeframe ? " • " : ""}${timeframe}</div>
-      ${content ? `<div class="tvDesc">${content}</div>` : ""}
+      <div class="tvMeta">${metaLine}</div>
+
+      <div class="tvDescRow">
+        <div class="tvDesc">${content ? content : ""}</div>
+        <div class="tvMore">Show more</div>
+      </div>
+
       <div class="tvFooter">
         <div class="tvTime">${created}</div>
         <div class="tvActions">
-          <button class="likeBtn" data-post-id="${postId}" title="Like">❤️ <span class="likeCount">0</span></button>
-          <button class="followBtn ${authorId ? "" : "isDisabled"}" data-user-id="${authorId}" ${authorId ? "" : "disabled"}>${"Follow"}</button>
+          <button class="likeBtn" data-post-id="${postId}" title="Like" type="button">
+            ❤️ <span class="likeCount">0</span>
+          </button>
+
+          <button class="followBtn ${authorId ? "" : "isDisabled"}"
+            data-user-id="${authorId}"
+            ${authorId ? "" : "disabled"}
+            type="button">Follow</button>
         </div>
       </div>
     </div>
@@ -237,6 +279,7 @@ function renderPost(row) {
 async function hydrateNewPosts(justAddedRows) {
     if (!grid) return;
 
+    // like counts
     for (const r of justAddedRows) {
         try {
             const postId = String(r.id);
@@ -247,6 +290,7 @@ async function hydrateNewPosts(justAddedRows) {
         } catch {}
     }
 
+    // follow states
     for (const r of justAddedRows) {
         try {
             const authorId = String(r.author_id || "").trim();
@@ -345,6 +389,31 @@ async function loadFeedMore() {
 
         grid.insertAdjacentHTML("beforeend", rows.map(renderPost).join(""));
         await hydrateNewPosts(rows);
+
+        // ✅ card click => view (butonlar hariç)
+        // (sadece yeni eklenenler için bağlayalım)
+        for (const r of rows) {
+            const pid = String(r.id || "").trim();
+            const card = grid.querySelector(`.tvCard[data-post-id="${CSS.escape(pid)}"]`);
+            if (!card || card.__bound) continue;
+            card.__bound = true;
+
+            card.addEventListener("click", (e) => {
+                const btn = e.target.closest("button");
+                if (btn) return;
+                openPost(pid);
+            });
+
+            card.addEventListener("keydown", (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    openPost(pid);
+                }
+            });
+
+            card.tabIndex = 0;
+            card.setAttribute("role", "button");
+        }
 
         if (rows.length < POSTS_STEP) postsHasMore = false;
         else postsPage++;

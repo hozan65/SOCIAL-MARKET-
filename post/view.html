@@ -3,51 +3,74 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Post | Social Market</title>
+    <title>View | Social Market</title>
 
+    <!-- GLOBAL CSS -->
     <link rel="stylesheet" href="/styles/variables.css">
     <link rel="stylesheet" href="/styles/base.css">
     <link rel="stylesheet" href="/styles/layout.css">
 
-    <link rel="stylesheet" href="/view/view.css">
+    <!-- VIEW CSS -->
+    <link rel="stylesheet" href="/post/view.css">
 </head>
 
 <body>
+<!-- GLOBAL HEADER -->
 <div id="headerMount"></div>
 
-<main class="container">
-    <div class="viewWrap">
+<main class="container viewWrap">
+    <div id="viewMsg" class="viewMsg"></div>
 
-        <a class="backLink" href="/feed/feed.html">← Back to Feed</a>
-
-        <div id="viewMsg" class="viewMsg"></div>
-
-        <article id="postBox" class="postView"></article>
-
-        <section class="commentsSection">
-            <div class="cTop">
-                <h3>Comments</h3>
-                <div id="cCount" class="cCount"></div>
+    <article class="viewCard" id="viewCard" style="display:none;">
+        <!-- top row: user + date -->
+        <div class="viewTop">
+            <div class="who">
+                <div class="avatar" id="vAvatar">👤</div>
+                <div class="whoText">
+                    <div class="name" id="vUser">User</div>
+                    <div class="date" id="vDate">—</div>
+                </div>
             </div>
 
-            <form id="commentForm" class="cForm">
-                <input id="commentInput" class="cInput" placeholder="Write a comment..." maxlength="280">
-                <button class="cBtn" type="submit">Post</button>
+            <div class="topActions">
+                <button class="btnGhost" id="btnFollow" type="button">Follow</button>
+                <button class="btnGhost" id="btnLike" type="button">💗 <span id="likeCount">0</span></button>
+            </div>
+        </div>
+
+        <!-- image -->
+        <div class="viewImage" id="vImageWrap"></div>
+
+        <!-- meta -->
+        <div class="viewMeta" id="vMeta">—</div>
+
+        <!-- desc -->
+        <div class="viewDesc">
+            <div class="descText clamp" id="vDesc"></div>
+            <button class="showMore" id="btnMore" type="button" style="display:none;">Show more</button>
+        </div>
+
+        <!-- comments -->
+        <section class="comments">
+            <h3 class="cTitle"><span id="cCount">0</span> comment</h3>
+
+            <form class="cForm" id="cForm">
+                <textarea id="cInput" rows="3" placeholder="Leave a comment that is helpful or encouraging."></textarea>
+                <div class="cFormRow">
+                    <button class="btnPrimary" type="submit">Post</button>
+                </div>
             </form>
 
-            <div id="commentsList" class="cList"></div>
+            <div class="cList" id="cList"></div>
         </section>
-
-    </div>
+    </article>
 </main>
 
-<!-- Supabase CDN -->
+<!-- GLOBAL JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script src="/assets1/header.js"></script>
-<script type="module" src="/assets/auth-ui.js"></script>
-<script type="module" src="/assets/jwt.js"></script>
 
-<script src="/view/view.js"></script>
+<!-- VIEW JS -->
+<script src="/post/view.js"></script>
 </body>
 </html>

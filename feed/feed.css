@@ -570,124 +570,153 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
 
 
 /* =========================
-   POSTS (TradingView-like cards)
+   FEED POSTS (TradingView-like) - tvCard
 ========================= */
 
-.posts{
+#postsGrid{
     display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap:18px;
-    padding-bottom: 26px;
     align-items:start;
-    grid-auto-rows: min-content;
 }
 
+@media (max-width: 1050px){
+    #postsGrid{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px){
+    #postsGrid{ grid-template-columns: 1fr; }
+}
+
+/* card */
 .tvCard{
-    border-radius:18px;
+    background: rgba(255,255,255,.92);
+    border: 1px solid rgba(0,0,0,.08);
+    border-radius:16px;      /* hafif oval */
     overflow:hidden;
-    border:1px solid var(--border);
-    background: var(--card);
-    box-shadow: var(--softShadow);
+    box-shadow: 0 10px 30px rgba(0,0,0,.07);
+    cursor:pointer;
+    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    outline: none;
+}
+.tvCard:hover{
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px rgba(0,0,0,.10);
+    border-color: rgba(0,0,0,.12);
 }
 
+/* image */
 .tvMedia{
-    display:block;
     width:100%;
-    background: rgba(37,99,235,.06);
+    aspect-ratio: 16 / 9;
+    background: rgba(0,0,0,.04);
+    border-bottom: 1px solid rgba(0,0,0,.06);
+    position:relative;
 }
-
 .tvMedia img{
     width:100%;
-    height:320px;
+    height:100%;
     object-fit:cover;
     display:block;
 }
-
 .tvNoImg{
-    height:320px;
+    width:100%;
+    height:100%;
     display:grid;
     place-items:center;
     font-weight:1000;
-    color: var(--muted);
-    background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(15,23,42,.02));
+    opacity:.7;
 }
 
+/* body */
 .tvBody{
-    padding:12px 14px 14px;
+    padding:12px 12px 10px;
 }
 
 .tvTitle{
     font-weight:1000;
-    font-size:15px;
-    line-height:1.25;
+    font-size:14px;
+    letter-spacing:.02em;
 }
 
 .tvMeta{
-    margin-top:6px;
+    margin-top:4px;
+    opacity:.75;
     font-weight:900;
     font-size:12px;
-    opacity:.75;
 }
 
+/* desc: 1 line + show more */
+.tvDescRow{
+    margin-top:8px;
+    display:flex;
+    gap:10px;
+    align-items:center;
+}
 .tvDesc{
-    margin-top:10px;
-    font-weight:800;
+    flex:1;
+    font-weight:850;
     font-size:13px;
-    line-height:1.35;
     opacity:.92;
-
-    display:-webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space:nowrap;
     overflow:hidden;
+    text-overflow:ellipsis;
+}
+.tvMore{
+    font-weight:1000;
+    font-size:12px;
+    opacity:.85;
+    text-decoration:underline;
+    white-space:nowrap;
 }
 
+/* footer */
 .tvFooter{
-    margin-top:12px;
+    margin-top:10px;
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:12px;
+    gap:10px;
 }
 
 .tvTime{
+    opacity:.75;
     font-weight:900;
     font-size:12px;
-    opacity:.75;
 }
 
 .tvActions{
     display:flex;
-    gap:8px;
     align-items:center;
+    gap:10px;
 }
 
-.likeBtn,
-.followBtn{
-    border:1px solid var(--border);
-    background: var(--card);
-    color: var(--text);
+/* buttons */
+.likeBtn{
+    display:flex;
+    align-items:center;
+    gap:6px;
     padding:7px 10px;
     border-radius:12px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.75);
     font-weight:1000;
     cursor:pointer;
 }
+.likeBtn:disabled{ opacity:.6; cursor:not-allowed; }
 
-.likeBtn:hover,
-.followBtn:hover{
-    filter: brightness(0.98);
+.followBtn{
+    padding:7px 12px;
+    border-radius:12px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.85);
+    font-weight:1000;
+    cursor:pointer;
 }
-
 .followBtn.isFollowing{
-    color:#16a34a;
+    border-color: rgba(0,0,0,.14);
+    background: rgba(0,0,0,.06);
 }
-
 .followBtn.isDisabled{
-    opacity:.5;
+    opacity:.6;
     cursor:not-allowed;
-}
-
-/* mobile */
-@media (max-width:520px){
-    .tvMedia img{ height:55vh; }
 }
