@@ -1,4 +1,6 @@
-// /profile/profile.js (MODULE)
+// =========================
+// /profile/profile.js (FULL)
+// =========================
 import { account } from "/assets/appwrite.js";
 
 /* =========================
@@ -42,6 +44,21 @@ const saveEdit = $("saveEdit");
 const postsGrid = $("postsGrid");
 const pMsg = $("pMsg");
 
+/* ✅ modal DOM */
+const openFollowers = $("openFollowers");
+const openFollowing = $("openFollowing");
+
+const fModal = $("fModal");
+const fOverlay = $("fOverlay");
+const fClose = $("fClose");
+const fTitle = $("fTitle");
+const fList = $("fList");
+const fEmpty = $("fEmpty");
+
+const fTabs = $("fTabs");
+const tabFollowers = $("tabFollowers");
+const tabFollowing = $("tabFollowing");
+
 /* =========================
    Helpers
 ========================= */
@@ -49,20 +66,35 @@ function setMsg(t) {
     if (pMsg) pMsg.textContent = t || "";
 }
 
+function esc(str) {
+    return String(str ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
 function initials(name) {
     const s = String(name || "").trim();
     if (!s) return "SM";
-    return s
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((x) => (x[0] || "").toUpperCase())
-        .join("") || "SM";
+    return (
+        s
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((x) => (x[0] || "").toUpperCase())
+            .join("") || "SM"
+    );
 }
 
 function fmtDate(iso) {
     try {
         const d = new Date(iso);
-        return d.toLocaleDateString("tr-TR", { year: "numeric", month: "short", day: "2-digit" });
+        return d.toLocaleDateString("tr-TR", {
+            year: "numeric",
+            month: "short",
+            day: "2-digit",
+        });
     } catch {
         return "—";
     }
@@ -164,7 +196,72 @@ async function loadPosts(userId) {
 }
 
 /* =========================
-   Render
+   Follow lists (NEW)
+========================= */
+async function loadFollowerIds(targetId, limit = 200) {
+    const { data, error } = await sb
+        .from("follows")
+        .select("follower_uid")
+        .eq("following_uid", targetId)
+        .limit(limit);
+
+    if (error) {
+        console.warn("loadFollowerIds error:", error);
+        return [];
+    }
+    return (data || [])
+        .map((x) => String(x.follower_uid || "").trim())
+        .filter(Boolean);
+}
+
+async function loadFollowingIds(targetId, limit = 200) {
+    const { data, error } = await sb
+        .from("follows")
+        .select("following_uid")
+        .eq("follower_uid", targetId)
+        .limit(limit);
+
+    if (error) {
+        console.warn("loadFollowingIds error:", error);
+        return [];
+    }
+    return (data || [])
+        .map((x) => String(x.following_uid || "").trim())
+        .filter(Boolean);
+}
+
+/* Load profiles map for ids */
+async function loadProfilesMap(userIds) {
+    const ids = Array.from(
+        new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean))
+    );
+    if (!ids.length) return new Map();
+
+    try {
+        const { data, error } = await sb
+            .from("profiles")
+            .select("user_id, username, display_name, avatar_url")
+            .in("user_id", ids);
+
+        if (error) {
+            console.warn("loadProfilesMap error:", error);
+            return new Map();
+        }
+
+        const m = new Map();
+        (data || []).forEach((p) => {
+            const k = String(p.user_id || "").trim();
+            if (k) m.set(k, p);
+        });
+        return m;
+    } catch (e) {
+        console.warn("loadProfilesMap exception:", e);
+        return new Map();
+    }
+}
+
+/* =========================
+   Render Posts
 ========================= */
 function renderPosts(list) {
     postsGrid.innerHTML = "";
@@ -180,6 +277,9 @@ function renderPosts(list) {
     for (const it of list) {
         const card = document.createElement("div");
         card.className = "pPost";
+        card.onclick = () => {
+            location.href = `/view/view.html?id=${encodeURIComponent(it.id)}`;
+        };
 
         if (it.image_path) {
             const img = document.createElement("img");
@@ -210,6 +310,85 @@ function renderPosts(list) {
 }
 
 /* =========================
+   Render Follow Modal List
+========================= */
+function renderFollowList(ids, profilesMap) {
+    if (!fList) return;
+
+    fList.innerHTML = "";
+    fEmpty.style.display = ids.length ? "none" : "block";
+    if (!ids.length) return;
+
+    const frag = document.createDocumentFragment();
+
+    for (const uid of ids) {
+        const p = profilesMap?.get(uid);
+        const display =
+            (p?.display_name || "").trim() ||
+            (p?.username ? `@${p.username}` : "") ||
+            uid;
+
+        const handle = p?.username ? `@${p.username}` : uid;
+        const avatar = (p?.avatar_url || "").trim();
+        const init = initials(display);
+
+        const item = document.createElement("div");
+        item.className = "fItem";
+
+        const left = document.createElement("div");
+        left.className = "fLeft";
+
+        const av = document.createElement("div");
+        av.className = "fAv";
+        if (avatar) {
+            av.innerHTML = `<img src="${esc(avatar)}" alt="">`;
+        } else {
+            av.textContent = init.slice(0, 1);
+        }
+
+        const names = document.createElement("div");
+        names.className = "fNames";
+        names.innerHTML = `
+      <div class="fDisplay">${esc(display)}</div>
+      <div class="fHandle">${esc(handle)}</div>
+    `;
+
+        left.appendChild(av);
+        left.appendChild(names);
+
+        const go = document.createElement("a");
+        go.className = "fGo";
+        go.href = `/profile/index.html?uid=${encodeURIComponent(uid)}`;
+        go.textContent = "View";
+
+        item.appendChild(left);
+        item.appendChild(go);
+
+        frag.appendChild(item);
+    }
+
+    fList.appendChild(frag);
+}
+
+/* =========================
+   Modal open/close
+========================= */
+function openModal(title) {
+    fTitle.textContent = title;
+    fModal.style.display = "block";
+    document.body.style.overflow = "hidden";
+}
+function closeModal() {
+    fModal.style.display = "none";
+    document.body.style.overflow = "";
+}
+fOverlay?.addEventListener("click", closeModal);
+fClose?.addEventListener("click", closeModal);
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && fModal?.style.display !== "none") closeModal();
+});
+
+/* =========================
    Call toggle_follow function
 ========================= */
 async function toggleFollow(targetUid) {
@@ -227,7 +406,11 @@ async function toggleFollow(targetUid) {
 
     const text = await res.text();
     let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+    try {
+        data = text ? JSON.parse(text) : {};
+    } catch {
+        data = { error: text };
+    }
 
     if (!res.ok) {
         throw new Error(data?.error || `HTTP ${res.status}`);
@@ -303,6 +486,48 @@ async function main() {
 
     renderPosts(posts);
 
+    // Followers/Following modal handlers
+    openFollowers?.addEventListener("click", async () => {
+        try {
+            openModal("Followers");
+            fTabs.style.display = "flex";
+            tabFollowers.classList.add("active");
+            tabFollowing.classList.remove("active");
+            fList.innerHTML = "";
+            fEmpty.style.display = "none";
+
+            const ids = await loadFollowerIds(targetId);
+            const map = await loadProfilesMap(ids);
+            renderFollowList(ids, map);
+        } catch (e) {
+            console.error(e);
+            fList.innerHTML = "";
+            fEmpty.style.display = "block";
+        }
+    });
+
+    openFollowing?.addEventListener("click", async () => {
+        try {
+            openModal("Following");
+            fTabs.style.display = "flex";
+            tabFollowing.classList.add("active");
+            tabFollowers.classList.remove("active");
+            fList.innerHTML = "";
+            fEmpty.style.display = "none";
+
+            const ids = await loadFollowingIds(targetId);
+            const map = await loadProfilesMap(ids);
+            renderFollowList(ids, map);
+        } catch (e) {
+            console.error(e);
+            fList.innerHTML = "";
+            fEmpty.style.display = "block";
+        }
+    });
+
+    tabFollowers?.addEventListener("click", () => openFollowers?.click());
+    tabFollowing?.addEventListener("click", () => openFollowing?.click());
+
     // Buttons show/hide
     if (isMe) {
         editBtn.style.display = "inline-flex";
@@ -318,8 +543,6 @@ async function main() {
         followBtn.onclick = async () => {
             try {
                 followBtn.disabled = true;
-
-                // ✅ burada following_uid gönderiyoruz (EKSİK OLAN BUYDU)
                 const r = await toggleFollow(targetId);
                 setFollowUI(!!r.following);
 
@@ -337,10 +560,11 @@ async function main() {
             }
         };
 
-        msgBtn.onclick = () => alert("Message sistemi sonra (conversations/messages tabloları).");
+        msgBtn.onclick = () =>
+            alert("Message sistemi sonra (conversations/messages tabloları).");
     }
 
-    // Edit drawer (şimdilik UI; DB kaydı istersen upsert_profile function ile yaparız)
+    // Edit drawer (UI)
     editBtn.onclick = () => {
         editWrap.style.display = "block";
         bioInput.value = row?.bio || "";
@@ -355,7 +579,6 @@ async function main() {
         const newBio = (bioInput.value || "").trim();
         const newLink = (linkInput.value || "").trim();
 
-        // UI güncelle
         pBio.textContent = newBio || "No bio yet.";
 
         const link2 = safeUrl(newLink);
@@ -368,7 +591,7 @@ async function main() {
         }
 
         editWrap.style.display = "none";
-        alert("Bio/Link DB’ye kaydetmek için upsert_profile function çağrısı ekleyeceğiz.");
+        alert("Bio/Link DB’ye kaydetmek için upsert_profile function ekleyeceğiz.");
     };
 }
 

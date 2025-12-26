@@ -1,3 +1,6 @@
+<!-- =========================
+/profile/index.html  (FULL)
+========================= -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -5,20 +8,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Profile | Social Market</title>
 
-    <!-- Site genel CSS (istersen açık tema/dark) -->
     <link rel="stylesheet" href="/styles/variables.css">
     <link rel="stylesheet" href="/styles/base.css">
     <link rel="stylesheet" href="/styles/layout.css">
 
-    <!-- Profile -->
-    <link rel="stylesheet" href="/profile/profile.css?v=1">
+    <link rel="stylesheet" href="/profile/profile.css?v=2">
 </head>
 
 <body>
-<!-- Global header mount (sende varsa) -->
 <div id="headerMount"></div>
 
 <main class="container">
+
+    <!-- ================= PROFILE CARD ================= -->
     <section class="pCard">
 
         <div class="pTop">
@@ -50,14 +52,19 @@
                 <div class="statNum" id="postCount">0</div>
                 <div class="statLbl">Posts</div>
             </div>
-            <div class="stat">
+
+            <!-- ✅ clickable -->
+            <div class="stat isClick" id="openFollowers">
                 <div class="statNum" id="followerCount">0</div>
                 <div class="statLbl">Followers</div>
             </div>
-            <div class="stat">
+
+            <!-- ✅ clickable -->
+            <div class="stat isClick" id="openFollowing">
                 <div class="statNum" id="followingCount">0</div>
                 <div class="statLbl">Following</div>
             </div>
+
             <div class="stat">
                 <div class="statNum" id="joined">—</div>
                 <div class="statLbl">Joined</div>
@@ -81,19 +88,43 @@
                 <button class="btn primary" id="saveEdit">Save</button>
             </div>
         </div>
+
+        <!-- ================= FOLLOW LIST MODAL ================= -->
+        <div class="fModal" id="fModal" style="display:none;">
+            <div class="fOverlay" id="fOverlay"></div>
+
+            <div class="fPanel" role="dialog" aria-modal="true" aria-label="Followers/Following">
+                <div class="fTopbar">
+                    <div class="fTitle" id="fTitle">Followers</div>
+                    <button class="fClose" id="fClose" type="button">✕</button>
+                </div>
+
+                <div class="fTabs" id="fTabs" style="display:none;">
+                    <button class="fTab" id="tabFollowers" type="button">Followers</button>
+                    <button class="fTab" id="tabFollowing" type="button">Following</button>
+                </div>
+
+                <div class="fList" id="fList"></div>
+                <div class="fEmpty" id="fEmpty" style="display:none;">No users</div>
+            </div>
+        </div>
+
     </section>
 
-    <!-- Posts grid -->
+    <!-- ================= POSTS GRID ================= -->
     <section class="postsSec">
         <div class="postsHead">
             <h2>Posts</h2>
         </div>
+
         <div id="postsGrid" class="postsGrid"></div>
         <p id="pMsg" class="pMsg"></p>
     </section>
+
 </main>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script type="module" src="/profile/profile.js?v=1"></script>
+<script type="module" src="/profile/profile.js?v=2"></script>
 
 </body>
 </html>
