@@ -365,166 +365,6 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
     background: linear-gradient(135deg, rgba(29,78,216,.96), rgba(29,78,216,.80));
 }
 
-/* =========================
-   POSTS (senin foto style’a daha yakın)
-========================= */
-.posts{
-    display:grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap:18px;
-    padding-bottom: 26px;
-    align-items: start;
-    grid-auto-rows: min-content;
-}
-
-.post-card{
-    border-radius:18px;
-    background: var(--card);
-    border:1px solid var(--border);
-    box-shadow: var(--softShadow);
-    overflow:hidden;
-    align-self: start;
-}
-
-.post-img{
-    width:100%;
-    height:220px;
-    object-fit:cover;
-    display:block;
-    background: rgba(37,99,235,.06);
-}
-
-.chart-placeholder{
-    height:220px;
-    display:grid;
-    place-items:center;
-    background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(15,23,42,.02));
-    border-bottom: 1px solid var(--border);
-    color: var(--muted);
-    font-weight:900;
-}
-
-.post-body{
-    padding:12px 14px;
-}
-
-.tags{
-    display:flex;
-    gap:8px;
-    flex-wrap:wrap;
-    margin-bottom:10px;
-}
-.tags span{
-    font-size:12px;
-    padding:6px 10px;
-    border-radius:999px;
-    background: rgba(37,99,235,.10);
-    border: 1px solid rgba(37,99,235,.18);
-    color: var(--text);
-    font-weight:900;
-}
-
-.post-card h3{ margin:0; font-size:18px; font-weight:900; }
-.post-card p{ margin:8px 0 0; color: var(--muted); font-size:13px; }
-
-.post-meta{
-    margin-top:10px;
-    color: var(--muted);
-    font-weight:800;
-    font-size:12px;
-}
-
-/* Actions bar (foto gibi altta) */
-.post-actions{
-    display:flex;
-    gap:10px;
-    padding:12px 14px 14px;
-    border-top: 1px solid var(--border);
-}
-.post-actions button{
-    flex:1;
-    height:40px;
-    border-radius:12px;
-    border:1px solid var(--border);
-    background: var(--card);
-    color: var(--text);
-    cursor:pointer;
-    font-weight:900;
-}
-.post-actions button:hover{
-    background: rgba(37,99,235,.08);
-    border-color: rgba(37,99,235,.25);
-}
-
-.feedMsg{
-    margin: 10px 0 40px;
-    color: var(--muted);
-    font-weight: 800;
-}
-
-/* Comments drawer */
-.commentsWrap{
-    display:none;
-    margin: 0 14px 14px;
-    border:1px solid var(--border);
-    background: var(--panel);
-    border-radius:16px;
-    padding:12px;
-    box-shadow: var(--softShadow);
-}
-.post-card.isCommentsOpen .commentsWrap{ display:block; }
-.commentsList{
-    max-height:220px;
-    overflow:auto;
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    padding-right:4px;
-    margin-bottom:10px;
-}
-.commentItem{
-    border:1px solid var(--border);
-    background: var(--card);
-    border-radius:14px;
-    padding:10px;
-}
-.commentText{
-    font-size:13px;
-    font-weight:800;
-    color: var(--text);
-    line-height:1.25;
-}
-.commentMeta{
-    margin-top:6px;
-    font-size:11px;
-    font-weight:800;
-    color: var(--muted);
-}
-.commentForm{
-    display:flex;
-    gap:8px;
-    align-items:center;
-}
-.commentInput{
-    flex:1;
-    height:40px;
-    padding:0 12px;
-    border-radius:14px;
-    border:1px solid var(--border);
-    outline:none;
-    font-weight:800;
-    background: var(--card);
-    color: var(--text);
-}
-.commentSend{
-    height:40px;
-    padding:0 14px;
-    border-radius:14px;
-    border:1px solid var(--border);
-    background: var(--card);
-    font-weight:900;
-    cursor:pointer;
-}
 
 /* =========================
    ECON (arka kutu yok)
@@ -726,4 +566,262 @@ html[data-theme="dark"] .newsSlideSkeleton{ color: rgba(255,255,255,.75); }
 }
 @media (max-width: 760px){
     .textNewsGrid{ grid-template-columns: 1fr; }
+}
+
+/* =========================
+   POSTS (FULL PHOTO CARD)
+========================= */
+.posts{
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap:18px;
+    padding-bottom: 26px;
+    align-items:start;
+    grid-auto-rows: min-content;
+}
+
+/* card container */
+.post-card.post-photo{
+    border-radius:22px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--softShadow);
+    align-self:start;
+}
+
+/* full photo cover */
+.post-cover{
+    position:relative;
+    width:100%;
+    cursor:pointer;
+}
+
+.post-img{
+    width:100%;
+    height:420px;
+    object-fit:cover;
+    display:block;
+    background: rgba(37,99,235,.06);
+}
+
+/* tags INSIDE photo (top-left) */
+.post-tags{
+    position:absolute;
+    top:12px;
+    left:12px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    z-index:2;
+}
+
+.post-tags span{
+    font-size:12px;
+    padding:6px 10px;
+    border-radius:999px;
+    background: rgba(255,255,255,.92);
+    border:1px solid rgba(15,23,42,.10);
+    color: #0f172a;
+    font-weight:1000;
+    backdrop-filter: blur(10px);
+}
+
+/* overlay text inside photo (bottom) */
+.post-overlay{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    padding:14px 16px 14px;
+    z-index:2;
+    color:#fff;
+    background: linear-gradient(
+            180deg,
+            rgba(0,0,0,0) 0%,
+            rgba(0,0,0,.30) 35%,
+            rgba(0,0,0,.78) 100%
+    );
+}
+
+.post-overlay-title{
+    font-size:15px;
+    font-weight:1000;
+    line-height:1.35;
+}
+
+.post-overlay-text{
+    margin-top:6px;
+    font-size:12.5px;
+    font-weight:800;
+    opacity:.92;
+    line-height:1.35;
+    display:-webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow:hidden;
+}
+
+.post-overlay-meta{
+    margin-top:8px;
+    font-size:12px;
+    font-weight:900;
+    opacity:.85;
+}
+
+/* no image */
+.post-cover.noimg .chart-placeholder{
+    height:420px;
+    display:grid;
+    place-items:center;
+    background: linear-gradient(180deg, rgba(37,99,235,.10), rgba(15,23,42,.02));
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+    font-weight:1000;
+}
+
+/* thin action bar under photo */
+.post-actionbar{
+    display:flex;
+    align-items:center;
+    background: rgba(255,255,255,.92);
+    border-top:1px solid rgba(15,23,42,.10);
+}
+
+html[data-theme="dark"] .post-actionbar{
+    background: rgba(15,23,42,.55);
+    border-top:1px solid rgba(255,255,255,.10);
+}
+
+/* buttons */
+.post-actionbar button{
+    flex:1;
+    border:none;
+    background: transparent;
+    padding:10px 0;
+    font-weight:1000;
+    font-size:13px;
+    color: var(--text);
+    cursor:pointer;
+    transition:.18s ease;
+}
+
+.post-actionbar button:hover{
+    background: rgba(15,23,42,.06);
+}
+
+html[data-theme="dark"] .post-actionbar button:hover{
+    background: rgba(255,255,255,.07);
+}
+
+/* separators */
+.post-actionbar button + button{
+    border-left:1px solid rgba(15,23,42,.10);
+}
+html[data-theme="dark"] .post-actionbar button + button{
+    border-left:1px solid rgba(255,255,255,.10);
+}
+
+/* like count */
+.likeCount{
+    margin-left:6px;
+    font-weight:1000;
+}
+
+/* follow state (green) */
+.followBtn.isFollowing{
+    color:#16a34a;
+}
+
+/* comments drawer (aynı mantık) */
+.commentsWrap{
+    display:none;
+    margin: 12px 14px 14px;
+    border:1px solid var(--border);
+    background: var(--panel);
+    border-radius:16px;
+    padding:12px;
+    box-shadow: var(--softShadow);
+}
+.post-card.isCommentsOpen .commentsWrap{ display:block; }
+
+.cHead{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+}
+.cTitle{
+    font-weight:1000;
+}
+.cClose{
+    border:none;
+    background:transparent;
+    cursor:pointer;
+    font-weight:1000;
+    font-size:14px;
+    color: var(--text);
+}
+
+.commentsList{
+    max-height:220px;
+    overflow:auto;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    padding-right:4px;
+    margin-bottom:10px;
+}
+
+.commentItem{
+    border:1px solid var(--border);
+    background: var(--card);
+    border-radius:14px;
+    padding:10px;
+}
+.commentText{
+    font-size:13px;
+    font-weight:900;
+    color: var(--text);
+    line-height:1.25;
+}
+.commentMeta{
+    margin-top:6px;
+    font-size:11px;
+    font-weight:900;
+    color: var(--muted);
+}
+
+.commentForm{
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+
+.commentInput{
+    flex:1;
+    height:40px;
+    padding:0 12px;
+    border-radius:14px;
+    border:1px solid var(--border);
+    outline:none;
+    font-weight:900;
+    background: var(--card);
+    color: var(--text);
+}
+
+.commentSend{
+    height:40px;
+    padding:0 14px;
+    border-radius:14px;
+    border:1px solid var(--border);
+    background: var(--card);
+    font-weight:1000;
+    cursor:pointer;
+}
+
+/* responsive */
+@media (max-width:520px){
+    .post-img{ height:55vh; }
 }
