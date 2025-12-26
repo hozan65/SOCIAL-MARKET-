@@ -70,6 +70,14 @@ function getPostIdFromQuery() {
     return String(u.searchParams.get("id") || "").trim();
 }
 
+// ✅ FIX: image_path bazen storage path -> URL'e çevir
+function resolveImageUrl(image_path) {
+    const p = String(image_path ?? "").trim();
+    if (!p) return "";
+    if (p.startsWith("http://") || p.startsWith("https://")) return p;
+    return `${SUPABASE_URL}/storage/v1/object/public/analysis-images/${p}`;
+}
+
 // =========================
 // AUTH
 // =========================
@@ -185,10 +193,10 @@ async function getPostById(postId) {
         .from("analyses")
         .select("id, author_id, market, category, timeframe, content, pairs, image_path, created_at")
         .eq("id", postId)
-        .limit(1);
+        .maybeSingle();
 
     if (error) throw error;
-    return (data && data[0]) || null;
+    return data || null;
 }
 
 async function getLikeCount(postId) {
@@ -218,9 +226,6 @@ async function loadComments(postId, limit = 100) {
 /**
  * OPTIONAL profiles hydrate (fallback’lı)
  * Eğer sende profiles tablosu yoksa, user_id gösterir.
- * Eğer varsa:
- * table: profiles
- * columns: user_id, username, avatar_url
  */
 const PROFILES_TABLE = "profiles";
 async function loadProfiles(userIds) {
@@ -251,7 +256,7 @@ async function loadProfiles(userIds) {
 // RENDER
 // =========================
 function renderPostView(row, likeCount, isFollowing) {
-    const img = esc(row.image_path || "");
+    const img = esc(resolveImageUrl(row.image_path));
     const pairsText = esc(formatPairs(row.pairs));
     const created = esc(formatTime(row.created_at));
 
@@ -274,6 +279,7 @@ function renderPostView(row, likeCount, isFollowing) {
     <div class="pvHead">
       <div class="pvTitle">${pairsText || "PAIR"}</div>
       <div class="pvMeta">${market}${market && category ? " • " : ""}${category}${(market||category) && timeframe ? " • " : ""}${timeframe}</div>
+
       <div class="pvSub">
         <div class="pvAuthor">Author: <span class="pvMono">${authorId || "-"}</span></div>
         <div class="pvTime">${created}</div>
@@ -343,12 +349,17 @@ let CURRENT_POST_ID = null;
 
 async function loadAll() {
     CURRENT_POST_ID = getPostIdFromQuery();
+
     if (!CURRENT_POST_ID) {
         setMsg("❌ Missing id");
         return;
     }
     if (!sb) {
         setMsg("❌ Supabase CDN not loaded");
+        return;
+    }
+    if (!postBox) {
+        setMsg("❌ postBox not found in view.html");
         return;
     }
 
@@ -368,7 +379,7 @@ async function loadAll() {
             if (row.author_id) following = await isFollowingUser(row.author_id);
         } catch {}
 
-        if (postBox) postBox.innerHTML = renderPostView(row, likeCount, following);
+        postBox.innerHTML = renderPostView(row, likeCount, following);
 
         // expand handler
         const pvText = document.getElementById("pvText");
