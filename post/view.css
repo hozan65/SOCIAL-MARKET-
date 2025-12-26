@@ -1,0 +1,277 @@
+.postView{
+    max-width: 980px;
+    margin: 18px auto 60px;
+}
+
+.pvTop{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom: 12px;
+}
+
+.pvBack{
+    text-decoration:none;
+    font-weight: 1000;
+    color: var(--text);
+    opacity:.85;
+}
+.pvBack:hover{ opacity:1; text-decoration:underline; }
+
+.pvMsg{
+    font-weight:900;
+    opacity:.8;
+    color: var(--muted);
+}
+
+.pvCard{
+    border-radius: 22px;
+    overflow:hidden;
+    border:1px solid var(--border);
+    background: var(--card);
+    box-shadow: var(--softShadow);
+}
+
+.pvImageWrap{
+    position:relative;
+    width:100%;
+    background: rgba(37,99,235,.06);
+}
+
+.pvImage{
+    width:100%;
+    height: min(70vh, 720px);
+    object-fit: cover;
+    display:block;
+    cursor: zoom-in;
+}
+
+.pvImgSkeleton{
+    height: min(70vh, 720px);
+    display:grid;
+    place-items:center;
+    font-weight:1000;
+    opacity:.75;
+    color: var(--muted);
+}
+
+.pvBody{
+    padding: 14px 16px 6px;
+}
+
+.pvHeader{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.pvTitle{
+    font-size: 20px;
+    font-weight: 1000;
+    letter-spacing: -.01em;
+}
+
+.pvMeta{
+    font-size: 12px;
+    font-weight: 900;
+    color: var(--muted);
+}
+
+.pvAuthor{
+    margin-top: 10px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-weight: 1000;
+}
+
+.pvAvatar{
+    width:34px;
+    height:34px;
+    border-radius:999px;
+    object-fit:cover;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.08);
+    flex:0 0 34px;
+}
+
+.pvAuthorName{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:0;
+}
+.pvAuthorName strong{
+    font-size: 13px;
+    line-height:1.1;
+}
+.pvAuthorName span{
+    font-size: 12px;
+    opacity:.75;
+    font-weight:900;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.pvDescWrap{
+    margin-top: 12px;
+    border-top:1px solid rgba(0,0,0,.06);
+    padding-top: 12px;
+}
+
+html[data-theme="dark"] .pvDescWrap{
+    border-top:1px solid rgba(255,255,255,.10);
+}
+
+.pvDesc{
+    font-weight: 900;
+    line-height: 1.45;
+    color: var(--text);
+    white-space: pre-wrap;
+    max-height: 150px;
+    overflow:auto;
+    padding-right: 6px;
+}
+
+.pvMore{
+    margin-top: 10px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border:1px solid var(--border);
+    background: var(--card);
+    font-weight: 1000;
+    cursor:pointer;
+}
+
+.pvActions{
+    display:flex;
+    border-top:1px solid rgba(0,0,0,.06);
+    background: rgba(255,255,255,.92);
+}
+html[data-theme="dark"] .pvActions{
+    background: rgba(15,23,42,.55);
+    border-top:1px solid rgba(255,255,255,.10);
+}
+
+.pvBtn{
+    flex:1;
+    border:none;
+    background: transparent;
+    padding: 12px 0;
+    font-weight: 1000;
+    cursor:pointer;
+    color: var(--text);
+}
+.pvBtn + .pvBtn{
+    border-left:1px solid rgba(0,0,0,.06);
+}
+html[data-theme="dark"] .pvBtn + .pvBtn{
+    border-left:1px solid rgba(255,255,255,.10);
+}
+.pvBtn:disabled{
+    opacity:.55;
+    cursor:not-allowed;
+}
+
+.pvFollowOn{
+    color: #16a34a !important;
+}
+
+.pvComments{
+    padding: 14px 16px 16px;
+}
+
+.pvCommentsHead{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom: 10px;
+}
+
+.pvCommentsTitle{
+    font-weight: 1000;
+    font-size: 14px;
+}
+
+.pvCommentsList{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-bottom: 12px;
+}
+
+.pvComment{
+    border:1px solid var(--border);
+    background: var(--card);
+    border-radius: 14px;
+    padding: 10px;
+}
+
+.pvCommentTop{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom: 6px;
+    font-weight: 1000;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.pvCommentUser{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    min-width:0;
+}
+.pvCommentUser strong{
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 1000;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    max-width: 60vw;
+}
+
+.pvCommentText{
+    font-weight: 900;
+    line-height: 1.35;
+    white-space: pre-wrap;
+}
+
+.pvCommentForm{
+    display:flex;
+    gap:8px;
+}
+
+.pvCommentInput{
+    flex:1;
+    height: 42px;
+    padding: 0 12px;
+    border-radius: 14px;
+    border:1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    outline:none;
+    font-weight: 900;
+}
+
+.pvCommentSend{
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 14px;
+    border:1px solid var(--border);
+    background: var(--card);
+    font-weight: 1000;
+    cursor:pointer;
+}
+
+@media (max-width: 650px){
+    .pvBody, .pvComments{ padding-left: 12px; padding-right: 12px; }
+    .pvTitle{ font-size: 18px; }
+    .pvImage{ height: 58vh; }
+}

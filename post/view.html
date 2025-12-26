@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Post | Social Market</title>
+
+    <link rel="stylesheet" href="/styles/variables.css?v=1">
+    <link rel="stylesheet" href="/styles/base.css?v=1">
+    <link rel="stylesheet" href="/styles/layout.css?v=1">
+    <link rel="stylesheet" href="/post/view.css?v=1">
+</head>
+
+<body>
+<div id="headerMount"></div>
+
+<main class="container">
+    <div class="postView">
+        <div class="pvTop">
+            <a class="pvBack" href="/feed/feed.html">← Back to Feed</a>
+            <div class="pvMsg" id="pvMsg"></div>
+        </div>
+
+        <article class="pvCard" id="pvCard">
+            <div class="pvImageWrap" id="pvImageWrap">
+                <div class="pvImgSkeleton">Loading image…</div>
+            </div>
+
+            <div class="pvBody">
+                <div class="pvHeader">
+                    <div class="pvTitle" id="pvTitle">Loading…</div>
+                    <div class="pvMeta" id="pvMeta"></div>
+                </div>
+
+                <div class="pvAuthor" id="pvAuthor"></div>
+
+                <div class="pvDescWrap">
+                    <div class="pvDesc" id="pvDesc"></div>
+                    <button class="pvMore" id="pvMore" type="button" style="display:none;">Show more</button>
+                </div>
+            </div>
+
+            <div class="pvActions" id="pvActions">
+                <button class="pvBtn" id="pvLikeBtn" type="button">❤️ <span id="pvLikeCount">0</span></button>
+                <button class="pvBtn" id="pvFollowBtn" type="button" disabled>Follow</button>
+            </div>
+
+            <div class="pvComments">
+                <div class="pvCommentsHead">
+                    <div class="pvCommentsTitle">Comments</div>
+                </div>
+
+                <div class="pvCommentsList" id="pvCommentsList"></div>
+
+                <form class="pvCommentForm" id="pvCommentForm">
+                    <input class="pvCommentInput" id="pvCommentInput" maxlength="280" placeholder="Write a comment…" />
+                    <button class="pvCommentSend" type="submit">Send</button>
+                </form>
+            </div>
+        </article>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/assets1/header.js"></script>
+<script type="module" src="/assets/auth-ui.js"></script>
+<script type="module" src="/assets/jwt.js"></script>
+
+<script src="/post/view.js?v=1"></script>
+</body>
+</html>
