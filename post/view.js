@@ -1,11 +1,12 @@
 /* =========================
-  POST VIEW (NO MODULE)
-  - Reads post by id from Supabase (analyses)
-  - Comments: Supabase SELECT + Netlify add_comment
-  - Like/Follow: Netlify toggle + Supabase count + hydrate follow
+  VIEW.JS (NO MODULE / NO IMPORT)
+  - Loads single post by ?id=
+  - Renders: image + meta + author + created_at + content (expand)
+  - Comments list + add comment
+  - Like + Follow
 ========================= */
 
-console.log("✅ view.js loaded");
+console.log("✅ view.js running");
 
 // =========================
 // SUPABASE (READ ONLY)
@@ -28,148 +29,137 @@ const FN_AUTH_USER = "/.netlify/functions/_auth_user";
 // =========================
 // DOM
 // =========================
-const pvMsg = document.getElementById("pvMsg");
-const pvImageWrap = document.getElementById("pvImageWrap");
-const pvTitle = document.getElementById("pvTitle");
-const pvMeta = document.getElementById("pvMeta");
-const pvAuthor = document.getElementById("pvAuthor");
-const pvDesc = document.getElementById("pvDesc");
-const pvMore = document.getElementById("pvMore");
+const postBox = document.getElementById("postBox");
+const viewMsg = document.getElementById("viewMsg");
 
-const pvLikeBtn = document.getElementById("pvLikeBtn");
-const pvLikeCount = document.getElementById("pvLikeCount");
-const pvFollowBtn = document.getElementById("pvFollowBtn");
-
-const pvCommentsList = document.getElementById("pvCommentsList");
-const pvCommentForm = document.getElementById("pvCommentForm");
-const pvCommentInput = document.getElementById("pvCommentInput");
+const commentsList = document.getElementById("commentsList");
+const commentForm = document.getElementById("commentForm");
+const commentInput = document.getElementById("commentInput");
+const cCount = document.getElementById("cCount");
 
 // =========================
 // HELPERS
 // =========================
-function setMsg(t){ if (pvMsg) pvMsg.textContent = t || ""; }
-
-function esc(str){
-    return String(str ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
+function setMsg(t) {
+    if (viewMsg) viewMsg.textContent = t || "";
 }
 
-function formatTime(ts){
+function esc(str) {
+    return String(str ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function formatTime(ts) {
     if (!ts) return "";
     const d = new Date(ts);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleString("tr-TR", { dateStyle:"short", timeStyle:"short" });
+    return d.toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
 }
 
-function getIdFromUrl(){
+function formatPairs(pairs) {
+    if (Array.isArray(pairs)) return pairs.join(", ");
+    return String(pairs ?? "");
+}
+
+function getPostIdFromQuery() {
     const u = new URL(window.location.href);
-    return u.searchParams.get("id");
+    return String(u.searchParams.get("id") || "").trim();
 }
 
-function getJWT(){
+// =========================
+// AUTH
+// =========================
+function getJWT() {
     const jwt = window.SM_JWT || localStorage.getItem("sm_jwt");
     if (!jwt) throw new Error("Login required");
     return jwt;
 }
 
-async function fnPost(url, body){
+async function fnPost(url, body) {
     const jwt = getJWT();
+
     const r = await fetch(url, {
-        method:"POST",
-        headers:{
-            "Content-Type":"application/json",
-            "Authorization": `Bearer ${jwt}`,
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
         },
-        body: JSON.stringify(body || {})
+        body: JSON.stringify(body || {}),
     });
-    const j = await r.json().catch(()=>null);
+
+    const j = await r.json().catch(() => null);
     if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
     return j;
 }
 
-// =========================
-// READ (Supabase)
-// =========================
-async function fetchPost(postId){
-    if (!sb) throw new Error("Supabase CDN not loaded");
-    const { data, error } = await sb
-        .from("analyses")
-        .select("id, author_id, market, category, timeframe, content, pairs, image_path, created_at")
-        .eq("id", postId)
-        .limit(1);
-
-    if (error) throw error;
-    return data?.[0] || null;
+async function toggleLike(postId) {
+    return fnPost(FN_TOGGLE_LIKE, { post_id: String(postId) });
 }
 
-async function getLikeCount(postId){
-    if (!sb) throw new Error("Supabase CDN not loaded");
-    const { count, error } = await sb
-        .from("post_likes")
-        .select("*", { count:"exact", head:true })
-        .eq("post_id", postId);
-
-    if (error) throw error;
-    return count || 0;
+async function addComment(postId, text) {
+    const content = String(text || "").trim();
+    if (!content) throw new Error("Empty comment");
+    return fnPost(FN_ADD_COMMENT, { post_id: String(postId), content });
 }
 
-async function loadComments(postId, limit=50){
-    if (!sb) throw new Error("Supabase CDN not loaded");
-    const { data, error } = await sb
-        .from("post_comments")
-        .select("id, user_id, content, created_at")
-        .eq("post_id", postId)
-        .order("created_at", { ascending:true })
-        .limit(limit);
-
-    if (error) throw error;
-    return data || [];
+async function toggleFollow(targetUserId) {
+    const id = String(targetUserId || "").trim();
+    if (!id) throw new Error("Author id missing");
+    return fnPost(FN_TOGGLE_FOLLOW, { following_uid: id });
 }
 
 // =========================
-// AUTH USER
+// CURRENT USER (for follow hydrate)
 // =========================
 let _meCache = null;
-async function getMyUserId(){
+
+async function getMyUserId() {
     if (_meCache) return _meCache;
 
     const jwt = getJWT();
-    const r = await fetch(FN_AUTH_USER, { headers:{ Authorization:`Bearer ${jwt}` }});
-    const j = await r.json().catch(()=>null);
+    const r = await fetch(FN_AUTH_USER, { headers: { Authorization: `Bearer ${jwt}` } });
+    const j = await r.json().catch(() => null);
     if (!r.ok) throw new Error(j?.error || "Auth user failed");
 
     const myUserId = String(j?.user?.$id || j?.user_id || j?.uid || "").trim();
     if (!myUserId) throw new Error("My user id missing");
+
     _meCache = myUserId;
     return myUserId;
 }
 
 // =========================
-// FOLLOW HYDRATE (Supabase if allowed + cache fallback)
+// FOLLOW CACHE (fallback)
 // =========================
-function followCacheKey(myId){ return `sm_following:${myId}`; }
-function getFollowingSetFromCache(myId){
-    try{
+function followCacheKey(myId) {
+    return `sm_following:${myId}`;
+}
+function getFollowingSetFromCache(myId) {
+    try {
         const raw = localStorage.getItem(followCacheKey(myId));
         const arr = raw ? JSON.parse(raw) : [];
-        return new Set(Array.isArray(arr) ? arr.map(String) : []);
-    }catch{ return new Set(); }
+        if (!Array.isArray(arr)) return new Set();
+        return new Set(arr.map((x) => String(x)));
+    } catch {
+        return new Set();
+    }
 }
-function saveFollowingSetToCache(myId, set){
-    try{ localStorage.setItem(followCacheKey(myId), JSON.stringify(Array.from(set))); }catch{}
+function saveFollowingSetToCache(myId, set) {
+    try {
+        localStorage.setItem(followCacheKey(myId), JSON.stringify(Array.from(set)));
+    } catch {}
 }
-
-async function isFollowingUser(targetUserId){
+async function isFollowingUser(targetUserId) {
     const myId = await getMyUserId();
     const target = String(targetUserId || "").trim();
     if (!target) return false;
 
-    if (sb){
-        try{
+    if (sb) {
+        try {
             const { data, error } = await sb
                 .from("follows")
                 .select("id")
@@ -178,7 +168,7 @@ async function isFollowingUser(targetUserId){
                 .limit(1);
 
             if (!error) return !!(data && data.length);
-        }catch{}
+        } catch {}
     }
 
     const set = getFollowingSetFromCache(myId);
@@ -186,213 +176,292 @@ async function isFollowingUser(targetUserId){
 }
 
 // =========================
+// SUPABASE READS
+// =========================
+async function getPostById(postId) {
+    if (!sb) throw new Error("Supabase CDN not loaded");
+
+    const { data, error } = await sb
+        .from("analyses")
+        .select("id, author_id, market, category, timeframe, content, pairs, image_path, created_at")
+        .eq("id", postId)
+        .limit(1);
+
+    if (error) throw error;
+    return (data && data[0]) || null;
+}
+
+async function getLikeCount(postId) {
+    if (!sb) throw new Error("Supabase CDN not loaded");
+    const { count, error } = await sb
+        .from("post_likes")
+        .select("*", { count: "exact", head: true })
+        .eq("post_id", postId);
+
+    if (error) throw error;
+    return count || 0;
+}
+
+async function loadComments(postId, limit = 100) {
+    if (!sb) throw new Error("Supabase CDN not loaded");
+    const { data, error } = await sb
+        .from("post_comments")
+        .select("id, user_id, content, created_at")
+        .eq("post_id", postId)
+        .order("created_at", { ascending: true })
+        .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+}
+
+/**
+ * OPTIONAL profiles hydrate (fallback’lı)
+ * Eğer sende profiles tablosu yoksa, user_id gösterir.
+ * Eğer varsa:
+ * table: profiles
+ * columns: user_id, username, avatar_url
+ */
+const PROFILES_TABLE = "profiles";
+async function loadProfiles(userIds) {
+    const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
+    if (!ids.length) return new Map();
+    if (!sb) return new Map();
+
+    try {
+        const { data, error } = await sb
+            .from(PROFILES_TABLE)
+            .select("user_id, username, avatar_url")
+            .in("user_id", ids);
+
+        if (error) return new Map();
+
+        const m = new Map();
+        (data || []).forEach((p) => {
+            const k = String(p.user_id || "").trim();
+            if (k) m.set(k, p);
+        });
+        return m;
+    } catch {
+        return new Map();
+    }
+}
+
+// =========================
 // RENDER
 // =========================
-function renderAuthor(authorId){
-    // burada profile tablosu varsa çekip avatar/name gösterebiliriz.
-    // şimdilik user id gösteriyoruz (NET).
-    const id = String(authorId || "").trim();
-    pvAuthor.innerHTML = `
-    <img class="pvAvatar" src="/assets1/img/user.png" alt="" onerror="this.style.display='none'">
-    <div class="pvAuthorName">
-      <strong>${esc(id ? "User" : "Unknown")}</strong>
-      <span>${esc(id || "")}</span>
+function renderPostView(row, likeCount, isFollowing) {
+    const img = esc(row.image_path || "");
+    const pairsText = esc(formatPairs(row.pairs));
+    const created = esc(formatTime(row.created_at));
+
+    const market = esc(row.market || "");
+    const category = esc(row.category || "");
+    const timeframe = esc(row.timeframe || "");
+    const authorId = esc(row.author_id || "");
+
+    const content = esc(String(row.content || "").trim());
+
+    return `
+    <div class="pvMedia">
+      ${
+        img
+            ? `<img class="pvImg" src="${img}" alt="" loading="lazy" decoding="async">`
+            : `<div class="pvNoImg">NO IMAGE</div>`
+    }
+    </div>
+
+    <div class="pvHead">
+      <div class="pvTitle">${pairsText || "PAIR"}</div>
+      <div class="pvMeta">${market}${market && category ? " • " : ""}${category}${(market||category) && timeframe ? " • " : ""}${timeframe}</div>
+      <div class="pvSub">
+        <div class="pvAuthor">Author: <span class="pvMono">${authorId || "-"}</span></div>
+        <div class="pvTime">${created}</div>
+      </div>
+
+      <div class="pvActions">
+        <button id="pvLikeBtn" class="pvBtn" type="button">❤️ <span id="pvLikeCount">${likeCount}</span></button>
+        <button id="pvFollowBtn" class="pvBtn ${isFollowing ? "isFollowing" : ""}" type="button" ${authorId ? "" : "disabled"}>
+          ${isFollowing ? "Following" : "Follow"}
+        </button>
+      </div>
+    </div>
+
+    <div class="pvContent">
+      <div class="pvContentHead">
+        <div class="pvContentTitle">Analysis</div>
+        <button id="pvExpandBtn" class="pvLinkBtn" type="button">Expand</button>
+      </div>
+
+      <div id="pvText" class="pvText isClamp">${content || ""}</div>
     </div>
   `;
 }
 
-function renderPostUI(row){
-    const pairs = Array.isArray(row.pairs) ? row.pairs.join(", ") : (row.pairs || "");
-    const title = `${row.market || ""} • ${pairs || "PAIR"} • ${row.timeframe || ""}`.trim();
+function renderComments(list, profilesMap) {
+    if (!commentsList) return;
 
-    pvTitle.textContent = title || "Post";
-    pvMeta.textContent = `${row.category || ""}${row.category ? " • " : ""}${formatTime(row.created_at)}`;
-
-    renderAuthor(row.author_id);
-
-    const full = String(row.content || "");
-    pvDesc.textContent = full;
-
-    // Show more if long
-    requestAnimationFrame(()=>{
-        const isOverflow = pvDesc.scrollHeight > pvDesc.clientHeight + 6;
-        pvMore.style.display = isOverflow ? "inline-flex" : "none";
-    });
-
-    // image
-    const imgUrl = String(row.image_path || "").trim();
-    if (imgUrl){
-        pvImageWrap.innerHTML = `<img class="pvImage" id="pvImage" src="${esc(imgUrl)}" alt="chart" loading="lazy" decoding="async">`;
-        const img = document.getElementById("pvImage");
-        img?.addEventListener("click", ()=> window.open(imgUrl, "_blank", "noopener"));
-    }else{
-        pvImageWrap.innerHTML = `<div class="pvImgSkeleton">NO IMAGE</div>`;
-    }
-}
-
-function renderComments(list){
-    if (!pvCommentsList) return;
-
-    if (!list.length){
-        pvCommentsList.innerHTML = `<div style="font-weight:900;opacity:.7;color:var(--muted);">No comments yet.</div>`;
+    if (!list.length) {
+        commentsList.innerHTML = `<div class="cEmpty">No comments yet.</div>`;
         return;
     }
 
-    pvCommentsList.innerHTML = list.map(c => {
-        const userId = esc(c.user_id || "");
-        const time = esc(formatTime(c.created_at));
-        const text = esc(c.content || "");
-        return `
-      <div class="pvComment">
-        <div class="pvCommentTop">
-          <div class="pvCommentUser">
-            <strong>${userId || "User"}</strong>
-          </div>
-          <div>${time}</div>
+    commentsList.innerHTML = list
+        .map((c) => {
+            const uid = String(c.user_id || "").trim();
+            const p = profilesMap?.get(uid);
+            const name = esc(p?.username || uid || "user");
+            const avatar = esc(p?.avatar_url || "");
+
+            return `
+      <div class="cItem">
+        <div class="cAvatar">
+          ${
+                avatar
+                    ? `<img src="${avatar}" alt="" loading="lazy" decoding="async">`
+                    : `<div class="cAvatarFallback">${esc(name.slice(0, 1).toUpperCase())}</div>`
+            }
         </div>
-        <div class="pvCommentText">${text}</div>
-      </div>
-    `;
-    }).join("");
+
+        <div class="cBody">
+          <div class="cRow">
+            <div class="cName">${name}</div>
+            <div class="cTime">${esc(formatTime(c.created_at))}</div>
+          </div>
+          <div class="cText">${esc(c.content)}</div>
+        </div>
+      </div>`;
+        })
+        .join("");
 }
 
 // =========================
-// ACTIONS
-// =========================
-async function toggleLike(postId){
-    return fnPost(FN_TOGGLE_LIKE, { post_id: String(postId) });
-}
-
-async function addComment(postId, text){
-    const content = String(text || "").trim();
-    if (!content) throw new Error("Empty comment");
-    return fnPost(FN_ADD_COMMENT, { post_id: String(postId), content });
-}
-
-async function toggleFollow(targetUserId){
-    const id = String(targetUserId || "").trim();
-    if (!id) throw new Error("Author id missing");
-    return fnPost(FN_TOGGLE_FOLLOW, { following_uid: id });
-}
-
-// =========================
-// INIT
+// MAIN LOAD
 // =========================
 let CURRENT_POST = null;
+let CURRENT_POST_ID = null;
 
-document.addEventListener("DOMContentLoaded", async () => {
-    try{
-        const id = getIdFromUrl();
-        if (!id) throw new Error("Missing id");
+async function loadAll() {
+    CURRENT_POST_ID = getPostIdFromQuery();
+    if (!CURRENT_POST_ID) {
+        setMsg("❌ Missing id");
+        return;
+    }
+    if (!sb) {
+        setMsg("❌ Supabase CDN not loaded");
+        return;
+    }
 
-        setMsg("Loading…");
-
-        const row = await fetchPost(id);
-        if (!row) throw new Error("Post not found");
-
+    setMsg("Loading...");
+    try {
+        const row = await getPostById(CURRENT_POST_ID);
+        if (!row) {
+            setMsg("❌ Post not found");
+            return;
+        }
         CURRENT_POST = row;
-        renderPostUI(row);
 
-        // likes
-        try{
-            const c = await getLikeCount(id);
-            pvLikeCount.textContent = String(c);
-        }catch{}
+        const likeCount = await getLikeCount(CURRENT_POST_ID).catch(() => 0);
 
-        // follow hydrate
-        try{
-            const authorId = String(row.author_id || "").trim();
-            if (authorId){
-                pvFollowBtn.disabled = false;
-                const following = await isFollowingUser(authorId);
-                pvFollowBtn.textContent = following ? "Following" : "Follow";
-                pvFollowBtn.classList.toggle("pvFollowOn", following);
+        let following = false;
+        try {
+            if (row.author_id) following = await isFollowingUser(row.author_id);
+        } catch {}
+
+        if (postBox) postBox.innerHTML = renderPostView(row, likeCount, following);
+
+        // expand handler
+        const pvText = document.getElementById("pvText");
+        const pvExpandBtn = document.getElementById("pvExpandBtn");
+        pvExpandBtn?.addEventListener("click", () => {
+            pvText?.classList.toggle("isClamp");
+            pvExpandBtn.textContent = pvText?.classList.contains("isClamp") ? "Expand" : "Collapse";
+        });
+
+        // like handler
+        const likeBtn = document.getElementById("pvLikeBtn");
+        likeBtn?.addEventListener("click", async () => {
+            likeBtn.disabled = true;
+            try {
+                await toggleLike(CURRENT_POST_ID);
+                const c = await getLikeCount(CURRENT_POST_ID);
+                const span = document.getElementById("pvLikeCount");
+                if (span) span.textContent = String(c);
+            } catch (err) {
+                alert("❌ " + (err?.message || err));
+            } finally {
+                likeBtn.disabled = false;
             }
-        }catch{}
+        });
 
-        // comments
-        const list = await loadComments(id);
-        renderComments(list);
+        // follow handler
+        const followBtn = document.getElementById("pvFollowBtn");
+        followBtn?.addEventListener("click", async () => {
+            if (!row.author_id) return;
+            followBtn.disabled = true;
+            try {
+                const r = await toggleFollow(row.author_id);
+                const isFollowing = !!r?.following;
+                followBtn.textContent = isFollowing ? "Following" : "Follow";
+                followBtn.classList.toggle("isFollowing", isFollowing);
+
+                // cache update
+                try {
+                    const myId = await getMyUserId();
+                    const set = getFollowingSetFromCache(myId);
+                    const tid = String(row.author_id || "").trim();
+                    if (tid) {
+                        if (isFollowing) set.add(tid);
+                        else set.delete(tid);
+                        saveFollowingSetToCache(myId, set);
+                    }
+                } catch {}
+            } catch (err) {
+                alert("❌ " + (err?.message || err));
+            } finally {
+                followBtn.disabled = false;
+            }
+        });
+
+        // comments load
+        const list = await loadComments(CURRENT_POST_ID);
+        if (cCount) cCount.textContent = `${list.length}`;
+
+        const profiles = await loadProfiles(list.map((x) => x.user_id));
+        renderComments(list, profiles);
 
         setMsg("");
-    }catch(err){
+    } catch (err) {
         console.error(err);
-        setMsg("❌ " + (err?.message || "Error"));
-        if (pvImageWrap) pvImageWrap.innerHTML = `<div class="pvImgSkeleton">Error</div>`;
+        setMsg("❌ " + (err?.message || "unknown"));
     }
-});
-
-// show more
-pvMore?.addEventListener("click", ()=>{
-    if (!pvDesc) return;
-    const expanded = pvDesc.dataset.expanded === "1";
-    pvDesc.dataset.expanded = expanded ? "0" : "1";
-    pvDesc.style.maxHeight = expanded ? "150px" : "none";
-    pvMore.textContent = expanded ? "Show more" : "Show less";
-});
-
-// like click
-pvLikeBtn?.addEventListener("click", async ()=>{
-    const id = getIdFromUrl();
-    if (!id) return;
-    pvLikeBtn.disabled = true;
-    try{
-        await toggleLike(id);
-        const c = await getLikeCount(id);
-        pvLikeCount.textContent = String(c);
-    }catch(err){
-        alert("❌ " + (err?.message || err));
-    }finally{
-        pvLikeBtn.disabled = false;
-    }
-});
-
-// follow click
-pvFollowBtn?.addEventListener("click", async ()=>{
-    const authorId = String(CURRENT_POST?.author_id || "").trim();
-    if (!authorId) return;
-
-    pvFollowBtn.disabled = true;
-    try{
-        const r = await toggleFollow(authorId);
-        const isFollowing = !!r?.following;
-        pvFollowBtn.textContent = isFollowing ? "Following" : "Follow";
-        pvFollowBtn.classList.toggle("pvFollowOn", isFollowing);
-
-        // cache update
-        try{
-            const myId = await getMyUserId();
-            const set = getFollowingSetFromCache(myId);
-            if (isFollowing) set.add(authorId);
-            else set.delete(authorId);
-            saveFollowingSetToCache(myId, set);
-        }catch{}
-    }catch(err){
-        alert("❌ " + (err?.message || err));
-    }finally{
-        pvFollowBtn.disabled = false;
-    }
-});
+}
 
 // comment submit
-pvCommentForm?.addEventListener("submit", async (e)=>{
+commentForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const id = getIdFromUrl();
-    if (!id) return;
+    if (!CURRENT_POST_ID) return;
 
-    const text = pvCommentInput?.value || "";
-    const btn = pvCommentForm.querySelector('button[type="submit"]');
+    const text = String(commentInput?.value || "").trim();
+    if (!text) return;
+
+    const btn = commentForm.querySelector('button[type="submit"]');
     if (btn) btn.disabled = true;
 
-    try{
-        await addComment(id, text);
-        if (pvCommentInput) pvCommentInput.value = "";
+    try {
+        await addComment(CURRENT_POST_ID, text);
+        if (commentInput) commentInput.value = "";
 
-        const list = await loadComments(id);
-        renderComments(list);
-    }catch(err){
+        const list = await loadComments(CURRENT_POST_ID);
+        if (cCount) cCount.textContent = `${list.length}`;
+        const profiles = await loadProfiles(list.map((x) => x.user_id));
+        renderComments(list, profiles);
+    } catch (err) {
         alert("❌ " + (err?.message || err));
-    }finally{
+    } finally {
         if (btn) btn.disabled = false;
     }
 });
+
+// init
+document.addEventListener("DOMContentLoaded", loadAll);
