@@ -289,3 +289,65 @@
     cursor:pointer;
 }
 .commentBtn:disabled{ opacity:.6; cursor:not-allowed; }
+
+
+/* =========================
+   MOBILE FIX (no horizontal scroll)
+========================= */
+
+/* 1) Sayfada sağa kaymayı tamamen kapat */
+html, body{
+    width: 100%;
+    overflow-x: hidden;
+}
+
+/* 2) Container / grid taşmasını engelle */
+.viewWrap,
+.viewGrid,
+.viewLeft,
+.viewRight,
+.postBox{
+    min-width: 0;
+}
+
+/* 3) Resim ve kartlar taşmasın */
+.pvMedia,
+.pvImg{
+    max-width: 100%;
+}
+
+/* 4) Uzun author id / metinler taşmasın */
+.pvMono,
+.cName,
+.cText,
+.pvText{
+    overflow-wrap: anywhere;  /* uzun string kır */
+    word-break: break-word;
+}
+
+/* 5) Mobilde grid tek kolon + daha kompakt */
+@media (max-width: 900px){
+    .viewGrid{
+        grid-template-columns: 1fr;
+    }
+
+    .viewRight{
+        padding: 10px;
+    }
+
+    .pvHead{
+        padding: 12px 12px 8px;
+    }
+
+    .pvContent{
+        padding: 0 12px 12px;
+    }
+}
+
+/* 6) Yorum formu mobilde sığsın */
+.commentForm{
+    min-width: 0;
+}
+.commentInput{
+    min-width: 0;
+}
