@@ -3,10 +3,12 @@
   - Supabase CDN (READ ONLY)
   - Like / Comment / Follow: Netlify Functions (Appwrite JWT)
   - News slider (Supabase news table)
-  - NEW:
-    ✅ Full photo card UI (same)
-    ✅ Image Lightbox (click photo -> zoom)
-    ✅ Follow state hydrate on refresh (Supabase check + localStorage fallback)
+  - UI:
+     ✅ full photo post card
+     ✅ thin action bar
+     ✅ comments: NO BOX (flat area)
+     ✅ lightbox: photo click -> full readable content + scroll
+     ✅ follow state hydrate on load (feed button stays Following after refresh)
 ========================= */
 
 console.log("✅ feed.js running");
@@ -106,58 +108,24 @@ async function addComment(postId, text) {
     return fnPost(FN_ADD_COMMENT, { post_id: String(postId), content });
 }
 
-/** ✅ FIX: field name must be following_uid (not following_id) */
+/** follow api expects following_uid */
 async function toggleFollow(targetUserId) {
     const id = String(targetUserId || "").trim();
     if (!id) throw new Error("Author id missing");
     return fnPost(FN_TOGGLE_FOLLOW, { following_uid: id });
 }
 
-// =========================
-// CURRENT USER (for follow hydrate)
-// =========================
-let _meCache = null;
-
-async function getMyUserId() {
-    if (_meCache) return _meCache;
-
-    const jwt = getJWT();
-    const r = await fetch(FN_AUTH_USER, {
-        headers: { Authorization: `Bearer ${jwt}` },
-    });
-    const j = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(j?.error || "Auth user failed");
-
-    // common shapes
-    const myUserId = String(j?.user?.$id || j?.user_id || j?.uid || "").trim();
-    if (!myUserId) throw new Error("My user id missing");
-
-    _meCache = myUserId;
-    return myUserId;
-}
-
-// =========================
-// FOLLOW CACHE (fallback if Supabase read blocked)
-// =========================
-function followCacheKey(myId) {
-    return `sm_following:${myId}`;
-}
-
-function getFollowingSetFromCache(myId) {
+// current user id (for follow hydrate)
+let CURRENT_UID = null;
+async function ensureCurrentUserId() {
+    if (CURRENT_UID) return CURRENT_UID;
     try {
-        const raw = localStorage.getItem(followCacheKey(myId));
-        const arr = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(arr)) return new Set();
-        return new Set(arr.map((x) => String(x)));
+        const r = await fnPost(FN_AUTH_USER, {});
+        CURRENT_UID = r?.user?.$id || r?.user?.id || r?.uid || null;
     } catch {
-        return new Set();
+        CURRENT_UID = null;
     }
-}
-
-function saveFollowingSetToCache(myId, set) {
-    try {
-        localStorage.setItem(followCacheKey(myId), JSON.stringify(Array.from(set)));
-    } catch {}
+    return CURRENT_UID;
 }
 
 // =========================
@@ -187,152 +155,91 @@ async function loadComments(postId, limit = 30) {
     return data || [];
 }
 
-/**
- * Follow check (hydrate)
- * 1) Try Supabase SELECT from follows table (if allowed)
- * 2) Fallback localStorage cache
- *
- * ⚠️ Eğer senin follow tablon/kolonların farklıysa aşağıdaki SELECT kısmını değiştiririz.
- */
-async function isFollowingUser(targetUserId) {
-    const myId = await getMyUserId();
-    const target = String(targetUserId || "").trim();
-    if (!target) return false;
+// ✅ Follow hydrate: reads follow table and sets button state
+async function isFollowing(authorId) {
+    if (!sb) return false;
+    const me = await ensureCurrentUserId();
+    if (!me) return false;
+    if (!authorId) return false;
 
-    // 1) Try Supabase read
-    if (sb) {
-        try {
-            // ✅ Varsayılan şema:
-            // table: follows
-            // columns: follower_uid (me), following_uid (target)
-            const { data, error } = await sb
-                .from("follows")
-                .select("id")
-                .eq("follower_uid", myId)
-                .eq("following_uid", target)
-                .limit(1);
+    // ⚠️ table name assumption: "follows"
+    // columns: follower_uid, following_uid
+    // If your table differs, tell me: table + column names.
+    try {
+        const { data, error } = await sb
+            .from("follows")
+            .select("id")
+            .eq("follower_uid", me)
+            .eq("following_uid", authorId)
+            .limit(1);
 
-            if (!error) return !!(data && data.length);
-        } catch {}
+        if (error) return false;
+        return (data || []).length > 0;
+    } catch {
+        return false;
     }
-
-    // 2) fallback cache
-    const set = getFollowingSetFromCache(myId);
-    return set.has(target);
 }
 
 // =========================
-// LIGHTBOX (Image zoom modal)
+// LIGHTBOX (photo click -> full readable text)
 // =========================
 function ensureLightbox() {
-    if (document.getElementById("smLightbox")) return;
+    let lb = document.getElementById("smLightbox");
+    if (lb) return lb;
 
-    const el = document.createElement("div");
-    el.id = "smLightbox";
-    el.style.cssText = `
-    position:fixed; inset:0; z-index:99999;
-    display:none;
-    background: rgba(0,0,0,.82);
-    backdrop-filter: blur(6px);
-    align-items:center; justify-content:center;
-    padding: 18px;
-  `;
-
-    el.innerHTML = `
-    <div id="smLightboxInner" style="
-      position:relative;
-      width:min(1100px, 100%);
-      height:min(78vh, 900px);
-      border-radius:16px;
-      overflow:hidden;
-      background: rgba(15,23,42,.35);
-      border:1px solid rgba(255,255,255,.12);
-      box-shadow: 0 22px 60px rgba(0,0,0,.35);
-    ">
-      <button id="smLightboxClose" type="button" style="
-        position:absolute; top:10px; right:10px;
-        width:40px; height:40px;
-        border-radius:999px;
-        border:1px solid rgba(255,255,255,.18);
-        background: rgba(0,0,0,.35);
-        color:#fff;
-        font-weight:900;
-        cursor:pointer;
-        z-index:2;
-      ">✕</button>
-
-      <img id="smLightboxImg" alt="" style="
-        width:100%;
-        height:100%;
-        object-fit:contain;
-        display:block;
-        transform: scale(1);
-        transition: transform .15s ease;
-      "/>
-
-      <div style="
-        position:absolute; left:12px; bottom:12px;
-        background: rgba(0,0,0,.40);
-        border:1px solid rgba(255,255,255,.12);
-        color:#fff;
-        border-radius:999px;
-        padding:8px 12px;
-        font-weight:900;
-        font-size:12px;
-        z-index:2;
-      ">Scroll ile zoom • Sürükle yok</div>
+    lb = document.createElement("div");
+    lb.id = "smLightbox";
+    lb.innerHTML = `
+    <div class="lbBack"></div>
+    <div class="lbCard" role="dialog" aria-modal="true">
+      <button class="lbClose" type="button" aria-label="Close">✕</button>
+      <img class="lbImg" alt="post" />
+      <div class="lbText">
+        <div class="lbTitle"></div>
+        <div class="lbDesc"></div>
+        <div class="lbMeta"></div>
+      </div>
     </div>
   `;
-    document.body.appendChild(el);
+    document.body.appendChild(lb);
 
-    // close handlers
-    const close = () => {
-        el.style.display = "none";
-        const img = document.getElementById("smLightboxImg");
-        if (img) img.style.transform = "scale(1)";
-        el.dataset.zoom = "1";
-    };
-
-    el.addEventListener("click", (e) => {
-        if (e.target.id === "smLightbox") close();
+    lb.addEventListener("click", (e) => {
+        if (
+            e.target.classList.contains("lbBack") ||
+            e.target.classList.contains("lbClose")
+        ) {
+            lb.classList.remove("open");
+        }
     });
 
-    document.getElementById("smLightboxClose")?.addEventListener("click", close);
-
-    // wheel zoom
-    el.addEventListener(
-        "wheel",
-        (e) => {
-            const img = document.getElementById("smLightboxImg");
-            if (!img) return;
-            e.preventDefault();
-
-            const cur = Number(el.dataset.zoom || "1") || 1;
-            const next = Math.min(3, Math.max(1, cur + (e.deltaY < 0 ? 0.12 : -0.12)));
-            el.dataset.zoom = String(next);
-            img.style.transform = `scale(${next})`;
-        },
-        { passive: false }
-    );
-
-    // esc close
     document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && el.style.display === "flex") close();
+        if (e.key === "Escape") lb.classList.remove("open");
     });
+
+    return lb;
 }
 
-function openLightbox(src) {
-    const url = String(src || "").trim();
-    if (!url) return;
-    ensureLightbox();
-    const box = document.getElementById("smLightbox");
-    const img = document.getElementById("smLightboxImg");
-    if (!box || !img) return;
-    img.src = url;
-    box.dataset.zoom = "1";
-    img.style.transform = "scale(1)";
-    box.style.display = "flex";
+function openLightboxFromRow(row) {
+    const lb = ensureLightbox();
+    const img = lb.querySelector(".lbImg");
+    const title = lb.querySelector(".lbTitle");
+    const desc = lb.querySelector(".lbDesc");
+    const meta = lb.querySelector(".lbMeta");
+
+    const pairsText = formatPairs(row.pairs);
+    const contentRaw = String(row.content ?? "");
+    const created = formatTime(row.created_at);
+
+    if (img) img.src = row.image_path || "";
+    if (title) title.textContent = pairsText || "PAIR";
+    if (desc) desc.textContent = contentRaw || "";
+    if (meta) meta.textContent = created || "";
+
+    lb.classList.add("open");
 }
+
+// keep last loaded rows for lightbox open
+const ROW_BY_ID = new Map();
 
 // =========================
 // RENDER POST (full photo + overlay + thin action bar)
@@ -344,7 +251,7 @@ function renderPost(row) {
 
     const pairsText = esc(formatPairs(row.pairs));
     const contentRaw = String(row.content ?? "");
-    const content = esc(shortText(contentRaw, 140));
+    const contentShort = esc(shortText(contentRaw, 140));
 
     const image = row.image_path || "";
     const created = esc(formatTime(row.created_at));
@@ -354,30 +261,34 @@ function renderPost(row) {
 
     const cover = image
         ? `
-      <div class="post-cover" data-open-post="${postId}">
-        <img class="post-img" src="${esc(image)}" alt="chart" loading="lazy" decoding="async" data-img-src="${esc(image)}">
+    <div class="post-cover" data-open-post="${postId}">
+      <img class="post-img" src="${esc(image)}" alt="chart" loading="lazy" decoding="async">
 
-        <div class="post-tags">
-          <span>${market || "MARKET"}</span>
-          <span>${category || "Category"}</span>
-          <span>${timeframe || "TF"}</span>
-        </div>
-
-        <div class="post-overlay">
-          <div class="post-overlay-title">${pairsText || "PAIR"}</div>
-          ${content ? `<div class="post-overlay-text">${content}</div>` : ""}
-          <div class="post-overlay-meta">${created}</div>
-        </div>
+      <div class="post-tags">
+        <span>${market || "MARKET"}</span>
+        <span>${category || "Category"}</span>
+        <span>${timeframe || "TF"}</span>
       </div>
-    `
+
+      <div class="post-overlay">
+        <div class="post-overlay-title">${pairsText || "PAIR"}</div>
+        ${
+            contentShort
+                ? `<div class="post-overlay-text">${contentShort}</div>`
+                : ""
+        }
+        <div class="post-overlay-meta">${created}</div>
+      </div>
+    </div>
+  `
         : `
-      <div class="post-cover noimg">
-        <div class="chart-placeholder">NO IMAGE</div>
-      </div>
-    `;
+    <div class="post-cover noimg">
+      <div class="chart-placeholder">NO IMAGE</div>
+    </div>
+  `;
 
     return `
-  <article class="post-card post-photo" data-post-id="${postId}">
+  <article class="post-card post-photo" data-post-id="${postId}" data-author-id="${authorId}">
     ${cover}
 
     <div class="post-actionbar">
@@ -389,7 +300,9 @@ function renderPost(row) {
         💬
       </button>
 
-      <button class="followBtn" data-user-id="${authorId}" title="Follow" ${authorId ? "" : "disabled"}>
+      <button class="followBtn" data-user-id="${authorId}" title="Follow" ${
+        authorId ? "" : "disabled"
+    }>
         Follow
       </button>
     </div>
@@ -403,7 +316,7 @@ function renderPost(row) {
       <div class="commentsList"></div>
 
       <form class="commentForm" data-post-id="${postId}">
-        <input class="commentInput" placeholder="..." maxlength="280" />
+        <input class="commentInput" placeholder="Write a comment..." maxlength="280" />
         <button class="commentSend" type="submit">Send</button>
       </form>
     </div>
@@ -416,29 +329,32 @@ function renderPost(row) {
 async function hydrateNewPosts(justAddedRows) {
     if (!grid) return;
 
-    // Like counts
+    // like counts
     for (const r of justAddedRows) {
         try {
             const postId = String(r.id);
             const c = await getLikeCount(postId);
-            const btn = grid.querySelector(`.likeBtn[data-post-id="${CSS.escape(postId)}"]`);
+            const btn = grid.querySelector(
+                `.likeBtn[data-post-id="${CSS.escape(postId)}"]`
+            );
             const span = btn?.querySelector(".likeCount");
             if (span) span.textContent = String(c);
         } catch {}
     }
 
-    // Follow states
+    // follow state
     for (const r of justAddedRows) {
         try {
-            const authorId = String(r.author_id || "").trim();
-            if (!authorId) continue;
+            const postId = String(r.id);
+            const authorId = String(r.author_id || "");
+            const btn = grid.querySelector(
+                `.post-card[data-post-id="${CSS.escape(postId)}"] .followBtn`
+            );
+            if (!btn || !authorId) continue;
 
-            const btn = grid.querySelector(`.followBtn[data-user-id="${CSS.escape(authorId)}"]`);
-            if (!btn || btn.disabled) continue;
-
-            const following = await isFollowingUser(authorId);
+            const following = await isFollowing(authorId);
             btn.textContent = following ? "Following" : "Follow";
-            btn.classList.toggle("isFollowing", !!following);
+            btn.classList.toggle("isFollowing", following);
         } catch {}
     }
 }
@@ -474,7 +390,8 @@ function ensurePostsMoreUI() {
 
 function setPostsMoreLoading() {
     const wrap = document.getElementById("postsMoreWrap");
-    if (wrap) wrap.innerHTML = `<button class="postsMoreBtn" type="button" disabled>Loading…</button>`;
+    if (wrap)
+        wrap.innerHTML = `<button class="postsMoreBtn" type="button" disabled>Loading…</button>`;
 }
 
 async function loadFeed(reset = false) {
@@ -509,7 +426,9 @@ async function loadFeedMore() {
 
         const { data, error } = await sb
             .from("analyses")
-            .select("id, author_id, market, category, timeframe, content, pairs, image_path, created_at")
+            .select(
+                "id, author_id, market, category, timeframe, content, pairs, image_path, created_at"
+            )
             .order("created_at", { ascending: false })
             .range(from, to);
 
@@ -523,6 +442,9 @@ async function loadFeedMore() {
             ensurePostsMoreUI();
             return;
         }
+
+        // save rows for lightbox
+        rows.forEach((r) => ROW_BY_ID.set(String(r.id), r));
 
         grid.insertAdjacentHTML("beforeend", rows.map(renderPost).join(""));
         await hydrateNewPosts(rows);
@@ -607,7 +529,9 @@ async function loadNews() {
             return;
         }
 
-        newsSlider.innerHTML = items.map((n, i) => renderNewsSlide(n, i === 0)).join("");
+        newsSlider.innerHTML = items
+            .map((n, i) => renderNewsSlide(n, i === 0))
+            .join("");
         startNewsAutoRotate();
     } catch (err) {
         console.error("❌ News error:", err);
@@ -626,7 +550,18 @@ document.addEventListener("click", (e) => {
 // EVENTS (Like/Comment/Follow + Lightbox)
 // =========================
 document.addEventListener("click", async (e) => {
-    // close comments
+    // lightbox open
+    const cover = e.target.closest(".post-cover[data-open-post]");
+    if (cover) {
+        // ignore if click is on action bar or comments
+        if (e.target.closest(".post-actionbar") || e.target.closest(".commentsWrap")) return;
+
+        const postId = cover.dataset.openPost;
+        const row = ROW_BY_ID.get(String(postId));
+        if (row?.image_path) openLightboxFromRow(row);
+        return;
+    }
+
     const closeBtn = e.target.closest(".cClose");
     if (closeBtn) {
         const postId = closeBtn.dataset.postId;
@@ -636,16 +571,6 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
-    // image click -> lightbox
-    const cover = e.target.closest(".post-cover");
-    if (cover) {
-        const img = cover.querySelector("img[data-img-src]");
-        const src = img?.getAttribute("data-img-src") || img?.src;
-        if (src) openLightbox(src);
-        return;
-    }
-
-    // like
     const likeBtn = e.target.closest(".likeBtn");
     if (likeBtn) {
         const postId = likeBtn.dataset.postId;
@@ -662,11 +587,12 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
-    // comments toggle
     const tgl = e.target.closest(".commentToggleBtn");
     if (tgl) {
         const postId = tgl.dataset.postId;
-        const card = document.querySelector(`.post-card[data-post-id="${CSS.escape(postId)}"]`);
+        const card = document.querySelector(
+            `.post-card[data-post-id="${CSS.escape(postId)}"]`
+        );
         if (!card) return;
 
         const isOpen = card.classList.contains("isCommentsOpen");
@@ -678,7 +604,9 @@ document.addEventListener("click", async (e) => {
             card.classList.add("isCommentsOpen");
             try {
                 const list = await loadComments(postId);
-                const box = card.querySelector(`.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentsList`);
+                const box = card.querySelector(
+                    `.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentsList`
+                );
                 if (box) {
                     box.innerHTML = list
                         .map(
@@ -699,30 +627,15 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
-    // follow
     const followBtn = e.target.closest(".followBtn");
     if (followBtn) {
         const targetUserId = followBtn.dataset.userId;
         followBtn.disabled = true;
-
         try {
             const r = await toggleFollow(targetUserId);
-            const isFollowing = !!r?.following;
-
-            followBtn.textContent = isFollowing ? "Following" : "Follow";
-            followBtn.classList.toggle("isFollowing", isFollowing);
-
-            // ✅ update cache (so refresh still shows correctly even if Supabase read blocked)
-            try {
-                const myId = await getMyUserId();
-                const set = getFollowingSetFromCache(myId);
-                const tid = String(targetUserId || "").trim();
-                if (tid) {
-                    if (isFollowing) set.add(tid);
-                    else set.delete(tid);
-                    saveFollowingSetToCache(myId, set);
-                }
-            } catch {}
+            const isFollowingNow = !!r?.following;
+            followBtn.textContent = isFollowingNow ? "Following" : "Follow";
+            followBtn.classList.toggle("isFollowing", isFollowingNow);
         } catch (err) {
             alert("❌ " + (err?.message || err));
         } finally {
@@ -739,8 +652,12 @@ document.addEventListener("submit", async (e) => {
     e.preventDefault();
     const postId = f.dataset.postId;
 
-    const card = document.querySelector(`.post-card[data-post-id="${CSS.escape(postId)}"]`);
-    const input = card?.querySelector(`.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentInput`);
+    const card = document.querySelector(
+        `.post-card[data-post-id="${CSS.escape(postId)}"]`
+    );
+    const input = card?.querySelector(
+        `.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentInput`
+    );
     const text = input?.value || "";
 
     const btn = f.querySelector('button[type="submit"]');
@@ -751,7 +668,9 @@ document.addEventListener("submit", async (e) => {
         if (input) input.value = "";
 
         const list = await loadComments(postId);
-        const box = card?.querySelector(`.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentsList`);
+        const box = card?.querySelector(
+            `.commentsWrap[data-post-id="${CSS.escape(postId)}"] .commentsList`
+        );
         if (box) {
             box.innerHTML = list
                 .map(
@@ -776,7 +695,7 @@ document.addEventListener("submit", async (e) => {
 // INIT
 // =========================
 document.addEventListener("DOMContentLoaded", () => {
-    ensureLightbox();
     loadNews();
     loadFeed(true);
+    ensureLightbox();
 });
