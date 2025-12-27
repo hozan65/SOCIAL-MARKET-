@@ -1,4 +1,5 @@
 // /profile/profile.js (MODULE)
+// ✅ Old schema compatible: profiles.appwrite_user_id / name / bio / website / avatar_url
 import { account } from "/assets/appwrite.js";
 
 /* =========================
@@ -17,8 +18,12 @@ const sb = window.supabase?.createClient
 const $ = (id) => document.getElementById(id);
 
 const pAvatar = $("pAvatar");
-const pName = $("pName");
+const avatarImg = $("pAvatarImg");
+const avatarTxt = $("pAvatarTxt");
+const avatarInput = $("avatarInput");
+const changeAvatarBtn = $("changeAvatarBtn");
 
+const pName = $("pName");
 const pBio = $("pBio");
 const pLink = $("pLink");
 
@@ -53,75 +58,69 @@ const fEmpty = $("fEmpty");
 /* =========================
    Helpers
 ========================= */
-function setMsg(t) {
-    if (pMsg) pMsg.textContent = t || "";
-}
+function setMsg(t) { if (pMsg) pMsg.textContent = t || ""; }
 
 function initials(name) {
     const s = String(name || "").trim();
     if (!s) return "SM";
     return (
-        s
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((x) => (x[0] || "").toUpperCase())
-            .join("") || "SM"
+        s.split(/\s+/).slice(0, 2).map((x) => (x[0] || "").toUpperCase()).join("") || "SM"
     );
 }
-
 function fmtDate(iso) {
     try {
         const d = new Date(iso);
         return d.toLocaleDateString("tr-TR", { year: "numeric", month: "short", day: "2-digit" });
-    } catch {
-        return "—";
-    }
+    } catch { return "—"; }
 }
-
 function safeUrl(u) {
     const s = String(u || "").trim();
     if (!s) return "";
     if (s.startsWith("http://") || s.startsWith("https://")) return s;
     return "https://" + s;
 }
-
 function setFollowUI(isFollowing) {
     followBtn.textContent = isFollowing ? "Following" : "Follow";
     followBtn.classList.toggle("primary", !isFollowing);
 }
-
-function escapeHtml(s) {
+function escapeHtml(s){
     return String(s ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
 }
-function escapeAttr(s) {
-    return escapeHtml(s).replaceAll("`", "");
+function escapeAttr(s){ return escapeHtml(s).replaceAll("`",""); }
+
+function setAvatar(url, name){
+    const u = String(url || "").trim();
+    if (u) {
+        avatarImg.src = u + (u.includes("?") ? "&" : "?") + "v=" + Date.now();
+        avatarImg.style.display = "block";
+        avatarTxt.style.display = "none";
+        return;
+    }
+    avatarImg.style.display = "none";
+    avatarTxt.style.display = "block";
+    avatarTxt.textContent = initials(name);
 }
 
 /* =========================
    Auth
 ========================= */
 async function getMe() {
-    try {
-        return await account.get();
-    } catch {
-        return null;
-    }
+    try { return await account.get(); } catch { return null; }
 }
 
 /* =========================
    Supabase reads
 ========================= */
-// ✅ TABLO UYUMU: profiles.appwrite_user_id / name / bio / website / avatar_url / updated_at
-async function loadProfileRow(userId) {
+async function loadProfileRow(appwriteUserId) {
     const { data, error } = await sb
         .from("profiles")
         .select("appwrite_user_id, name, bio, website, avatar_url, updated_at")
-        .eq("appwrite_user_id", userId)
+        .eq("appwrite_user_id", appwriteUserId)
         .maybeSingle();
 
     if (error) console.warn("profiles read error:", error);
@@ -138,7 +137,6 @@ async function countPosts(userId) {
     return count || 0;
 }
 
-// follows kolonları: follower_uid / following_uid
 async function countFollowers(userId) {
     const { count, error } = await sb
         .from("follows")
@@ -167,10 +165,7 @@ async function isFollowing(meId, targetId) {
         .eq("following_uid", targetId)
         .limit(1);
 
-    if (error) {
-        console.warn("isFollowing error:", error);
-        return false;
-    }
+    if (error) { console.warn("isFollowing error:", error); return false; }
     return Array.isArray(data) && data.length > 0;
 }
 
@@ -186,7 +181,6 @@ async function loadPosts(userId) {
     return data || [];
 }
 
-/* ===== FOLLOW LIST READS ===== */
 async function listFollowers(targetId, limit = 50) {
     const { data, error } = await sb
         .from("follows")
@@ -195,10 +189,7 @@ async function listFollowers(targetId, limit = 50) {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-    if (error) {
-        console.warn("listFollowers error:", error);
-        return [];
-    }
+    if (error) { console.warn("listFollowers error:", error); return []; }
     return data || [];
 }
 
@@ -210,14 +201,10 @@ async function listFollowing(targetId, limit = 50) {
         .order("created_at", { ascending: false })
         .limit(limit);
 
-    if (error) {
-        console.warn("listFollowing error:", error);
-        return [];
-    }
+    if (error) { console.warn("listFollowing error:", error); return []; }
     return data || [];
 }
 
-// ✅ follower listesinde isim göstermek için profiles.name çekiyoruz
 async function loadProfiles(userIds) {
     const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
     if (!ids.length) return new Map();
@@ -242,11 +229,7 @@ async function loadProfiles(userIds) {
 ========================= */
 function renderPosts(list) {
     postsGrid.innerHTML = "";
-
-    if (!list || list.length === 0) {
-        setMsg("No posts yet.");
-        return;
-    }
+    if (!list || list.length === 0) { setMsg("No posts yet."); return; }
     setMsg("");
 
     const frag = document.createDocumentFragment();
@@ -254,7 +237,6 @@ function renderPosts(list) {
     for (const it of list) {
         const card = document.createElement("div");
         card.className = "pPost";
-
         card.addEventListener("click", () => {
             window.location.href = `/view/view.html?id=${encodeURIComponent(it.id)}`;
         });
@@ -288,7 +270,7 @@ function renderPosts(list) {
 }
 
 /* =========================
-   Toggle Follow (Netlify)
+   Netlify calls
 ========================= */
 async function toggleFollow(targetUid) {
     const jwt = localStorage.getItem("sm_jwt") || "";
@@ -296,10 +278,7 @@ async function toggleFollow(targetUid) {
 
     const res = await fetch("/.netlify/functions/toggle_follow", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify({ following_uid: String(targetUid) }),
     });
 
@@ -308,22 +287,16 @@ async function toggleFollow(targetUid) {
     try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
 
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    return data; // { ok:true, following:true/false }
+    return data;
 }
 
-/* =========================
-   Save Profile (Netlify upsert_profile)
-========================= */
 async function upsertProfile({ bio, website }) {
     const jwt = localStorage.getItem("sm_jwt") || "";
     if (!jwt) throw new Error("Missing JWT (sm_jwt)");
 
     const res = await fetch("/.netlify/functions/upsert_profile", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify({ bio, website }),
     });
 
@@ -333,6 +306,27 @@ async function upsertProfile({ bio, website }) {
 
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
     return data;
+}
+
+async function uploadAvatar(file) {
+    const jwt = localStorage.getItem("sm_jwt") || "";
+    if (!jwt) throw new Error("Missing JWT (sm_jwt)");
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const res = await fetch("/.netlify/functions/upload_avatar", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${jwt}` },
+        body: fd,
+    });
+
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data.avatar_url || "";
 }
 
 /* =========================
@@ -345,19 +339,13 @@ function openFollowModal(title) {
     followModal.style.display = "block";
     document.body.style.overflow = "hidden";
 }
-
 function closeFollowModal() {
     followModal.style.display = "none";
     document.body.style.overflow = "";
 }
-
 function renderFollowList(userIds, profilesMap) {
     fList.innerHTML = "";
-
-    if (!userIds.length) {
-        fEmpty.style.display = "block";
-        return;
-    }
+    if (!userIds.length) { fEmpty.style.display = "block"; return; }
     fEmpty.style.display = "none";
 
     const frag = document.createDocumentFragment();
@@ -371,7 +359,7 @@ function renderFollowList(userIds, profilesMap) {
         row.className = "fItem";
         row.innerHTML = `
       <div class="fLeft">
-        <div class="fAvatar">${init}</div>
+        <div class="fAvatar">${escapeHtml(init)}</div>
         <div style="min-width:0">
           <div class="fName">${escapeHtml(name)}</div>
           <div class="fSub">${escapeHtml(uid)}</div>
@@ -391,15 +379,11 @@ function renderFollowList(userIds, profilesMap) {
 async function main() {
     if (!sb) {
         setMsg("Supabase CDN missing. Add supabase-js CDN script.");
-        console.warn("Supabase CDN missing.");
         return;
     }
 
     const me = await getMe();
-    if (!me) {
-        location.href = "/auth/login.html";
-        return;
-    }
+    if (!me) { location.href = "/auth/login.html"; return; }
 
     const myId = me.$id;
 
@@ -410,19 +394,21 @@ async function main() {
 
     const row = await loadProfileRow(targetId);
 
-    // ✅ Name: DB name > Appwrite me.name > "User"
+    // Name: DB name > Appwrite name > fallback
     const displayName =
         (row?.name && String(row.name).trim()) ||
         (me?.name && String(me.name).trim()) ||
-        "User";
+        (me?.email ? me.email.split("@")[0] : "User");
 
     pName.textContent = displayName;
-    pAvatar.textContent = initials(displayName);
 
-    // ✅ Joined: row.updated_at yoksa Appwrite createdAt
+    // avatar
+    setAvatar(row?.avatar_url || "", displayName);
+
+    // joined
     joined.textContent = fmtDate(row?.updated_at || me?.$createdAt);
 
-    // ✅ Bio + website
+    // bio + link (website)
     pBio.textContent = row?.bio || "No bio yet.";
 
     const link = safeUrl(row?.website || "");
@@ -434,7 +420,7 @@ async function main() {
         pLink.style.display = "none";
     }
 
-    // Counts + posts + follow state
+    // stats + posts + follow state
     const [pc, fc, fg, posts, following] = await Promise.all([
         countPosts(targetId),
         countFollowers(targetId),
@@ -483,6 +469,36 @@ async function main() {
         msgBtn.onclick = () => alert("Message sistemi sonra.");
     }
 
+    // Avatar change (only me)
+    if (isMe) {
+        changeAvatarBtn.style.display = "inline-block";
+        changeAvatarBtn.onclick = () => avatarInput.click();
+
+        avatarInput.onchange = async () => {
+            const file = avatarInput.files?.[0];
+            if (!file) return;
+
+            try {
+                changeAvatarBtn.disabled = true;
+
+                // simple file size guard (optional)
+                if (file.size > 3 * 1024 * 1024) throw new Error("Max 3MB");
+
+                const url = await uploadAvatar(file);
+                setAvatar(url, displayName);
+                alert("Photo updated ✅");
+            } catch (e) {
+                alert(e?.message || "Upload failed");
+            } finally {
+                changeAvatarBtn.disabled = false;
+                avatarInput.value = "";
+            }
+        };
+    } else {
+        // başkasında avatar tıklanmasın
+        changeAvatarBtn.style.display = "none";
+    }
+
     // Followers modal
     openFollowers?.addEventListener("click", async () => {
         openFollowModal("Followers");
@@ -512,7 +528,6 @@ async function main() {
         editWrap.style.display = "none";
     };
 
-    // ✅ Save -> DB’ye yazar
     saveEdit.onclick = async () => {
         try {
             saveEdit.disabled = true;
@@ -522,7 +537,6 @@ async function main() {
 
             // UI update
             pBio.textContent = newBio || "No bio yet.";
-
             const link2 = safeUrl(newWebsite);
             if (link2) {
                 pLink.style.display = "inline-block";

@@ -11,77 +11,91 @@
     <link rel="stylesheet" href="/styles/layout.css">
 
     <!-- Profile CSS -->
-    <link rel="stylesheet" href="/profile/profile.css?v=1">
+    <link rel="stylesheet" href="/profile/profile.css?v=5">
 </head>
 
 <body>
-<!-- Global header mount (varsayılan sende varsa) -->
 <div id="headerMount"></div>
 
 <main class="container profilePage">
 
-    <!-- TOP -->
-    <section class="pTop">
-        <div class="pAvatar" id="pAvatar">SM</div>
+    <!-- TOP PROFILE -->
+    <section class="pCard">
 
-        <div class="pHead">
-            <div class="pNameRow">
-                <h1 class="pName" id="pName">Loading...</h1>
-                <span class="pUser" id="pUser" style="display:none;"></span>
+        <div class="pTop">
+            <!-- Avatar -->
+            <div class="pAvatarWrap">
+                <button id="changeAvatarBtn" class="pAvatarBtn" type="button" title="Change photo">
+                    <div class="pAvatar" id="pAvatar">
+                        <img id="pAvatarImg" class="pAvatarImg" alt="avatar" />
+                        <span id="pAvatarTxt" class="pAvatarTxt">SM</span>
+                    </div>
+                </button>
+
+                <input type="file" id="avatarInput" accept="image/*" hidden />
             </div>
 
-            <div class="pActions">
-                <button class="btn" id="editBtn" style="display:none;">Edit</button>
-                <button class="btn primary" id="followBtn" style="display:none;">Follow</button>
-                <button class="btn" id="msgBtn" style="display:none;">Message</button>
-            </div>
-
-            <div class="pBio">
-                <p class="pBioText" id="pBio">—</p>
-                <a class="pLink" id="pLink" href="#" target="_blank" rel="noreferrer" style="display:none;"></a>
-            </div>
-
-            <!-- STATS (flat) -->
-            <div class="pStats">
-                <div class="stat" id="openPosts">
-                    <div class="statLbl">Posts</div>
-                    <div class="statNum" id="postCount">0</div>
+            <!-- Head -->
+            <div class="pHead">
+                <div class="pNameRow">
+                    <h1 class="pName" id="pName">Loading...</h1>
                 </div>
 
-                <div class="stat isClickable" id="openFollowers" title="See followers">
-                    <div class="statLbl">Followers</div>
-                    <div class="statNum" id="followerCount">0</div>
+                <!-- Bio + link -->
+                <div class="pBio">
+                    <p class="pBioText" id="pBio">—</p>
+                    <a class="pLink" id="pLink" href="#" target="_blank" rel="noreferrer" style="display:none;"></a>
                 </div>
 
-                <div class="stat isClickable" id="openFollowing" title="See following">
-                    <div class="statLbl">Following</div>
-                    <div class="statNum" id="followingCount">0</div>
-                </div>
-
-                <div class="stat" id="openJoined">
-                    <div class="statLbl">Joined</div>
-                    <div class="statNum" id="joined">—</div>
+                <!-- Actions -->
+                <div class="pActions">
+                    <button class="btn" id="editBtn" style="display:none;" type="button">Edit</button>
+                    <button class="btn primary" id="followBtn" style="display:none;" type="button">Follow</button>
+                    <button class="btn" id="msgBtn" style="display:none;" type="button">Message</button>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- EDIT DRAWER -->
-    <section class="editWrap" id="editWrap" style="display:none;">
-        <div class="editGrid">
-            <div>
-                <label class="lbl">Bio</label>
-                <textarea id="bioInput" class="ta" rows="3" maxlength="240" placeholder="Write something..."></textarea>
+        <!-- Stats -->
+        <div class="pStats">
+            <div class="stat" id="openPosts">
+                <div class="statNum" id="postCount">0</div>
+                <div class="statLbl">Posts</div>
             </div>
-            <div>
-                <label class="lbl">Link</label>
-                <input id="linkInput" class="in" placeholder="https://..." />
+
+            <div class="stat isClickable" id="openFollowers" title="See followers">
+                <div class="statNum" id="followerCount">0</div>
+                <div class="statLbl">Followers</div>
+            </div>
+
+            <div class="stat isClickable" id="openFollowing" title="See following">
+                <div class="statNum" id="followingCount">0</div>
+                <div class="statLbl">Following</div>
+            </div>
+
+            <div class="stat" id="openJoined">
+                <div class="statNum" id="joined">—</div>
+                <div class="statLbl">Joined</div>
             </div>
         </div>
 
-        <div class="editBtns">
-            <button class="btn" id="cancelEdit">Cancel</button>
-            <button class="btn primary" id="saveEdit">Save</button>
+        <!-- Edit (flat) -->
+        <div class="editWrap" id="editWrap" style="display:none;">
+            <div class="editGrid">
+                <div>
+                    <label class="lbl">Bio</label>
+                    <textarea id="bioInput" class="ta" rows="3" maxlength="240" placeholder="Write something..."></textarea>
+                </div>
+                <div>
+                    <label class="lbl">Link</label>
+                    <input id="linkInput" class="in" placeholder="https://..." />
+                </div>
+            </div>
+
+            <div class="editBtns">
+                <button class="btn" id="cancelEdit" type="button">Cancel</button>
+                <button class="btn primary" id="saveEdit" type="button">Save</button>
+            </div>
         </div>
     </section>
 
@@ -94,7 +108,6 @@
         <div id="postsGrid" class="postsGrid"></div>
         <p id="pMsg" class="pMsg"></p>
     </section>
-
 </main>
 
 <!-- FOLLOW MODAL (NO TABS) -->
@@ -115,7 +128,7 @@
 <!-- Supabase CDN -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- Profile JS (module) -->
-<script type="module" src="/profile/profile.js?v=1"></script>
+<!-- Profile JS -->
+<script type="module" src="/profile/profile.js?v=5"></script>
 </body>
 </html>
