@@ -1,263 +1,231 @@
-/* =========================
-   PROFILE SETTINGS — FLAT (NO BOX)
-   - No cards, no shadows
-   - Only separators
-========================= */
+/* ===============================
+   FLAT PROFILE SETTINGS (NO BOX)
+=============================== */
 
-body.profile-flat{
-    background:#f4f7ff;
+* {
+    box-sizing: border-box;
 }
 
-/* Reset (profile sayfası sadece) */
-.profile-flat .container,
-.profile-flat .settingsLayout,
-.profile-flat .settingsNav,
-.profile-flat .settingsMain,
-.profile-flat .section,
-.profile-flat .rowBox,
-.profile-flat .field,
-.profile-flat .actionsBar{
-    background:transparent !important;
-    border:none !important;
-    box-shadow:none !important;
-    border-radius:0 !important;
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f5f7fb;
+    color: #0f172a;
 }
 
-/* Layout */
-.profile-flat .container{
+/* MAIN WRAP */
+.pWrap {
     max-width: 1100px;
     margin: 0 auto;
-    padding: 22px 16px;
+    padding: 24px 16px;
 }
 
-.profile-flat .settingsLayout{
-    display:grid;
+/* LAYOUT */
+.pShell {
+    display: grid;
     grid-template-columns: 260px 1fr;
-    gap: 28px;
-    align-items:start;
+    gap: 32px;
 }
 
-/* Left: flat list */
-.profile-flat .settingsNav{
-    padding: 6px 0;
+/* LEFT MENU */
+.pNav {
+    padding-top: 8px;
 }
 
-.profile-flat .navTitle{
-    font-weight: 1000;
+.pNavTitle {
     font-size: 14px;
-    color:#0f172a;
-    opacity:.85;
-    margin: 0 0 10px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: #111827;
 }
 
-.profile-flat .navItem{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding: 10px 10px;
-    border-radius: 10px;
-    cursor:pointer;
-    font-weight: 900;
-    color:#0f172a;
+.pNavItem {
+    width: 100%;
+    text-align: left;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: none;
+    border: none;
+    font-size: 14px;
+    cursor: pointer;
+    color: #111827;
 }
 
-.profile-flat .navItem:hover{
-    background: rgba(15,23,42,.04);
+.pNavItem:hover {
+    background: #eef2ff;
 }
 
-.profile-flat .navItem.active{
-    background: rgba(37,99,235,.10);
-    color:#2563eb;
+.pNavItem.active {
+    background: #e0e7ff;
+    color: #1d4ed8;
+    font-weight: 600;
 }
 
-/* Right */
-.profile-flat .settingsMain{
-    min-width:0;
+.pNavItem:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
-/* Page heading */
-.profile-flat .pageTitle{
-    margin:0;
-    font-weight: 1100;
-    letter-spacing:-.02em;
-    font-size: 26px;
-    color:#0f172a;
+/* RIGHT CONTENT */
+.pContent {
+    background: #fff;
+    padding: 24px 28px;
 }
 
-.profile-flat .pageSub{
-    margin:6px 0 0;
-    font-weight: 900;
+/* HEADER */
+.pTop {
+    margin-bottom: 24px;
+}
+
+.pTitle {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.pSub {
     font-size: 13px;
-    color: rgba(15,23,42,.60);
+    color: #6b7280;
+    margin-top: 4px;
 }
 
-/* Sections: flat with separators */
-.profile-flat .section{
-    padding: 18px 0;
-    border-top: 1px solid rgba(15,23,42,.10) !important;
+/* SECTIONS */
+.pBlock {
+    padding: 20px 0;
+    border-top: 1px solid #e5e7eb;
 }
 
-.profile-flat .section:first-of-type{
-    border-top:none !important;
+.pBlock:first-of-type {
+    border-top: none;
 }
 
-.profile-flat .sectionTitle{
-    margin:0 0 10px;
-    font-weight: 1000;
+.pBlockTitle {
     font-size: 14px;
-    color:#0f172a;
+    font-weight: 600;
 }
 
-.profile-flat .sectionHint{
-    margin: -6px 0 12px;
-    font-weight: 900;
+.pBlockHint {
     font-size: 12px;
-    color: rgba(15,23,42,.55);
+    color: #6b7280;
+    margin-top: 2px;
 }
 
-/* Picture row */
-.profile-flat .rowBox{
-    display:flex;
-    align-items:center;
-    gap:14px;
-    padding: 8px 0;
+/* AVATAR */
+.pAvatarRow {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 14px;
 }
 
-.profile-flat .avatar{
+.pAvatar {
     width: 56px;
     height: 56px;
-    border-radius: 999px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.pAvatar img {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
-    background: rgba(37,99,235,.10);
-    border: 1px solid rgba(37,99,235,.20) !important;
 }
 
-.profile-flat .who{
-    min-width:0;
-    display:flex;
-    flex-direction:column;
-    gap:2px;
+.pAvatarTxt {
+    font-size: 18px;
 }
 
-.profile-flat .whoName{
-    font-weight: 1100;
-    color:#0f172a;
-    line-height:1.1;
+.pName {
+    font-weight: 600;
 }
 
-.profile-flat .whoMeta{
-    font-weight: 900;
-    font-size: 12px;
-    color: rgba(15,23,42,.55);
+/* BUTTONS */
+.btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    border: 1px solid #d1d5db;
+    background: #fff;
+    cursor: pointer;
 }
 
-/* Buttons (flat) */
-.profile-flat .btn{
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    gap:8px;
-    padding: 10px 14px;
-    border-radius: 12px;
-    border: 1px solid rgba(15,23,42,.14) !important;
-    background: rgba(255,255,255,.8) !important;
-    font-weight: 1000;
-    cursor:pointer;
+.btn:hover {
+    background: #f9fafb;
 }
 
-.profile-flat .btn:hover{
-    background: rgba(255,255,255,1) !important;
+.btn.primary {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #fff;
 }
 
-.profile-flat .btnDanger{
-    border-color: rgba(239,68,68,.35) !important;
-    background: rgba(239,68,68,.07) !important;
+.btn.primary:hover {
+    background: #1d4ed8;
 }
 
-.profile-flat .btnDanger:hover{
-    background: rgba(239,68,68,.10) !important;
+.btn.ghost {
+    background: transparent;
 }
 
-/* Inputs (flat) */
-.profile-flat .field{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
-    padding: 10px 0;
+.btn.danger {
+    border-color: #ef4444;
+    color: #ef4444;
 }
 
-.profile-flat label{
-    font-weight: 1000;
-    font-size: 12px;
-    color: rgba(15,23,42,.65);
+.btn.danger:hover {
+    background: #fee2e2;
 }
 
-.profile-flat input,
-.profile-flat textarea{
-    width:100%;
-    padding: 12px 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(15,23,42,.14);
-    background: rgba(255,255,255,.92);
-    font-weight: 900;
-    outline:none;
+/* TEXTAREA & INPUT */
+.pTextarea,
+.pInput {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    font-size: 14px;
+    margin-top: 10px;
 }
 
-.profile-flat textarea{
-    min-height: 110px;
+.pTextarea {
     resize: vertical;
+    min-height: 90px;
 }
 
-.profile-flat input:focus,
-.profile-flat textarea:focus{
-    border-color: rgba(37,99,235,.35);
-    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
-}
-
-/* Links row: 2 inputs */
-.profile-flat .grid2{
-    display:grid;
+/* LINKS GRID */
+.pGrid2 {
+    display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
+    margin-top: 12px;
 }
 
-/* Bottom actions */
-.profile-flat .actionsBar{
-    display:flex;
-    justify-content:flex-end;
-    gap:10px;
-    padding-top: 14px;
-    border-top: 1px solid rgba(15,23,42,.10) !important;
+.pLabel {
+    font-size: 12px;
+    color: #6b7280;
 }
 
-.profile-flat .btnPrimary{
-    border-color: rgba(37,99,235,.30) !important;
-    background: rgba(37,99,235,.10) !important;
-    color:#2563eb;
+/* ACTIONS */
+.pActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 24px;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 16px;
 }
 
-.profile-flat .btnPrimary:hover{
-    background: rgba(37,99,235,.14) !important;
-}
-
-.profile-flat .btn:disabled{
-    opacity:.5;
-    cursor:not-allowed;
-}
-
-/* Responsive */
-@media (max-width: 900px){
-    .profile-flat .settingsLayout{
-        grid-template-columns: 1fr;
-        gap: 14px;
-    }
-    .profile-flat .grid2{
+/* MOBILE */
+@media (max-width: 900px) {
+    .pShell {
         grid-template-columns: 1fr;
     }
-    .profile-flat .actionsBar{
-        justify-content: stretch;
-    }
-    .profile-flat .actionsBar .btn{
-        width:100%;
+
+    .pGrid2 {
+        grid-template-columns: 1fr;
     }
 }
