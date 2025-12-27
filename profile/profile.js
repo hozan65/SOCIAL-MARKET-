@@ -1,9 +1,7 @@
-// /profile/profile.js (MODULE)
-import { account } from "/assets/appwrite.js";
+/* profile/profile.js (v2) */
+console.log("✅ profile.js v2 loaded");
 
-/* =========================
-   SUPABASE (CDN global)
-========================= */
+// ===== Supabase (READ only) =====
 const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
 
@@ -11,534 +9,513 @@ const sb = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
-/* =========================
-   DOM
-========================= */
-const $ = (id) => document.getElementById(id);
+// ===== Elements =====
+const el = (id) => document.getElementById(id);
 
-const pAvatar = $("pAvatar");
-const pName = $("pName");
-const pUser = $("pUser");
-const pMeta = $("pMeta");
+const pAvatar = el("pAvatar");
+const pName = el("pName");
+const pEmail = el("pEmail");
+const pBio = el("pBio");
+const pLink = el("pLink");
+const followersCount = el("followersCount");
+const followingCount = el("followingCount");
+const joined = el("joined");
 
-const pBio = $("pBio");
-const pLink = $("pLink");
+const editBtn = el("editBtn");
+const followBtn = el("followBtn");
 
-const postCount = $("postCount");
-const followerCount = $("followerCount");
-const followingCount = $("followingCount");
-const joined = $("joined");
+const editWrap = el("editWrap");
+const bioInput = el("bioInput");
+const linkInput = el("linkInput");
+const cancelEdit = el("cancelEdit");
+const saveEdit = el("saveEdit");
 
-const editBtn = $("editBtn");
-const followBtn = $("followBtn");
-const msgBtn = $("msgBtn");
+const postsGrid = el("postsGrid");
+const pMsg = el("pMsg");
 
-const editWrap = $("editWrap");
-const bioInput = $("bioInput");
-const linkInput = $("linkInput");
-const cancelEdit = $("cancelEdit");
-const saveEdit = $("saveEdit");
+const followersBtn = el("followersBtn");
+const followingBtn = el("followingBtn");
 
-const postsGrid = $("postsGrid");
-const pMsg = $("pMsg");
+// ===== Netlify Functions =====
+const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";
+const FN_UPSERT_PROFILE = "/.netlify/functions/upsert_profile";
 
-const openFollowers = $("openFollowers");
-const openFollowing = $("openFollowing");
+// ===== Helpers =====
+const esc = (s) =>
+    String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 
-/* ===== Follow Modal (NO TABS) ===== */
-const followModal = $("followModal");
-const fCloseBtn = $("fCloseBtn");
-const fTitle = $("fTitle");
-const fList = $("fList");
-const fEmpty = $("fEmpty");
-
-/* =========================
-   Helpers
-========================= */
-function setMsg(t) {
-    if (pMsg) pMsg.textContent = t || "";
+function getJWT() {
+    // senin projede jwt.js "sm_jwt updated" yazıyor → localStorage sm_jwt kullanıyoruz
+    return localStorage.getItem("sm_jwt") || "";
 }
 
 function initials(name) {
-    const s = String(name || "").trim();
-    if (!s) return "SM";
-    return (
-        s
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((x) => (x[0] || "").toUpperCase())
-            .join("") || "SM"
-    );
+    const t = String(name || "").trim();
+    if (!t) return "SM";
+    const parts = t.split(/\s+/).slice(0, 2);
+    return parts.map(x => x[0]?.toUpperCase() || "").join("") || "SM";
 }
 
 function fmtDate(iso) {
     try {
         const d = new Date(iso);
-        return d.toLocaleDateString("tr-TR", { year: "numeric", month: "short", day: "2-digit" });
+        return d.toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" });
     } catch {
         return "—";
     }
 }
 
-function safeUrl(u) {
-    const s = String(u || "").trim();
-    if (!s) return "";
-    if (s.startsWith("http://") || s.startsWith("https://")) return s;
-    return "https://" + s;
-}
-
-function setFollowUI(isFollowing) {
-    followBtn.textContent = isFollowing ? "Following" : "Follow";
-    followBtn.classList.toggle("primary", !isFollowing);
-}
-
-/* =========================
-   Auth
-========================= */
-async function getMe() {
-    try {
-        return await account.get();
-    } catch {
-        return null;
-    }
-}
-
-/* =========================
-   Supabase reads
-========================= */
-async function loadProfileRow(userId) {
-    const { data, error } = await sb
-        .from("profiles")
-        .select("user_id, username, display_name, bio, link, avatar_url, created_at")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-    if (error) console.warn("profiles read error:", error);
-    return data || null;
-}
-
-async function countPosts(userId) {
-    const { count, error } = await sb
-        .from("analyses")
-        .select("id", { count: "exact", head: true })
-        .eq("author_id", userId);
-
-    if (error) console.warn("countPosts error:", error);
-    return count || 0;
-}
-
-// follows kolonları: follower_uid / following_uid
-async function countFollowers(userId) {
-    const { count, error } = await sb
-        .from("follows")
-        .select("follower_uid", { count: "exact", head: true })
-        .eq("following_uid", userId);
-
-    if (error) console.warn("countFollowers error:", error);
-    return count || 0;
-}
-
-async function countFollowing(userId) {
-    const { count, error } = await sb
-        .from("follows")
-        .select("following_uid", { count: "exact", head: true })
-        .eq("follower_uid", userId);
-
-    if (error) console.warn("countFollowing error:", error);
-    return count || 0;
-}
-
-async function isFollowing(meId, targetId) {
-    const { data, error } = await sb
-        .from("follows")
-        .select("follower_uid")
-        .eq("follower_uid", meId)
-        .eq("following_uid", targetId)
-        .limit(1);
-
-    if (error) {
-        console.warn("isFollowing error:", error);
-        return false;
-    }
-    return Array.isArray(data) && data.length > 0;
-}
-
-async function loadPosts(userId) {
-    const { data, error } = await sb
-        .from("analyses")
-        .select("id, content, image_path, created_at")
-        .eq("author_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(12);
-
-    if (error) console.warn("loadPosts error:", error);
-    return data || [];
-}
-
-/* ===== FOLLOW LIST READS (NO TABS) ===== */
-async function listFollowers(targetId, limit = 50) {
-    const { data, error } = await sb
-        .from("follows")
-        .select("follower_uid, created_at")
-        .eq("following_uid", targetId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        console.warn("listFollowers error:", error);
-        return [];
-    }
-    return data || [];
-}
-
-async function listFollowing(targetId, limit = 50) {
-    const { data, error } = await sb
-        .from("follows")
-        .select("following_uid, created_at")
-        .eq("follower_uid", targetId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-
-    if (error) {
-        console.warn("listFollowing error:", error);
-        return [];
-    }
-    return data || [];
-}
-
-/**
- * profiles hydrate
- * table: profiles (user_id, username, avatar_url)
- */
-const PROFILES_TABLE = "profiles";
-async function loadProfiles(userIds) {
-    const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
-    if (!ids.length) return new Map();
-    if (!sb) return new Map();
-
-    try {
-        const { data, error } = await sb
-            .from(PROFILES_TABLE)
-            .select("user_id, username, avatar_url, display_name")
-            .in("user_id", ids);
-
-        if (error) return new Map();
-
-        const m = new Map();
-        (data || []).forEach((p) => {
-            const k = String(p.user_id || "").trim();
-            if (k) m.set(k, p);
-        });
-        return m;
-    } catch {
-        return new Map();
-    }
-}
-
-/* =========================
-   Render Posts
-========================= */
-function renderPosts(list) {
-    postsGrid.innerHTML = "";
-
-    if (!list || list.length === 0) {
-        setMsg("No posts yet.");
-        return;
-    }
-    setMsg("");
-
-    const frag = document.createDocumentFragment();
-
-    for (const it of list) {
-        const card = document.createElement("div");
-        card.className = "pPost";
-
-        card.addEventListener("click", () => {
-            window.location.href = `/view/view.html?id=${encodeURIComponent(it.id)}`;
-        });
-
-        if (it.image_path) {
-            const img = document.createElement("img");
-            img.className = "pPostImg";
-            img.src = it.image_path;
-            img.alt = "post";
-            card.appendChild(img);
-        }
-
-        const body = document.createElement("div");
-        body.className = "pPostBody";
-
-        const title = document.createElement("div");
-        title.className = "pPostTitle";
-        title.textContent = (it.content || "").slice(0, 90) || "Post";
-        body.appendChild(title);
-
-        const time = document.createElement("div");
-        time.className = "pPostTime";
-        time.textContent = fmtDate(it.created_at);
-        body.appendChild(time);
-
-        card.appendChild(body);
-        frag.appendChild(card);
-    }
-
-    postsGrid.appendChild(frag);
-}
-
-/* =========================
-   Toggle Follow (Netlify)
-========================= */
-async function toggleFollow(targetUid) {
-    const jwt = localStorage.getItem("sm_jwt") || "";
-    if (!jwt) throw new Error("Missing JWT (sm_jwt)");
-
-    const res = await fetch("/.netlify/functions/toggle_follow", {
+async function fnPost(url, bodyObj) {
+    const jwt = getJWT();
+    const res = await fetch(url, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
+            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {})
         },
-        body: JSON.stringify({ following_uid: String(targetUid) }),
+        body: JSON.stringify(bodyObj || {})
     });
 
-    const text = await res.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+    // JSON olmayan hata dönünce "Unexpected token..." patlamasın:
+    const txt = await res.text();
+    let data = null;
+    try { data = JSON.parse(txt); } catch { data = { raw: txt }; }
 
-    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    return data; // { ok:true, following:true/false }
-}
-
-/* =========================
-   Follow Modal (NO TABS)
-========================= */
-function openFollowModal(title) {
-    if (!followModal) return;
-    fTitle.textContent = title;
-    fList.innerHTML = "";
-    fEmpty.style.display = "none";
-    followModal.style.display = "block";
-    document.body.style.overflow = "hidden";
-}
-
-function closeFollowModal() {
-    if (!followModal) return;
-    followModal.style.display = "none";
-    document.body.style.overflow = "";
-}
-
-function renderFollowList(userIds, profilesMap) {
-    fList.innerHTML = "";
-
-    if (!userIds.length) {
-        fEmpty.style.display = "block";
-        return;
+    if (!res.ok) {
+        const msg = data?.error || data?.message || txt || `HTTP ${res.status}`;
+        throw new Error(msg);
     }
-    fEmpty.style.display = "none";
+    return data;
+}
 
-    const frag = document.createDocumentFragment();
+// ===== Determine which profile is being viewed =====
+// /profile/index.html?uid=APPWRITE_UID  → başka profili gör
+// yoksa kendi profilini görmeye çalışır (localStorage sm_uid varsa)
+function getViewingUid() {
+    const u = new URL(location.href);
+    const uid = (u.searchParams.get("uid") || "").trim();
+    if (uid) return uid;
 
-    userIds.forEach((uid) => {
-        const p = profilesMap?.get(uid);
-        const name = p?.display_name || p?.username || uid;
-        const handle = p?.username ? `@${p.username}` : uid;
-        const initialsTxt = (String(name).trim()[0] || "U").toUpperCase();
+    // fallback: projende eğer kullanıcı id saklıyorsan
+    const cached = (localStorage.getItem("sm_uid") || "").trim();
+    return cached || "";
+}
 
-        const row = document.createElement("div");
-        row.className = "fItem";
+let VIEW_UID = "";
+let ME_UID = "";
 
-        row.innerHTML = `
-      <div class="fLeft">
-        <div class="fAvatar">${initialsTxt}</div>
-        <div style="min-width:0">
-          <div class="fName">${name}</div>
-          <div class="fSub">${handle}</div>
-        </div>
+// ===== Modal (Followers/Following) =====
+function ensureModal() {
+    if (document.getElementById("fModalBack")) return;
+
+    const back = document.createElement("div");
+    back.className = "fModalBack";
+    back.id = "fModalBack";
+
+    back.innerHTML = `
+    <div class="fModal" role="dialog" aria-modal="true">
+      <div class="fHead">
+        <h3 id="fTitle">Followers</h3>
+        <button class="fClose" id="fClose" type="button">×</button>
       </div>
-      <button class="fBtn" data-uid="${uid}" type="button">View</button>
-    `;
 
-        frag.appendChild(row);
+      <div class="fTabs">
+        <button class="fTab active" id="tabFollowers" type="button">Followers</button>
+        <button class="fTab" id="tabFollowing" type="button">Following</button>
+      </div>
+
+      <div class="fList" id="fList"></div>
+    </div>
+  `;
+
+    document.body.appendChild(back);
+
+    const close = document.getElementById("fClose");
+    close.onclick = () => back.classList.remove("open");
+
+    back.addEventListener("click", (e) => {
+        if (e.target === back) back.classList.remove("open");
     });
 
-    fList.appendChild(frag);
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") back.classList.remove("open");
+    });
 }
 
-/* =========================
-   Main
-========================= */
-async function main() {
-    if (!sb) {
-        setMsg("Supabase CDN missing. Add supabase-js CDN script.");
-        console.warn("Supabase CDN missing.");
+function openModal(mode) {
+    ensureModal();
+    const back = document.getElementById("fModalBack");
+    const tabFollowers = document.getElementById("tabFollowers");
+    const tabFollowing = document.getElementById("tabFollowing");
+    const fTitle = document.getElementById("fTitle");
+
+    const setMode = (m) => {
+        tabFollowers.classList.toggle("active", m === "followers");
+        tabFollowing.classList.toggle("active", m === "following");
+        fTitle.textContent = m === "followers" ? "Followers" : "Following";
+        loadFollowList(m).catch(err => {
+            const list = document.getElementById("fList");
+            list.innerHTML = `<div style="padding:10px;font-weight:900;opacity:.8;">${esc(err.message)}</div>`;
+        });
+    };
+
+    tabFollowers.onclick = () => setMode("followers");
+    tabFollowing.onclick = () => setMode("following");
+
+    back.classList.add("open");
+    setMode(mode);
+}
+
+async function loadFollowList(mode) {
+    if (!sb) throw new Error("Supabase client missing.");
+
+    const list = document.getElementById("fList");
+    list.innerHTML = `<div style="padding:10px;font-weight:900;opacity:.75;">Loading...</div>`;
+
+    // follows table columns:
+    // follower_uid (kim takip ediyor)
+    // following_uid (kimi takip ediyor)
+
+    let rows = [];
+    if (mode === "followers") {
+        // Benim followerlarım → following_uid = VIEW_UID, listede follower_uid göster
+        const { data, error } = await sb
+            .from("follows")
+            .select("follower_uid, created_at")
+            .eq("following_uid", VIEW_UID)
+            .order("created_at", { ascending: false })
+            .limit(60);
+        if (error) throw error;
+        rows = data || [];
+    } else {
+        // Ben kimi takip ediyorum → follower_uid = VIEW_UID, listede following_uid göster
+        const { data, error } = await sb
+            .from("follows")
+            .select("following_uid, created_at")
+            .eq("follower_uid", VIEW_UID)
+            .order("created_at", { ascending: false })
+            .limit(60);
+        if (error) throw error;
+        rows = data || [];
+    }
+
+    const uids = rows.map(r => (mode === "followers" ? r.follower_uid : r.following_uid)).filter(Boolean);
+
+    // Profiles from profiles table (appwrite_user_id)
+    let profMap = new Map();
+    if (uids.length) {
+        const { data: profs, error: pErr } = await sb
+            .from("profiles")
+            .select("appwrite_user_id,name,email,avatar_url,created_at")
+            .in("appwrite_user_id", uids);
+        if (pErr) throw pErr;
+
+        (profs || []).forEach(p => profMap.set(p.appwrite_user_id, p));
+    }
+
+    if (!uids.length) {
+        list.innerHTML = `<div style="padding:10px;font-weight:900;opacity:.75;">Empty.</div>`;
         return;
     }
 
-    const me = await getMe();
-    if (!me) {
-        location.href = "/auth/login.html";
-        return;
-    }
+    list.innerHTML = uids.map((uid) => {
+        const p = profMap.get(uid);
+        const name = p?.name || uid.slice(0, 10);
+        const sub = p?.email || uid;
+        const ava = initials(p?.name || uid);
 
-    const myId = me.$id;
+        return `
+      <div class="fRow">
+        <div class="fLeft">
+          <div class="fAva">${esc(ava)}</div>
+          <div class="fNames">
+            <div class="fName">${esc(name)}</div>
+            <div class="fSub">${esc(sub)}</div>
+          </div>
+        </div>
+        <button class="fView" type="button" data-uid="${esc(uid)}">View</button>
+      </div>
+    `;
+    }).join("");
 
-    // URL: /profile/index.html?uid=HEDEF_UID
-    const targetUidFromUrl = new URL(location.href).searchParams.get("uid");
-    const targetId = targetUidFromUrl || myId;
-    const isMe = !targetUidFromUrl || targetUidFromUrl === myId;
+    list.querySelectorAll(".fView").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const uid = btn.getAttribute("data-uid");
+            if (!uid) return;
+            location.href = `/profile/index.html?uid=${encodeURIComponent(uid)}`;
+        });
+    });
+}
 
-    // Profile row
-    const row = await loadProfileRow(targetId);
+// ===== Data loaders =====
+async function loadCounts() {
+    if (!sb) throw new Error("Supabase client missing.");
 
-    const name =
-        row?.display_name ||
-        me?.name ||
-        me?.email?.split("@")[0] ||
-        "User";
+    // followers: following_uid = VIEW_UID
+    const { count: followers, error: e1 } = await sb
+        .from("follows")
+        .select("id", { count: "exact", head: true })
+        .eq("following_uid", VIEW_UID);
+    if (e1) throw e1;
+
+    // following: follower_uid = VIEW_UID
+    const { count: following, error: e2 } = await sb
+        .from("follows")
+        .select("id", { count: "exact", head: true })
+        .eq("follower_uid", VIEW_UID);
+    if (e2) throw e2;
+
+    followersCount.textContent = String(followers || 0);
+    followingCount.textContent = String(following || 0);
+}
+
+async function loadProfile() {
+    if (!sb) throw new Error("Supabase client missing.");
+
+    // profiles table: appwrite_user_id
+    const { data, error } = await sb
+        .from("profiles")
+        .select("appwrite_user_id,name,email,avatar_url,bio,website,created_at")
+        .eq("appwrite_user_id", VIEW_UID)
+        .maybeSingle();
+
+    if (error) throw error;
+
+    const prof = data || {};
+    const name = prof.name || "User";
+    const email = prof.email || "—";
+    const bio = (prof.bio || "").trim();
+    const link = (prof.website || "").trim();
+    const created = prof.created_at || null;
 
     pName.textContent = name;
-    pUser.textContent = row?.username ? `@${row.username}` : "@user";
+    pEmail.textContent = email;
+
     pAvatar.textContent = initials(name);
 
-    // meta: sadece kendinde email göster
-    pMeta.textContent = isMe ? (me.email || "") : "";
+    pBio.textContent = bio ? bio : "No bio yet.";
 
-    // joined
-    joined.textContent = fmtDate(row?.created_at || me?.$createdAt);
-
-    // bio + link
-    pBio.textContent = row?.bio || "No bio yet.";
-    const link = safeUrl(row?.link || "");
     if (link) {
-        pLink.style.display = "inline-block";
-        pLink.href = link;
-        pLink.textContent = link.replace(/^https?:\/\//, "");
+        pLink.style.display = "";
+        pLink.href = link.startsWith("http") ? link : `https://${link}`;
+        pLink.textContent = link;
     } else {
         pLink.style.display = "none";
     }
 
-    // counts + posts + follow state
-    const [pc, fc, fg, posts, following] = await Promise.all([
-        countPosts(targetId),
-        countFollowers(targetId),
-        countFollowing(targetId),
-        loadPosts(targetId),
-        isMe ? Promise.resolve(false) : isFollowing(myId, targetId),
-    ]);
+    joined.textContent = created ? `Joined ${fmtDate(created)}` : "Joined —";
 
-    postCount.textContent = String(pc || 0);
-    followerCount.textContent = String(fc || 0);
-    followingCount.textContent = String(fg || 0);
-
-    renderPosts(posts);
-
-    // Buttons show/hide
-    if (isMe) {
-        editBtn.style.display = "inline-flex";
-        followBtn.style.display = "none";
-        msgBtn.style.display = "none";
-    } else {
-        editBtn.style.display = "none";
-        followBtn.style.display = "inline-flex";
-        msgBtn.style.display = "inline-flex";
-
-        setFollowUI(following);
-
-        followBtn.onclick = async () => {
-            try {
-                followBtn.disabled = true;
-                const r = await toggleFollow(targetId);
-                setFollowUI(!!r.following);
-
-                // refresh counts
-                const [fc2, fg2] = await Promise.all([
-                    countFollowers(targetId),
-                    countFollowing(targetId),
-                ]);
-                followerCount.textContent = String(fc2 || 0);
-                followingCount.textContent = String(fg2 || 0);
-            } catch (e) {
-                alert(e?.message || "Follow error");
-            } finally {
-                followBtn.disabled = false;
-            }
-        };
-
-        msgBtn.onclick = () => alert("Message sistemi sonra.");
-    }
-
-    // ✅ Followers click -> Followers modal (NO TABS)
-    openFollowers?.addEventListener("click", async () => {
-        openFollowModal("Followers");
-
-        const rows = await listFollowers(targetId, 50);
-        const ids = rows.map((x) => String(x.follower_uid || "").trim()).filter(Boolean);
-
-        const profiles = await loadProfiles(ids);
-        renderFollowList(ids, profiles);
-    });
-
-    // ✅ Following click -> Following modal (NO TABS)
-    openFollowing?.addEventListener("click", async () => {
-        openFollowModal("Following");
-
-        const rows = await listFollowing(targetId, 50);
-        const ids = rows.map((x) => String(x.following_uid || "").trim()).filter(Boolean);
-
-        const profiles = await loadProfiles(ids);
-        renderFollowList(ids, profiles);
-    });
-
-    // Edit drawer (şimdilik UI)
-    editBtn.onclick = () => {
-        editWrap.style.display = "block";
-        bioInput.value = row?.bio || "";
-        linkInput.value = row?.link || "";
-    };
-
-    cancelEdit.onclick = () => {
-        editWrap.style.display = "none";
-    };
-
-    saveEdit.onclick = async () => {
-        const newBio = (bioInput.value || "").trim();
-        const newLink = (linkInput.value || "").trim();
-
-        // UI güncelle
-        pBio.textContent = newBio || "No bio yet.";
-
-        const link2 = safeUrl(newLink);
-        if (link2) {
-            pLink.style.display = "inline-block";
-            pLink.href = link2;
-            pLink.textContent = link2.replace(/^https?:\/\//, "");
-        } else {
-            pLink.style.display = "none";
-        }
-
-        editWrap.style.display = "none";
-        alert("Bio/Link DB’ye kaydetmek için upsert_profile function ekleyeceğiz.");
-    };
+    // Fill edit inputs
+    bioInput.value = bio;
+    linkInput.value = link;
 }
 
-/* =========================
-   Modal Events
-========================= */
-fCloseBtn?.addEventListener("click", closeFollowModal);
+async function loadPosts() {
+    // Senin post kaynağın projede farklı olabilir.
+    // Burada "analyses" tablosundan author_id = VIEW_UID diye çekiyoruz (senin feed mantığına uyuyor)
+    if (!sb) throw new Error("Supabase client missing.");
 
-followModal?.addEventListener("click", (e) => {
-    if (e.target?.dataset?.close) closeFollowModal();
-});
+    pMsg.textContent = "Loading posts...";
+    postsGrid.innerHTML = "";
 
-fList?.addEventListener("click", (e) => {
-    const btn = e.target.closest(".fBtn");
-    if (!btn) return;
-    const uid = btn.dataset.uid;
-    if (!uid) return;
-    window.location.href = `/profile/index.html?uid=${encodeURIComponent(uid)}`;
-});
+    const { data, error } = await sb
+        .from("analyses")
+        .select("id,title,content,image_path,created_at,author_id")
+        .eq("author_id", VIEW_UID)
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+    if (error) {
+        // tablo/kolon farklıysa en azından sayfa patlamasın
+        console.warn("posts load error:", error);
+        pMsg.textContent = "Posts load error.";
+        return;
+    }
+
+    const list = data || [];
+    if (!list.length) {
+        pMsg.textContent = "No posts yet.";
+        return;
+    }
+
+    pMsg.textContent = "";
+
+    postsGrid.innerHTML = list.map((x) => {
+        const title = x.title || "Post";
+        const date = fmtDate(x.created_at);
+        const img = (x.image_path || "").trim();
+
+        const imgHtml = img
+            ? `<img class="postImg" src="${esc(img)}" alt="${esc(title)}">`
+            : `<div class="postImg ph">No image</div>`;
+
+        return `
+      <article class="pPost">
+        ${imgHtml}
+        <div class="pPostBody">
+          <div class="pPostTitle">${esc(title)}</div>
+          <div class="pPostMeta">${esc(date)}</div>
+        </div>
+      </article>
+    `;
+    }).join("");
+
+    // post cards small css injection (minimum)
+    injectPostCssOnce();
+}
+
+function injectPostCssOnce() {
+    if (document.getElementById("postCssMini")) return;
+    const s = document.createElement("style");
+    s.id = "postCssMini";
+    s.textContent = `
+    .pPost{
+      border-radius:16px;
+      overflow:hidden;
+      border:1px solid rgba(15,23,42,.10);
+      background: rgba(255,255,255,.92);
+      box-shadow: var(--softShadow);
+    }
+    html[data-theme="dark"] .pPost{
+      border-color: rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+    }
+    .postImg{ width:100%; height:170px; object-fit:cover; display:block; background: rgba(37,99,235,.06); }
+    .postImg.ph{ display:grid; place-items:center; font-weight:1000; opacity:.65; }
+    .pPostBody{ padding:10px 12px; }
+    .pPostTitle{ font-weight:1000; font-size:14px; line-height:1.25; }
+    .pPostMeta{ margin-top:6px; font-weight:900; font-size:12px; opacity:.7; }
+  `;
+    document.head.appendChild(s);
+}
+
+// ===== Actions =====
+function wireEdit() {
+    editBtn.addEventListener("click", () => {
+        editWrap.style.display = "";
+        editBtn.style.display = "none";
+    });
+
+    cancelEdit.addEventListener("click", () => {
+        editWrap.style.display = "none";
+        editBtn.style.display = "";
+        // revert to loaded
+        loadProfile().catch(() => {});
+    });
+
+    saveEdit.addEventListener("click", async () => {
+        saveEdit.disabled = true;
+        try {
+            const bio = String(bioInput.value || "").trim();
+            const link = String(linkInput.value || "").trim();
+
+            // upsert_profile function (Authorization: Bearer sm_jwt gerekiyor)
+            await fnPost(FN_UPSERT_PROFILE, {
+                bio,
+                website: link
+            });
+
+            editWrap.style.display = "none";
+            editBtn.style.display = "";
+            await loadProfile();
+        } catch (e) {
+            alert(e.message || "Save failed");
+        } finally {
+            saveEdit.disabled = false;
+        }
+    });
+}
+
+function wireFollow() {
+    followBtn.addEventListener("click", async () => {
+        followBtn.disabled = true;
+        try {
+            // toggle_follow: { following_uid }
+            const out = await fnPost(FN_TOGGLE_FOLLOW, { following_uid: VIEW_UID });
+
+            // UI
+            const following = !!out.following;
+            followBtn.textContent = following ? "Following" : "Follow";
+            followBtn.classList.toggle("primary", !following);
+
+            await loadCounts();
+        } catch (e) {
+            alert(e.message || "Follow failed");
+        } finally {
+            followBtn.disabled = false;
+        }
+    });
+}
+
+async function detectMeUid() {
+    // Eğer login akışında sm_uid set ediyorsan onu alır
+    ME_UID = (localStorage.getItem("sm_uid") || "").trim();
+
+    // yoksa yine de follow/edit mantığını çalıştıracağız:
+    // - ME_UID yoksa Edit gösteremeyiz
+    // - follow için JWT yoksa function 401 döner
+}
+
+// ===== Main =====
+async function main() {
+    if (!sb) {
+        pMsg.textContent = "Supabase client not found (CDN missing).";
+        return;
+    }
+
+    VIEW_UID = getViewingUid();
+    if (!VIEW_UID) {
+        pMsg.textContent = "Missing uid. (Try /profile/index.html?uid=...)";
+        return;
+    }
+
+    await detectMeUid();
+
+    // show correct buttons
+    const isMe = ME_UID && VIEW_UID === ME_UID;
+
+    editBtn.style.display = isMe ? "" : "none";
+    followBtn.style.display = !isMe ? "" : "none";
+
+    // initial follow button text (optional)
+    if (!isMe) {
+        // check if ME follows VIEW
+        try {
+            const { data, error } = await sb
+                .from("follows")
+                .select("id")
+                .eq("follower_uid", ME_UID)
+                .eq("following_uid", VIEW_UID)
+                .maybeSingle();
+            if (!error && data?.id) {
+                followBtn.textContent = "Following";
+                followBtn.classList.remove("primary");
+            } else {
+                followBtn.textContent = "Follow";
+                followBtn.classList.add("primary");
+            }
+        } catch {}
+    }
+
+    // click stats open modal
+    followersBtn.addEventListener("click", () => openModal("followers"));
+    followingBtn.addEventListener("click", () => openModal("following"));
+
+    wireEdit();
+    wireFollow();
+
+    // load data
+    await loadProfile();
+    await loadCounts();
+    await loadPosts();
+}
 
 main().catch((e) => {
-    console.error(e);
-    setMsg("Profile load error.");
+    console.error("profile main error:", e);
+    pMsg.textContent = e.message || "Profile load error.";
 });
