@@ -18,7 +18,6 @@ const $ = (id) => document.getElementById(id);
 
 const pAvatar = $("pAvatar");
 const pName = $("pName");
-const pUser = $("pUser");
 
 const pBio = $("pBio");
 const pLink = $("pLink");
@@ -62,7 +61,11 @@ function initials(name) {
     const s = String(name || "").trim();
     if (!s) return "SM";
     return (
-        s.split(/\s+/).slice(0, 2).map((x) => (x[0] || "").toUpperCase()).join("") || "SM"
+        s
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((x) => (x[0] || "").toUpperCase())
+            .join("") || "SM"
     );
 }
 
@@ -87,6 +90,18 @@ function setFollowUI(isFollowing) {
     followBtn.classList.toggle("primary", !isFollowing);
 }
 
+function escapeHtml(s) {
+    return String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+function escapeAttr(s) {
+    return escapeHtml(s).replaceAll("`", "");
+}
+
 /* =========================
    Auth
 ========================= */
@@ -101,11 +116,12 @@ async function getMe() {
 /* =========================
    Supabase reads
 ========================= */
+// ✅ TABLO UYUMU: profiles.appwrite_user_id / name / bio / website / avatar_url / updated_at
 async function loadProfileRow(userId) {
     const { data, error } = await sb
         .from("profiles")
-        .select("user_id, username, display_name, bio, link, avatar_url, created_at")
-        .eq("user_id", userId)
+        .select("appwrite_user_id, name, bio, website, avatar_url, updated_at")
+        .eq("appwrite_user_id", userId)
         .maybeSingle();
 
     if (error) console.warn("profiles read error:", error);
@@ -170,7 +186,7 @@ async function loadPosts(userId) {
     return data || [];
 }
 
-/* ===== FOLLOW LIST READS (NO TABS) ===== */
+/* ===== FOLLOW LIST READS ===== */
 async function listFollowers(targetId, limit = 50) {
     const { data, error } = await sb
         .from("follows")
@@ -201,22 +217,21 @@ async function listFollowing(targetId, limit = 50) {
     return data || [];
 }
 
-/* hydrate profiles for follow list */
-const PROFILES_TABLE = "profiles";
+// ✅ follower listesinde isim göstermek için profiles.name çekiyoruz
 async function loadProfiles(userIds) {
     const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
     if (!ids.length) return new Map();
 
     const { data, error } = await sb
-        .from(PROFILES_TABLE)
-        .select("user_id, username, avatar_url, display_name")
-        .in("user_id", ids);
+        .from("profiles")
+        .select("appwrite_user_id, name, avatar_url")
+        .in("appwrite_user_id", ids);
 
     if (error) return new Map();
 
     const m = new Map();
     (data || []).forEach((p) => {
-        const k = String(p.user_id || "").trim();
+        const k = String(p.appwrite_user_id || "").trim();
         if (k) m.set(k, p);
     });
     return m;
@@ -297,6 +312,30 @@ async function toggleFollow(targetUid) {
 }
 
 /* =========================
+   Save Profile (Netlify upsert_profile)
+========================= */
+async function upsertProfile({ bio, website }) {
+    const jwt = localStorage.getItem("sm_jwt") || "";
+    if (!jwt) throw new Error("Missing JWT (sm_jwt)");
+
+    const res = await fetch("/.netlify/functions/upsert_profile", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify({ bio, website }),
+    });
+
+    const text = await res.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+
+    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+    return data;
+}
+
+/* =========================
    Follow Modal
 ========================= */
 function openFollowModal(title) {
@@ -325,8 +364,7 @@ function renderFollowList(userIds, profilesMap) {
 
     userIds.forEach((uid) => {
         const p = profilesMap?.get(uid);
-        const name = p?.display_name || p?.username || uid;
-        const handle = p?.username ? `@${p.username}` : uid;
+        const name = p?.name || uid;
         const init = (String(name).trim()[0] || "U").toUpperCase();
 
         const row = document.createElement("div");
@@ -336,7 +374,7 @@ function renderFollowList(userIds, profilesMap) {
         <div class="fAvatar">${init}</div>
         <div style="min-width:0">
           <div class="fName">${escapeHtml(name)}</div>
-          <div class="fSub">${escapeHtml(handle)}</div>
+          <div class="fSub">${escapeHtml(uid)}</div>
         </div>
       </div>
       <button class="fBtn" data-uid="${escapeAttr(uid)}" type="button">View</button>
@@ -346,16 +384,6 @@ function renderFollowList(userIds, profilesMap) {
 
     fList.appendChild(frag);
 }
-
-function escapeHtml(s){
-    return String(s ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-}
-function escapeAttr(s){ return escapeHtml(s).replaceAll("`",""); }
 
 /* =========================
    Main
@@ -382,32 +410,22 @@ async function main() {
 
     const row = await loadProfileRow(targetId);
 
-    // ✅ Name: DB display_name > Appwrite me.name > "User"
+    // ✅ Name: DB name > Appwrite me.name > "User"
     const displayName =
-        (row?.display_name && String(row.display_name).trim()) ||
+        (row?.name && String(row.name).trim()) ||
         (me?.name && String(me.name).trim()) ||
         "User";
 
     pName.textContent = displayName;
     pAvatar.textContent = initials(displayName);
 
-    // ✅ Username: sadece varsa göster, yoksa HİÇ gösterme (@user yok)
-    const uname = (row?.username && String(row.username).trim()) || "";
-    if (uname) {
-        pUser.style.display = "inline-block";
-        pUser.textContent = `@${uname}`;
-    } else {
-        pUser.style.display = "none";
-        pUser.textContent = "";
-    }
+    // ✅ Joined: row.updated_at yoksa Appwrite createdAt
+    joined.textContent = fmtDate(row?.updated_at || me?.$createdAt);
 
-    // ✅ Joined
-    joined.textContent = fmtDate(row?.created_at || me?.$createdAt);
-
-    // ✅ Bio + link
+    // ✅ Bio + website
     pBio.textContent = row?.bio || "No bio yet.";
 
-    const link = safeUrl(row?.link || "");
+    const link = safeUrl(row?.website || "");
     if (link) {
         pLink.style.display = "inline-block";
         pLink.href = link;
@@ -483,35 +501,47 @@ async function main() {
         renderFollowList(ids, profiles);
     });
 
-    // Edit drawer (UI only)
+    // Edit drawer
     editBtn.onclick = () => {
         editWrap.style.display = "block";
         bioInput.value = row?.bio || "";
-        linkInput.value = row?.link || "";
+        linkInput.value = row?.website || "";
     };
 
     cancelEdit.onclick = () => {
         editWrap.style.display = "none";
     };
 
+    // ✅ Save -> DB’ye yazar
     saveEdit.onclick = async () => {
-        const newBio = (bioInput.value || "").trim();
-        const newLink = (linkInput.value || "").trim();
+        try {
+            saveEdit.disabled = true;
 
-        // UI update
-        pBio.textContent = newBio || "No bio yet.";
+            const newBio = (bioInput.value || "").trim();
+            const newWebsite = (linkInput.value || "").trim();
 
-        const link2 = safeUrl(newLink);
-        if (link2) {
-            pLink.style.display = "inline-block";
-            pLink.href = link2;
-            pLink.textContent = link2.replace(/^https?:\/\//, "");
-        } else {
-            pLink.style.display = "none";
+            // UI update
+            pBio.textContent = newBio || "No bio yet.";
+
+            const link2 = safeUrl(newWebsite);
+            if (link2) {
+                pLink.style.display = "inline-block";
+                pLink.href = link2;
+                pLink.textContent = link2.replace(/^https?:\/\//, "");
+            } else {
+                pLink.style.display = "none";
+            }
+
+            // DB save
+            await upsertProfile({ bio: newBio, website: newWebsite });
+
+            editWrap.style.display = "none";
+            alert("Saved ✅");
+        } catch (e) {
+            alert(e?.message || "Save failed");
+        } finally {
+            saveEdit.disabled = false;
         }
-
-        editWrap.style.display = "none";
-        alert("DB’ye kaydetme için ayrıca upsert_profile function ekleyeceğiz.");
     };
 }
 
