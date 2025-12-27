@@ -1,80 +1,46 @@
-// netlify/functions/upsert_profile.js
-const { createClient } = require("@supabase/supabase-js");
-const { authUser } = require("./_auth_user");
+import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
-const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+const sb = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-function json(statusCode, bodyObj) {
-    return {
-        statusCode,
-        headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-        },
-        body: JSON.stringify(bodyObj),
-    };
-}
-
-function getBearer(event) {
-    const h = event.headers.authorization || event.headers.Authorization || "";
-    return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
-}
-
-const s = (v) => String(v ?? "").trim();
-const cleanUrl = (v) => {
-    const x = s(v);
-    if (!x) return "";
+export const handler = async (event) => {
     try {
-        const u = new URL(x.startsWith("http") ? x : "https://" + x);
-        return u.toString();
-    } catch {
-        return "";
-    }
-};
-
-exports.handler = async (event) => {
-    try {
-        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
-
-        const jwt = getBearer(event);
-        if (!jwt) return json(401, { error: "Missing JWT" });
-
-        const user = await authUser(jwt); // { uid, email }
-
         const body = JSON.parse(event.body || "{}");
+        const { appwrite_user_id, name, bio, website, avatar_url } = body;
 
-        // ✅ x YOK
-        // ✅ avatar_url boş gelirse bile yazıyoruz (delete için)
+        if (!appwrite_user_id) return json(400, { error: "Missing appwrite_user_id" });
+
         const payload = {
-            appwrite_user_id: user.uid,
-            email: s(body.email || user.email),
-            name: s(body.name || user.email?.split("@")?.[0] || "user"),
-
-            bio: s(body.bio),
-            website: cleanUrl(body.website),
-
-            avatar_url: cleanUrl(body.avatar_url), // "" => DB'de siler
-            updated_at: new Date().toISOString(),
+            appwrite_user_id,
+            name: name ?? null,
+            bio: bio ?? null,
+            website: website ?? null,
+            avatar_url: avatar_url ?? null,
+            updated_at: new Date().toISOString()
         };
 
-        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+        const { data, error } = await sb
+            .from("profiles")
+            .upsert(payload, { onConflict: "appwrite_user_id" })
+            .select("appwrite_user_id, name, bio, website, avatar_url, created_at")
+            .single();
 
-        const { error } = await sb.from("profiles").upsert(payload, {
-            onConflict: "appwrite_user_id",
-        });
+        if (error) return json(500, { error: error.message });
 
-        if (error) throw error;
-
-        return json(200, { ok: true });
+        return json(200, { ok: true, profile: data });
     } catch (e) {
-        console.error("upsert_profile error:", e);
-        return json(500, { error: e?.message || "Server error" });
+        return json(500, { error: String(e?.message || e) });
     }
 };
+
+function json(statusCode, body) {
+    return {
+        statusCode,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify(body),
+    };
+}
