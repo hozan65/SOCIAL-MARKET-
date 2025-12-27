@@ -3,16 +3,16 @@ import { account } from "/assets/appwrite.js";
 
 /**
  * Creates (or refreshes) Appwrite JWT and stores it for Netlify Functions.
- * - window.SM_JWT  (fast access)
- * - localStorage.sm_jwt (persistence, mobile)
+ * - window.SM_JWT
+ * - localStorage.sm_jwt
+ * - window.SM_REFRESH_JWT()
+ * - window.SM_JWT_READY (await this!)
  */
 
 async function refreshJWT() {
     try {
-        // If session is invalid, this throws
-        await account.get();
+        await account.get(); // throws if no session
 
-        // Create a short-lived JWT (Appwrite)
         const jwtObj = await account.createJWT();
         const jwt = jwtObj?.jwt;
 
@@ -24,24 +24,21 @@ async function refreshJWT() {
         console.log("✅ sm_jwt updated");
         return jwt;
     } catch (e) {
-        // Not logged in / session expired
         window.SM_JWT = "";
         localStorage.removeItem("sm_jwt");
-
         console.warn("⚠️ No session -> sm_jwt cleared");
         return null;
     }
 }
 
 // Run once on load
-refreshJWT();
+window.SM_JWT_READY = refreshJWT();
 
-// Optional: refresh every 8 minutes (keeps mobile alive)
-// You can remove this if you want.
+// Optional: refresh every 8 minutes (only when visible)
 setInterval(() => {
     if (document.visibilityState !== "visible") return;
     refreshJWT();
 }, 8 * 60 * 1000);
 
-// Make callable from other scripts if needed
+// Expose callable
 window.SM_REFRESH_JWT = refreshJWT;
