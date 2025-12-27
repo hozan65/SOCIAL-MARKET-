@@ -5,17 +5,14 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Profile</title>
 
-    <!-- Global CSS -->
     <link rel="stylesheet" href="/styles/variables.css">
     <link rel="stylesheet" href="/styles/base.css">
     <link rel="stylesheet" href="/styles/layout.css">
 
-    <!-- Page CSS -->
     <link rel="stylesheet" href="/u/u.css">
 </head>
 <body>
 
-<!-- Global Header -->
 <div id="headerMount"></div>
 
 <main class="container uPage">
@@ -29,11 +26,8 @@
             <div class="uRow1">
                 <h1 id="uName" class="uName">—</h1>
 
-                <!-- Follow (only for other users) -->
+                <!-- ✅ Follow button (only on other users) -->
                 <button id="uFollowBtn" class="uFollowBtn" hidden>Follow</button>
-
-                <!-- Settings (only for me) -->
-                <a id="uSettingsBtn" class="uSettingsBtn" href="/profile/index.html" hidden>⚙ Settings</a>
             </div>
 
             <div id="uBio" class="uBio"></div>
@@ -56,17 +50,17 @@
             </div>
 
             <div id="uLinks" class="uLinks"></div>
+            <div id="uMsg" class="uMsg"></div>
         </div>
     </section>
 
     <section class="uPosts">
         <div id="uPostsGrid" class="uPostsGrid"></div>
-        <div id="uMsg" class="uMsg"></div>
     </section>
 
 </main>
 
-<!-- Modal (followers/following) -->
+<!-- ✅ Modal (followers/following list) -->
 <div id="uModal" class="uModal" hidden>
     <div class="uModalCard">
         <div class="uModalHead">
@@ -77,7 +71,6 @@
     </div>
 </div>
 
-<!-- Scripts -->
 <script src="/assets1/header.js"></script>
 <script src="/u/u.js"></script>
 </body>
