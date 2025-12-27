@@ -1,11 +1,17 @@
-// /profile/profile.js (MODULE) ✅ Settings UI
+// /profile/profile.js (MODULE) ✅ FULL (Upload + Delete + Save + Cancel)
+// Uses:
+//  - /.netlify/functions/get_profile?uid=...
+//  - /.netlify/functions/upsert_profile
+//  - /.netlify/functions/upload_avatar
 import { account } from "/assets/appwrite.js";
 
 const FN_GET_PROFILE = "/.netlify/functions/get_profile";
 const FN_UPSERT_PROFILE = "/.netlify/functions/upsert_profile";
 const FN_UPLOAD_AVATAR = "/.netlify/functions/upload_avatar";
 
-/* DOM */
+/* =========================
+   DOM
+========================= */
 const $ = (id) => document.getElementById(id);
 
 const avatarImg = $("pAvatarImg");
@@ -17,35 +23,35 @@ const deleteBtn = $("deleteBtn");
 
 const pName = $("pName");
 const bioInput = $("bioInput");
-const link1Input = $("link1Input");
-const link2Input = $("link2Input");
+const link1Input = $("link1Input"); // only website for now
 
 const cancelBtn = $("cancelBtn");
 const saveBtn = $("saveBtn");
 const pMsg = $("pMsg");
 
-function setMsg(t){ pMsg.textContent = t || ""; }
+/* =========================
+   Helpers
+========================= */
+function setMsg(t) { if (pMsg) pMsg.textContent = t || ""; }
 
 function initials(name) {
     const s = String(name || "").trim();
     if (!s) return "SM";
-    return s.split(/\s+/).slice(0, 2).map(x => (x[0]||"").toUpperCase()).join("") || "SM";
+    return s
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((x) => (x[0] || "").toUpperCase())
+        .join("") || "SM";
 }
 
-function safeUrl(v){
+function safeUrl(v) {
     const s = String(v || "").trim();
     if (!s) return "";
     if (s.startsWith("http://") || s.startsWith("https://")) return s;
     return "https://" + s;
 }
 
-function getJWT(){
-    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt") || "";
-    if (!jwt) throw new Error("Missing sm_jwt (login required)");
-    return jwt;
-}
-
-function setAvatar(url, displayName){
+function setAvatar(url, displayName) {
     const u = String(url || "").trim();
     if (u) {
         avatarImg.src = u + (u.includes("?") ? "&" : "?") + "v=" + Date.now();
@@ -58,228 +64,271 @@ function setAvatar(url, displayName){
     }
 }
 
-async function getMe(){
+function getJWT() {
+    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt") || "";
+    if (!jwt) throw new Error("Missing sm_jwt (login required)");
+    return jwt;
+}
+
+async function getMe() {
     try { return await account.get(); } catch { return null; }
 }
 
-/* API */
-async function apiGetProfile(uid){
+/* =========================
+   API
+========================= */
+async function apiGetProfile(uid) {
     const jwt = getJWT();
     const res = await fetch(`${FN_GET_PROFILE}?uid=${encodeURIComponent(uid)}`, {
         method: "GET",
-        headers: { Authorization: `Bearer ${jwt}` }
+        headers: { Authorization: `Bearer ${jwt}` },
     });
-    const j = await res.json().catch(() => ({}));
+
+    const text = await res.text();
+    let j = {};
+    try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
+
     if (!res.ok) throw new Error(j?.error || `get_profile ${res.status}`);
     return j.profile || null;
 }
 
-async function apiSaveProfile(payload){
+async function apiUpsertProfile(payload) {
     const jwt = getJWT();
     const res = await fetch(FN_UPSERT_PROFILE, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify(payload),
     });
-    const j = await res.json().catch(() => ({}));
+
+    const text = await res.text();
+    let j = {};
+    try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
+
     if (!res.ok) throw new Error(j?.error || `upsert_profile ${res.status}`);
     return j;
 }
 
-async function apiUploadAvatar(file){
+async function apiUploadAvatar(file) {
     const jwt = getJWT();
     const fd = new FormData();
-    fd.append("file", file); // field name must be 'file'
+    fd.append("file", file); // ✅ must be 'file'
 
     const res = await fetch(FN_UPLOAD_AVATAR, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}` },
         body: fd,
     });
-    const j = await res.json().catch(() => ({}));
+
+    const text = await res.text();
+    let j = {};
+    try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
+
     if (!res.ok) throw new Error(j?.error || `upload_avatar ${res.status}`);
     return j.avatar_url || "";
 }
 
-/* State */
+/* =========================
+   State
+========================= */
 let me = null;
-let current = { name:"", bio:"", link1:"", link2:"", avatar_url:"" };
-let original = null;
+let displayName = "User";
 
-function setDirtyUI(dirty){
+// current DB snapshot (for cancel)
+let current = {
+    name: "User",
+    bio: "",
+    website: "",
+    avatar_url: "",
+};
+
+function readForm() {
+    return {
+        bio: (bioInput.value || "").trim(),
+        website: safeUrl(link1Input.value || "").trim(),
+    };
+}
+
+function applyForm(state) {
+    bioInput.value = state.bio || "";
+    link1Input.value = state.website || "";
+}
+
+function setDirty(dirty) {
     cancelBtn.disabled = !dirty;
     saveBtn.disabled = !dirty;
 }
 
-function readInputs(){
-    return {
-        name: current.name, // name’i değiştirmiyoruz (istersen ekleriz)
-        bio: (bioInput.value || "").trim(),
-        link1: safeUrl(link1Input.value || "").trim(),
-        link2: safeUrl(link2Input.value || "").trim(),
-        avatar_url: current.avatar_url,
-    };
+function computeDirty() {
+    const now = readForm();
+    return (now.bio !== (current.bio || "")) || (now.website !== (current.website || ""));
 }
 
-function applyToInputs(state){
-    bioInput.value = state.bio || "";
-    link1Input.value = state.link1 || "";
-    link2Input.value = state.link2 || "";
+function bindDirtyListeners() {
+    bioInput.addEventListener("input", () => setDirty(computeDirty()));
+    link1Input.addEventListener("input", () => setDirty(computeDirty()));
 }
 
-function computeDirty(){
-    const now = readInputs();
-    return JSON.stringify(now) !== JSON.stringify(original);
-}
-
-function onAnyChange(){
-    setDirtyUI(computeDirty());
-}
-
-/* Main */
-async function main(){
+/* =========================
+   Main
+========================= */
+async function main() {
     me = await getMe();
-    if (!me) { location.href = "/auth/login.html"; return; }
+    if (!me) {
+        location.href = "/auth/login.html";
+        return;
+    }
 
-    // show name
-    const displayName = (me?.name && String(me.name).trim()) || (me?.email ? me.email.split("@")[0] : "User");
+    displayName =
+        (me?.name && String(me.name).trim()) ||
+        (me?.email ? me.email.split("@")[0] : "User");
+
     pName.textContent = displayName;
 
     setMsg("Loading...");
     const row = await apiGetProfile(me.$id);
 
-    // DB -> current
+    // load current from DB
     current = {
         name: (row?.name && String(row.name).trim()) || displayName,
         bio: row?.bio || "",
-        link1: row?.website || "",     // 1. link: website
-        link2: row?.x || "",           // 2. link: x (yada youtube vs)
+        website: row?.website || "",
         avatar_url: row?.avatar_url || "",
     };
 
     // render
-    setAvatar(current.avatar_url, current.name);
-    applyToInputs(current);
+    pName.textContent = current.name || displayName;
+    setAvatar(current.avatar_url, current.name || displayName);
+    applyForm(current);
 
-    // snapshot
-    original = readInputs();
-    setDirtyUI(false);
+    setDirty(false);
     setMsg("");
 
-    // listeners
-    bioInput.addEventListener("input", onAnyChange);
-    link1Input.addEventListener("input", onAnyChange);
-    link2Input.addEventListener("input", onAnyChange);
+    bindDirtyListeners();
 
-    cancelBtn.onclick = () => {
-        applyToInputs(current);         // current zaten DB’den gelen son değer
-        original = readInputs();        // reset dirty baseline
-        setDirtyUI(false);
-        setMsg("Canceled.");
-        setTimeout(() => setMsg(""), 800);
-    };
-
-    saveBtn.onclick = async () => {
-        try{
-            saveBtn.disabled = true;
-            cancelBtn.disabled = true;
-            setMsg("Saving...");
-
-            const now = readInputs();
-
-            // ✅ DB schema’ya yaz: bio + website + x (2 link)
-            await apiSaveProfile({
-                name: current.name,
-                bio: now.bio,
-                website: now.link1,
-                x: now.link2,
-            });
-
-            // refresh from server (kalıcı olsun)
-            const fresh = await apiGetProfile(me.$id);
-
-            current = {
-                name: (fresh?.name && String(fresh.name).trim()) || current.name,
-                bio: fresh?.bio || "",
-                link1: fresh?.website || "",
-                link2: fresh?.x || "",
-                avatar_url: fresh?.avatar_url || current.avatar_url,
-            };
-
-            applyToInputs(current);
-            setAvatar(current.avatar_url, current.name);
-
-            original = readInputs();
-            setDirtyUI(false);
-
-            setMsg("Saved ✅");
-            setTimeout(() => setMsg(""), 1200);
-        }catch(e){
-            setMsg(e?.message || "Save failed");
-            setDirtyUI(true);
-        }
-    };
-
-    // Upload
+    /* ===== Upload photo ===== */
     uploadBtn.onclick = () => avatarInput.click();
+
     avatarInput.onchange = async () => {
         const file = avatarInput.files?.[0];
         if (!file) return;
 
-        try{
+        try {
             uploadBtn.disabled = true;
             deleteBtn.disabled = true;
             setMsg("Uploading...");
 
+            if (file.size > 3 * 1024 * 1024) throw new Error("Max 3MB");
+
             await apiUploadAvatar(file);
 
-            // refresh
+            // ✅ refresh from server so reload is consistent
             const fresh = await apiGetProfile(me.$id);
             current.avatar_url = fresh?.avatar_url || "";
+            setAvatar(current.avatar_url, current.name || displayName);
 
-            setAvatar(current.avatar_url, current.name);
             setMsg("Photo updated ✅");
             setTimeout(() => setMsg(""), 1200);
-        }catch(e){
+        } catch (e) {
             setMsg(e?.message || "Upload failed");
-        }finally{
+        } finally {
             uploadBtn.disabled = false;
             deleteBtn.disabled = false;
             avatarInput.value = "";
         }
     };
 
-    // Delete photo
+    /* ===== Delete photo (DB: avatar_url = "") ===== */
     deleteBtn.onclick = async () => {
-        try{
+        try {
             uploadBtn.disabled = true;
             deleteBtn.disabled = true;
             setMsg("Deleting...");
 
-            await apiSaveProfile({
-                name: current.name,
-                bio: (bioInput.value || "").trim(),
-                website: safeUrl(link1Input.value || ""),
-                x: safeUrl(link2Input.value || ""),
-                avatar_url: "", // clear
+            // ✅ 1) DB'ye avatar_url boş gönder
+            const form = readForm();
+            await apiUpsertProfile({
+                name: current.name || displayName,
+                bio: form.bio,
+                website: form.website,
+                avatar_url: "", // ✅ CRITICAL: clears DB
             });
 
+            // ✅ 2) serverdan tekrar oku (kesinleşsin)
             const fresh = await apiGetProfile(me.$id);
-            current.avatar_url = fresh?.avatar_url || "";
 
-            setAvatar("", current.name);
-            setMsg("Deleted ✅");
+            current = {
+                name: (fresh?.name && String(fresh.name).trim()) || (current.name || displayName),
+                bio: fresh?.bio || "",
+                website: fresh?.website || "",
+                avatar_url: fresh?.avatar_url || "", // should be ""
+            };
+
+            // ✅ 3) UI temizle
+            setAvatar(current.avatar_url, current.name || displayName);
+
+            setMsg("Photo deleted ✅");
             setTimeout(() => setMsg(""), 1200);
-        }catch(e){
+        } catch (e) {
             setMsg(e?.message || "Delete failed");
-        }finally{
+        } finally {
             uploadBtn.disabled = false;
             deleteBtn.disabled = false;
+        }
+    };
+
+    /* ===== Cancel ===== */
+    cancelBtn.onclick = () => {
+        applyForm(current);
+        setDirty(false);
+        setMsg("Canceled.");
+        setTimeout(() => setMsg(""), 800);
+    };
+
+    /* ===== Save ===== */
+    saveBtn.onclick = async () => {
+        try {
+            saveBtn.disabled = true;
+            cancelBtn.disabled = true;
+            setMsg("Saving...");
+
+            const form = readForm();
+
+            await apiUpsertProfile({
+                name: current.name || displayName,
+                bio: form.bio,
+                website: form.website,
+                // avatar_url göndermiyoruz -> mevcut değer kalsın
+            });
+
+            // refresh from server (kalıcı)
+            const fresh = await apiGetProfile(me.$id);
+
+            current = {
+                name: (fresh?.name && String(fresh.name).trim()) || (current.name || displayName),
+                bio: fresh?.bio || "",
+                website: fresh?.website || "",
+                avatar_url: fresh?.avatar_url || current.avatar_url || "",
+            };
+
+            applyForm(current);
+            setAvatar(current.avatar_url, current.name || displayName);
+
+            setDirty(false);
+            setMsg("Saved ✅");
+            setTimeout(() => setMsg(""), 1200);
+        } catch (e) {
+            setMsg(e?.message || "Save failed");
+            setDirty(true);
+        } finally {
+            // only enable based on dirty again
+            setDirty(computeDirty());
+            saveBtn.disabled = !computeDirty();
+            cancelBtn.disabled = !computeDirty();
         }
     };
 }
 
 main().catch((e) => {
     console.error(e);
-    setMsg("Page error.");
+    setMsg("Profile page error.");
 });
