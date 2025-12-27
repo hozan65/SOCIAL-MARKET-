@@ -70,7 +70,7 @@ function renderLoggedIn(slot, user) {
 
     const name = escapeHtml(user?.name || "Profile");
 
-    // ✅ ÜST BAR: Profile + Settings (Logout yok)
+    // ✅ ÜST BAR: My Profile + Settings menu (Logout yok)
     slot.innerHTML = `
     <div class="authWrap">
       <button class="authBtn" id="profileBtn">👤 ${name}</button>
@@ -97,9 +97,9 @@ function renderLoggedIn(slot, user) {
     </div>
   `;
 
-    // Profile
+    // ✅ FIX: Profile artık My Profile açar
     slot.querySelector("#profileBtn").onclick = () => {
-        location.href = "../profile/index.html";
+        location.href = "/u/?me=1";
     };
 
     // Settings open/close
