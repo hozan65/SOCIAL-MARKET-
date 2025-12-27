@@ -1,86 +1,63 @@
-// netlify/functions/upload_avatar.js
 import { authedUser } from "./_auth_user.js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+const json = (statusCode, bodyObj) => ({
+    statusCode,
+    headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+    },
+    body: JSON.stringify(bodyObj),
+});
 
 export async function handler(event) {
-    if (event.httpMethod === "OPTIONS") {
-        return {
-            statusCode: 200,
-            headers: {
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-            },
-            body: "",
-        };
-    }
+    try {
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+        if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
+        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
 
-    if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: "Method not allowed" };
-    }
+        const me = await authedUser(event);
+        if (!me?.ok) return json(401, { error: me?.error || "Unauthorized" });
 
-    if (!SUPABASE_URL || !SERVICE_KEY) {
-        return { statusCode: 500, body: "Missing Supabase ENV" };
-    }
+        const body = JSON.parse(event.body || "{}");
+        const base64 = String(body.base64 || "");
+        const ext = String(body.ext || "jpg").toLowerCase();
 
-    // ✅ JWT doğrula
-    const me = await authedUser(event);
-    if (!me?.ok) {
-        return { statusCode: 401, body: "Unauthorized" };
-    }
+        if (!base64) return json(400, { error: "Missing base64" });
+        if (!["jpg", "jpeg", "png", "webp"].includes(ext)) return json(400, { error: "Invalid ext" });
 
-    const contentType = event.headers["content-type"] || "";
-    if (!contentType.includes("multipart/form-data")) {
-        return { statusCode: 400, body: "Expected multipart/form-data" };
-    }
+        const buffer = Buffer.from(base64, "base64");
+        if (!buffer?.length) return json(400, { error: "Invalid base64 data" });
 
-    // multipart parse (basit)
-    const boundary = contentType.split("boundary=")[1];
-    const raw = Buffer.from(event.body, "base64").toString("binary");
-    const parts = raw.split("--" + boundary);
+        // bucket: avatars (public)
+        const path = `avatars/${me.user_id}.${ext}`;
+        const contentType =
+            ext === "png" ? "image/png" :
+                ext === "webp" ? "image/webp" : "image/jpeg";
 
-    const filePart = parts.find((p) => p.includes("filename="));
-    if (!filePart) {
-        return { statusCode: 400, body: "File not found" };
-    }
-
-    const match = filePart.match(/filename="(.+?)"/);
-    const filename = match ? match[1] : "avatar.jpg";
-    const ext = filename.split(".").pop().toLowerCase();
-    if (!["jpg", "jpeg", "png", "webp"].includes(ext)) {
-        return { statusCode: 400, body: "Invalid file type" };
-    }
-
-    const fileData = filePart.split("\r\n\r\n")[1].split("\r\n--")[0];
-    const buffer = Buffer.from(fileData, "binary");
-
-    const path = `avatars/${me.user_id}.${ext}`;
-
-    // 🔹 Supabase upload
-    const uploadRes = await fetch(
-        `${SUPABASE_URL}/storage/v1/object/${path}`,
-        {
+        // Storage upload (upsert)
+        const up = await fetch(`${SUPABASE_URL}/storage/v1/object/${path}`, {
             method: "PUT",
             headers: {
                 Authorization: `Bearer ${SERVICE_KEY}`,
-                "Content-Type": `image/${ext}`,
+                "Content-Type": contentType,
+                "x-upsert": "true",
             },
             body: buffer,
-        }
-    );
+        });
 
-    if (!uploadRes.ok) {
-        return { statusCode: 500, body: "Upload failed" };
-    }
+        const upText = await up.text();
+        if (!up.ok) return json(up.status, { error: upText || "Upload failed" });
 
-    const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${path}`;
+        const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${path}`;
 
-    // 🔹 DB update
-    await fetch(
-        `${SUPABASE_URL}/rest/v1/profiles?appwrite_user_id=eq.${me.user_id}`,
-        {
+        // profiles.avatar_url update
+        const pr = await fetch(`${SUPABASE_URL}/rest/v1/profiles?appwrite_user_id=eq.${me.user_id}`, {
             method: "PATCH",
             headers: {
                 Authorization: `Bearer ${SERVICE_KEY}`,
@@ -91,12 +68,14 @@ export async function handler(event) {
                 avatar_url: publicUrl,
                 updated_at: new Date().toISOString(),
             }),
-        }
-    );
+        });
 
-    return {
-        statusCode: 200,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ok: true, avatar_url: publicUrl }),
-    };
+        const prText = await pr.text();
+        if (!pr.ok) return json(pr.status, { error: prText || "Profile update failed" });
+
+        return json(200, { ok: true, avatar_url: publicUrl });
+    } catch (e) {
+        console.error("upload_avatar error:", e);
+        return json(500, { error: e?.message || "Server error" });
+    }
 }

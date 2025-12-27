@@ -1,20 +1,27 @@
-// netlify/functions/upsert_profile.js  (ESM)
-import { authedUser } from "./_auth_user.js";
+// netlify/functions/upsert_profile.js  (CommonJS)
+const { authUser } = require("./_auth_user");
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
 const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
-const json = (statusCode, bodyObj) => ({
-    statusCode,
-    headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-    },
-    body: JSON.stringify(bodyObj),
-});
+function json(statusCode, bodyObj) {
+    return {
+        statusCode,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+        },
+        body: JSON.stringify(bodyObj),
+    };
+}
+
+function getBearer(event) {
+    const h = event.headers.authorization || event.headers.Authorization || "";
+    return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
+}
 
 const s = (v) => String(v ?? "").trim();
 
@@ -29,30 +36,40 @@ const cleanUrl = (v) => {
     }
 };
 
-export async function handler(event) {
+exports.handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
+        if (!SUPABASE_URL || !SERVICE_KEY) {
+            return json(500, { error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY" });
+        }
 
-        // ✅ auth
-        const me = await authedUser(event); // { ok:true, user_id, email, name }
-        if (!me?.ok) return json(401, { error: "Unauthorized" });
+        const jwt = getBearer(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
+
+        // ✅ Appwrite JWT doğrula
+        const user = await authUser(jwt); // { uid, email }
 
         const body = JSON.parse(event.body || "{}");
 
-        // ✅ DB şeman: profiles(appwrite_user_id, name, bio, website, avatar_url, updated_at)
+        // ✅ Payload (senin tablo kolonlarına göre)
         const payload = {
-            appwrite_user_id: me.user_id,
-            name: s(body.name || me.name || "User"),
+            appwrite_user_id: user.uid,
+            name: s(body.name || body.display_name || body.username || ""), // istersen boş bırak
             bio: s(body.bio),
             website: cleanUrl(body.website),
             updated_at: new Date().toISOString(),
         };
 
-        // ✅ upsert via REST (service role)
-        const res = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+        // name boş gelirse email'in user kısmını koy
+        if (!payload.name) {
+            const em = s(user.email);
+            payload.name = em ? em.split("@")[0] : "User";
+        }
+
+        // ✅ Upsert (REST) - merge duplicates
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
             method: "POST",
             headers: {
                 Authorization: `Bearer ${SERVICE_KEY}`,
@@ -63,12 +80,15 @@ export async function handler(event) {
             body: JSON.stringify(payload),
         });
 
-        const text = await res.text();
-        if (!res.ok) return json(res.status, { error: text || "Supabase upsert failed" });
+        const t = await r.text();
+
+        if (!r.ok) {
+            return json(r.status, { error: t || "Supabase upsert failed" });
+        }
 
         return json(200, { ok: true });
     } catch (e) {
         console.error("upsert_profile error:", e);
         return json(500, { error: e?.message || "Server error" });
     }
-}
+};
