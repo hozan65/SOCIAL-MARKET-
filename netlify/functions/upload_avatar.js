@@ -27,14 +27,11 @@ function getBearer(event) {
 
 /**
  * Parse multipart/form-data from Netlify event.body
- * Netlify supplies body as base64 for multipart.
- * We must decode base64 -> Buffer then split by boundary.
+ * ✅ Accepts ANY file field name (file/avatar/image/etc)
  */
-function parseMultipart(event) {
+function parseMultipartAnyFile(event) {
     const ct = event.headers["content-type"] || event.headers["Content-Type"] || "";
-    if (!ct.includes("multipart/form-data")) {
-        throw new Error("Expected multipart/form-data");
-    }
+    if (!ct.includes("multipart/form-data")) throw new Error("Expected multipart/form-data");
 
     const m = ct.match(/boundary=([^\s;]+)/i);
     if (!m) throw new Error("Missing boundary");
@@ -42,7 +39,6 @@ function parseMultipart(event) {
 
     if (!event.body) throw new Error("Missing body");
 
-    // Netlify often sets event.isBase64Encoded = true for multipart
     const bodyBuf = event.isBase64Encoded
         ? Buffer.from(event.body, "base64")
         : Buffer.from(event.body, "utf8");
@@ -52,7 +48,7 @@ function parseMultipart(event) {
     let start = bodyBuf.indexOf(boundaryBuf);
 
     while (start !== -1) {
-        start += boundaryBuf.length + 2; // skip boundary + CRLF
+        start += boundaryBuf.length + 2; // boundary + CRLF
         const end = bodyBuf.indexOf(boundaryBuf, start);
         if (end === -1) break;
 
@@ -61,28 +57,39 @@ function parseMultipart(event) {
         start = end;
     }
 
-    // Find file part: has Content-Disposition with name="file"
+    // find FIRST file part (has filename=)
     for (const p of parts) {
         const headerEnd = p.indexOf(Buffer.from("\r\n\r\n"));
         if (headerEnd === -1) continue;
 
         const header = p.slice(0, headerEnd).toString("utf8");
-        const content = p.slice(headerEnd + 4); // after \r\n\r\n
+        const content = p.slice(headerEnd + 4);
 
-        const disp = header.match(/Content-Disposition:.*name="([^"]+)"/i);
         const filename = header.match(/filename="([^"]*)"/i);
+        if (!filename) continue; // not a file field
+
         const ctype = header.match(/Content-Type:\s*([^\r\n]+)/i);
-
-        const fieldName = disp?.[1] || "";
-        if (fieldName !== "file") continue;
-
         const originalName = filename?.[1] || "avatar";
         const mime = (ctype?.[1] || "application/octet-stream").trim();
 
         return { fileBuffer: content, originalName, mime };
     }
 
-    throw new Error("Missing file in multipart (field name must be 'file')");
+    // helpful debug: list field names we saw
+    const fieldNames = parts
+        .map((p) => {
+            const headerEnd = p.indexOf(Buffer.from("\r\n\r\n"));
+            if (headerEnd === -1) return null;
+            const header = p.slice(0, headerEnd).toString("utf8");
+            const disp = header.match(/Content-Disposition:.*name="([^"]+)"/i);
+            const fn = header.match(/filename="([^"]*)"/i);
+            return disp ? `${disp[1]}${fn ? " (file)" : ""}` : null;
+        })
+        .filter(Boolean);
+
+    throw new Error(
+        "No file found in multipart. Fields seen: " + (fieldNames.join(", ") || "none")
+    );
 }
 
 exports.handler = async (event) => {
@@ -95,42 +102,31 @@ exports.handler = async (event) => {
         const jwt = getBearer(event);
         if (!jwt) return json(401, { error: "Missing JWT" });
 
-        // ✅ Verify Appwrite JWT
         const user = await authUser(jwt); // { uid, email }
 
-        // ✅ Parse multipart file
-        const { fileBuffer, originalName, mime } = parseMultipart(event);
+        const { fileBuffer, originalName, mime } = parseMultipartAnyFile(event);
 
-        // ✅ Basic validation
         if (!fileBuffer || !fileBuffer.length) return json(400, { error: "Empty file" });
         if (fileBuffer.length > 3 * 1024 * 1024) return json(400, { error: "Max 3MB" });
-
-        // Only allow images
         if (!mime.startsWith("image/")) return json(400, { error: "File must be an image" });
 
         const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-        // ✅ Create path
         const ext = (originalName.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
         const safeExt = ["jpg", "jpeg", "png", "webp", "gif"].includes(ext) ? ext : "jpg";
         const filePath = `${user.uid}/avatar.${safeExt}`;
 
-        // ✅ Upload (upsert true)
         const up = await sb.storage.from(BUCKET).upload(filePath, fileBuffer, {
             contentType: mime,
             upsert: true,
             cacheControl: "3600",
         });
-
         if (up.error) throw up.error;
 
-        // ✅ Public URL
         const pub = sb.storage.from(BUCKET).getPublicUrl(filePath);
         const avatar_url = pub?.data?.publicUrl || "";
-
         if (!avatar_url) return json(500, { error: "Could not create public URL" });
 
-        // ✅ Save avatar_url to profiles row (PK = appwrite_user_id)
         const { error: upsertErr } = await sb.from("profiles").upsert(
             {
                 appwrite_user_id: user.uid,
@@ -139,7 +135,6 @@ exports.handler = async (event) => {
             },
             { onConflict: "appwrite_user_id" }
         );
-
         if (upsertErr) throw upsertErr;
 
         return json(200, { ok: true, avatar_url });
