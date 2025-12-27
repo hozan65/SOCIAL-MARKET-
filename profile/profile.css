@@ -1,24 +1,26 @@
-/* /profile/profile.css */
+/* /profile/profile.css — FLAT (no boxes) */
 
-/* flat sayfa */
-.profilePage{ padding-bottom: 40px; }
-
-.pCard{
-    margin-top: 18px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    box-shadow: var(--softShadow);
-    padding: 16px;
+.profilePage{
+    padding: 18px 0 40px;
 }
 
+/* ✅ KUTU YOK: pCard artık kart değil */
+.pCard{
+    margin-top: 10px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+/* üst alan */
 .pTop{
     display:flex;
     gap:14px;
     align-items:flex-start;
 }
 
-/* Avatar */
+/* avatar */
 .pAvatarWrap{ display:flex; align-items:flex-start; }
 .pAvatarBtn{
     background: transparent;
@@ -26,28 +28,22 @@
     padding: 0;
     cursor: pointer;
 }
+
 .pAvatar{
-    width:72px;
-    height:72px;
-    border-radius: 999px; /* ✅ yuvarlak */
+    width:76px;
+    height:76px;
+    border-radius: 999px;
     overflow:hidden;
     display:grid;
     place-items:center;
     font-weight:1000;
-    letter-spacing:.06em;
-    background: rgba(37,99,235,.12);
-    border:1px solid rgba(37,99,235,.22);
+    background: rgba(37,99,235,.10);
+    border:1px solid rgba(37,99,235,.18);
     color: var(--text);
 }
-.pAvatarImg{
-    width:100%;
-    height:100%;
-    object-fit:cover;
-    display:none;
-}
-.pAvatarTxt{
-    display:block;
-}
+
+.pAvatarImg{ width:100%; height:100%; object-fit:cover; display:none; }
+.pAvatarTxt{ display:block; }
 
 .pHead{ flex:1; min-width:0; }
 
@@ -57,92 +53,94 @@
     gap:10px;
     flex-wrap:wrap;
 }
+
 .pName{
     margin:0;
-    font-size: 28px;
+    font-size: 30px;
     font-weight:1000;
     letter-spacing:-.02em;
 }
 
-.pBio{
-    margin-top:10px;
-}
+/* bio + link (flat) */
+.pBio{ margin-top: 8px; }
 .pBioText{
     margin:0;
     font-weight:800;
     line-height:1.45;
-    color: var(--text);
     opacity:.92;
 }
 
 .pLink{
     display:inline-block;
-    margin-top:10px;
+    margin-top:8px;
     font-weight:1000;
     color: var(--brand);
     text-decoration:none;
 }
 .pLink:hover{ text-decoration:underline; }
 
+/* actions (sade butonlar) */
 .pActions{
-    margin-top:14px;
+    margin-top: 12px;
     display:flex;
     gap:10px;
     flex-wrap:wrap;
 }
 
-/* Stats */
+/* ✅ STAT KUTU YOK: satır gibi */
 .pStats{
-    margin-top:14px;
-    display:grid;
-    grid-template-columns: repeat(4, minmax(0,1fr));
-    gap:10px;
+    margin-top: 14px;
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    align-items:center;
 }
+
 .stat{
-    border:1px solid var(--border);
-    background: var(--card);
-    border-radius: 16px;
-    padding: 10px;
-    text-align:center;
+    border:none;
+    background:transparent;
+    border-radius:0;
+    padding:0;
+    text-align:left;
 }
-.stat.isClickable{
-    cursor:pointer;
-    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
-}
-.stat.isClickable:hover{
-    transform: translateY(-1px);
-    box-shadow: var(--softShadow);
-    border-color: rgba(37,99,235,.25);
-}
+
 .statNum{
     font-weight:1000;
-    font-size: 18px;
+    font-size: 16px;
 }
+
 .statLbl{
-    margin-top:4px;
-    font-weight:1000;
-    font-size: 12px;
+    margin-top:2px;
+    font-weight:900;
+    font-size:12px;
     color: var(--muted);
 }
 
-/* Posts */
-.postsSec{ margin-top:18px; }
-.postsHead{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    margin-bottom:10px;
+.stat.isClickable{
+    cursor:pointer;
+    padding: 6px 10px;
+    border-radius: 12px;
+    transition: background .12s ease;
 }
+.stat.isClickable:hover{
+    background: rgba(37,99,235,.08);
+}
+
+/* posts */
+.postsSec{ margin-top: 16px; }
+.postsHead{ margin-bottom: 10px; }
 .postsHead h2{
     margin:0;
-    font-size:20px;
+    font-size: 18px;
     font-weight:1000;
 }
+
 .postsGrid{
     display:grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap:14px;
 }
+
 .pPost{
     border:1px solid var(--border);
     background: var(--card);
@@ -150,50 +148,32 @@
     overflow:hidden;
     box-shadow: var(--softShadow);
     cursor:pointer;
-    transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    transition: transform .12s ease, box-shadow .12s ease;
 }
 .pPost:hover{
     transform: translateY(-2px);
     box-shadow: 0 16px 40px rgba(0,0,0,.10);
-    border-color: rgba(0,0,0,.12);
-}
-.pPostImg{
-    width:100%;
-    height:170px;
-    object-fit:cover;
-    background: rgba(37,99,235,.06);
-    display:block;
-}
-.pPostBody{ padding:12px; }
-.pPostTitle{
-    margin:0;
-    font-weight:1000;
-    font-size: 15px;
-    line-height:1.25;
-}
-.pPostTime{
-    margin-top:8px;
-    font-weight:900;
-    font-size:12px;
-    color: var(--muted);
-}
-.pMsg{
-    margin-top:10px;
-    color: var(--muted);
-    font-weight:900;
 }
 
-/* Edit (flat buttons) */
+.pPostImg{ width:100%; height:170px; object-fit:cover; display:block; background: rgba(37,99,235,.06); }
+.pPostBody{ padding:12px; }
+.pPostTitle{ font-weight:1000; font-size: 15px; line-height:1.25; }
+.pPostTime{ margin-top:8px; font-weight:900; font-size:12px; color: var(--muted); }
+.pMsg{ margin-top:10px; color: var(--muted); font-weight:900; }
+
+/* edit area */
 .editWrap{
-    margin-top:14px;
-    border-top:1px solid var(--border);
-    padding-top:14px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
 }
+
 .editGrid{
     display:grid;
     grid-template-columns: 1fr 1fr;
     gap:12px;
 }
+
 .lbl{
     display:block;
     font-weight:1000;
@@ -201,6 +181,7 @@
     margin-bottom:6px;
     color: var(--muted);
 }
+
 .ta, .in{
     width:100%;
     border-radius: 14px;
@@ -211,133 +192,47 @@
     font-weight:900;
     outline:none;
 }
+
 .ta:focus, .in:focus{
     border-color: rgba(37,99,235,.35);
     box-shadow: 0 0 0 3px rgba(37,99,235,.14);
 }
+
 .editBtns{
-    margin-top:12px;
+    margin-top: 12px;
     display:flex;
     gap:10px;
-    justify-content:flex-end;
 }
 
-/* FOLLOW MODAL */
-.fModal{
-    position:fixed;
-    inset:0;
-    z-index:9999;
-}
-.fBackdrop{
-    position:absolute;
-    inset:0;
-    background: rgba(15,23,42,.55);
-    backdrop-filter: blur(3px);
-}
-.fBox{
-    position:relative;
-    width:min(560px, calc(100% - 24px));
-    margin: 90px auto 0;
-    background: var(--card);
-    border:1px solid var(--border);
-    border-radius: 18px;
-    box-shadow: 0 30px 80px rgba(0,0,0,.25);
-    overflow:hidden;
-}
-.fTop{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    padding: 12px 14px;
-    border-bottom:1px solid var(--border);
-}
+/* ✅ modal aynı kalsın (istersen sonra flat yaparız) */
+.fModal{ position:fixed; inset:0; z-index:9999; }
+.fBackdrop{ position:absolute; inset:0; background: rgba(15,23,42,.55); backdrop-filter: blur(3px); }
+.fBox{ position:relative; width:min(560px, calc(100% - 24px)); margin: 90px auto 0; background: var(--card); border:1px solid var(--border); border-radius: 18px; box-shadow: 0 30px 80px rgba(0,0,0,.25); overflow:hidden; }
+.fTop{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 12px 14px; border-bottom:1px solid var(--border); }
 .fTitle{ font-weight:1000; font-size:14px; }
-.fClose{
-    width:34px;
-    height:34px;
-    border-radius:12px;
-    border:1px solid var(--border);
-    background: var(--panel);
-    cursor:pointer;
-    font-weight:1000;
-}
-.fList{
-    padding: 12px;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
-    max-height: 420px;
-    overflow:auto;
-}
-.fItem{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:12px;
-    padding:10px 12px;
-    border-radius: 14px;
-    border:1px solid var(--border);
-    background: var(--panel);
-}
-.fLeft{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    min-width:0;
-}
-.fAvatar{
-    width:38px;
-    height:38px;
-    border-radius:999px;
-    display:grid;
-    place-items:center;
-    font-weight:1000;
-    background: rgba(37,99,235,.12);
-    border:1px solid rgba(37,99,235,.22);
-    flex:0 0 38px;
-}
-.fName{
-    font-weight:1000;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    max-width: 260px;
-}
-.fSub{
-    font-weight:900;
-    opacity:.7;
-    font-size:12px;
-    margin-top:2px;
-}
-.fBtn{
-    padding:8px 12px;
-    border-radius:12px;
-    border:1px solid var(--border);
-    background: var(--card);
-    font-weight:1000;
-    cursor:pointer;
-}
-.fEmpty{
-    padding: 14px;
-    font-weight:1000;
-    opacity:.75;
-}
+.fClose{ width:34px; height:34px; border-radius:12px; border:1px solid var(--border); background: var(--panel); cursor:pointer; font-weight:1000; }
+.fList{ padding: 12px; display:flex; flex-direction:column; gap:10px; max-height: 420px; overflow:auto; }
+.fItem{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border-radius: 14px; border:1px solid var(--border); background: var(--panel); }
+.fLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
+.fAvatar{ width:38px; height:38px; border-radius:999px; display:grid; place-items:center; font-weight:1000; background: rgba(37,99,235,.12); border:1px solid rgba(37,99,235,.22); flex:0 0 38px; }
+.fName{ font-weight:1000; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width: 260px; }
+.fSub{ font-weight:900; opacity:.7; font-size:12px; margin-top:2px; }
+.fBtn{ padding:8px 12px; border-radius:12px; border:1px solid var(--border); background: var(--card); font-weight:1000; cursor:pointer; }
+.fEmpty{ padding: 14px; font-weight:1000; opacity:.75; }
 
-/* MOBILE */
+/* mobile */
 @media (max-width: 800px){
-    .pTop{ flex-direction:column; align-items:flex-start; }
-    .pStats{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .pTop{ flex-direction:column; }
     .editGrid{ grid-template-columns: 1fr; }
 }
+
 @media (max-width: 600px){
-    .pAvatar{ width:82px; height:82px; }
+    .pAvatar{ width:86px; height:86px; }
     .pActions{ width:100%; }
     .pActions .btn{ flex:1 1 auto; min-height:44px; }
     .postsGrid{ grid-template-columns: 1fr; }
     .pPostImg{ height:190px; }
-    .editBtns{ justify-content:stretch; }
+
     .editBtns .btn{ flex:1 1 auto; min-height:44px; }
     .fBox{ margin-top: 56px; width: calc(100% - 16px); }
-    .fName{ max-width: 180px; }
 }
