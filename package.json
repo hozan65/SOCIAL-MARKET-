@@ -2,8 +2,11 @@
   "name": "social-market",
   "private": true,
   "version": "1.0.0",
+  "type": "commonjs",
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
-    "node-appwrite": "^12.0.1"
+    "@supabase/supabase-js": "^2.49.1"
   }
 }

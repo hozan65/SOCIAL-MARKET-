@@ -1,13 +1,13 @@
-# netlify.toml
-
 [build]
-command = ""
 publish = "."
+command = ""
 
 [functions]
 directory = "netlify/functions"
 node_bundler = "esbuild"
 
-# (Opsiyonel) Scheduled function kullanıyorsan:
-[functions."news_ingest"]
-schedule = "*/5 * * * *"
+# (Opsiyonel) SPA ise 404 yerine index.html
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
