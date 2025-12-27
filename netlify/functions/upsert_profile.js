@@ -25,6 +25,8 @@ function getBearer(event) {
 }
 
 const s = (v) => String(v ?? "").trim();
+
+// URL sanitize (boş ise "" döner)
 const cleanUrl = (v) => {
     const x = s(v);
     if (!x) return "";
@@ -50,21 +52,28 @@ exports.handler = async (event) => {
 
         const body = JSON.parse(event.body || "{}");
 
-        // ✅ Table schema: profiles(appwrite_user_id, name, bio, website, avatar_url, created_at, updated_at)
+        // ✅ BURASI ÖNEMLİ:
+        // avatar_url alanını HER ZAMAN set ediyoruz (delete için "" gelsin)
         const payload = {
             appwrite_user_id: user.uid,
-            name: s(body.name || ""),              // istersen frontend gönderebilir; göndermese de sorun değil
-            bio: s(body.bio || ""),
-            website: cleanUrl(body.website || ""),
+            email: s(body.email || user.email),
+            name: s(body.name || body.display_name || user.email?.split("@")?.[0] || "user"),
+
+            bio: s(body.bio),
+            website: cleanUrl(body.website),
+
+            // 2.link olarak x kullanıyorsan:
+            x: cleanUrl(body.x),
+
+            // ✅ avatar_url boş da gelse yaz
+            avatar_url: cleanUrl(body.avatar_url), // "" ise DB'ye "" yazar
+
             updated_at: new Date().toISOString(),
         };
 
-        // name boşsa DB’deki name’i ezmemek için: boşsa kaldır
-        if (!payload.name) delete payload.name;
-
         const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-        // ✅ upsert = insert or update
+        // appwrite_user_id UNIQUE olmalı
         const { error } = await sb.from("profiles").upsert(payload, {
             onConflict: "appwrite_user_id",
         });
