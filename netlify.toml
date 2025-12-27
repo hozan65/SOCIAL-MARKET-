@@ -1,3 +1,5 @@
+# netlify.toml
+
 [build]
 command = ""
 publish = "."
@@ -6,5 +8,6 @@ publish = "."
 directory = "netlify/functions"
 node_bundler = "esbuild"
 
+# (Opsiyonel) Scheduled function kullanıyorsan:
 [functions."news_ingest"]
 schedule = "*/5 * * * *"
