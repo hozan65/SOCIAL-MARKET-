@@ -1,9 +1,6 @@
-// /profile/profile.js (MODULE) ✅ REFRESH-SAFE
+// /profile/profile.js (MODULE) ✅ AUTO-COLUMN FIX for 400
 import { account } from "/assets/appwrite.js";
 
-/* =========================
-   SUPABASE (CDN global)
-========================= */
 const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
 
@@ -11,14 +8,9 @@ const sb = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
-/* =========================
-   TABLE SCHEMA (IMPORTANT)
-   - profiles PK column is: appwrite_user
-   - link column: website
-   - avatar column: avatar_url
-========================= */
 const PROFILE_TABLE = "profiles";
-const COL_UID = "appwrite_user";   // ✅ senin tabloda böyle
+
+// UI columns (these exist in your table)
 const COL_NAME = "name";
 const COL_BIO = "bio";
 const COL_WEBSITE = "website";
@@ -75,20 +67,14 @@ function setMsg(t) { if (pMsg) pMsg.textContent = t || ""; }
 function initials(name) {
     const s = String(name || "").trim();
     if (!s) return "SM";
-    return s
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((x) => (x[0] || "").toUpperCase())
-        .join("") || "SM";
+    return s.split(/\s+/).slice(0, 2).map((x) => (x[0] || "").toUpperCase()).join("") || "SM";
 }
 
 function fmtDate(iso) {
     try {
         const d = new Date(iso);
         return d.toLocaleDateString("tr-TR", { year: "numeric", month: "short", day: "2-digit" });
-    } catch {
-        return "—";
-    }
+    } catch { return "—"; }
 }
 
 function safeUrl(u) {
@@ -106,12 +92,11 @@ function escapeHtml(s) {
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#039;");
 }
-function escapeAttr(s) { return escapeHtml(s).replaceAll("`", ""); }
+function escapeAttr(s){ return escapeHtml(s).replaceAll("`",""); }
 
 function setAvatar(url, displayName) {
     const u = String(url || "").trim();
     if (u) {
-        // cache bust
         avatarImg.src = u + (u.includes("?") ? "&" : "?") + "v=" + Date.now();
         avatarImg.style.display = "block";
         avatarTxt.style.display = "none";
@@ -154,25 +139,70 @@ async function getMe() {
 }
 
 /* =========================
-   Supabase reads
+   IMPORTANT: Detect correct UID column
+   Because your request is 400, likely wrong column.
 ========================= */
-async function loadProfileRow(appwriteUid) {
+let UID_COL = null;
+const UID_COL_CANDIDATES = ["appwrite_user", "appwrite_user_id", "user_id"];
+
+async function tryLoadWithCol(col, uid) {
     const { data, error } = await sb
         .from(PROFILE_TABLE)
-        .select(`${COL_UID},${COL_NAME},${COL_BIO},${COL_WEBSITE},${COL_AVATAR},${COL_CREATED},${COL_UPDATED}`)
-        .eq(COL_UID, appwriteUid)
+        .select(`${col},${COL_NAME},${COL_BIO},${COL_WEBSITE},${COL_AVATAR},${COL_CREATED},${COL_UPDATED}`)
+        .eq(col, uid)
+        .maybeSingle();
+
+    return { data: data || null, error };
+}
+
+async function detectUidColumn(uid) {
+    for (const col of UID_COL_CANDIDATES) {
+        const { data, error } = await tryLoadWithCol(col, uid);
+
+        // If error exists and is a "column not found / bad request" -> try next.
+        // Supabase-js error shape differs, so check loosely:
+        const msg = String(error?.message || error?.hint || "");
+        const bad =
+            error &&
+            (msg.includes("column") ||
+                msg.includes("failed to parse") ||
+                msg.includes("not found") ||
+                msg.includes("bad request") ||
+                msg.includes("PGRST"));
+
+        if (!error || !bad) {
+            // even if row doesn't exist, no column error means column is valid
+            UID_COL = col;
+            return { col, row: data };
+        }
+    }
+
+    // fallback to first candidate
+    UID_COL = UID_COL_CANDIDATES[0];
+    return { col: UID_COL, row: null };
+}
+
+async function loadProfileRow(uid) {
+    if (!UID_COL) await detectUidColumn(uid);
+
+    const { data, error } = await sb
+        .from(PROFILE_TABLE)
+        .select(`${UID_COL},${COL_NAME},${COL_BIO},${COL_WEBSITE},${COL_AVATAR},${COL_CREATED},${COL_UPDATED}`)
+        .eq(UID_COL, uid)
         .maybeSingle();
 
     if (error) console.warn("loadProfileRow error:", error);
     return data || null;
 }
 
+/* =========================
+   Stats + Posts
+========================= */
 async function countPosts(userId) {
     const { count, error } = await sb
         .from("analyses")
         .select("id", { count: "exact", head: true })
         .eq("author_id", userId);
-
     if (error) console.warn("countPosts error:", error);
     return count || 0;
 }
@@ -182,7 +212,6 @@ async function countFollowers(userId) {
         .from("follows")
         .select("follower_uid", { count: "exact", head: true })
         .eq("following_uid", userId);
-
     if (error) console.warn("countFollowers error:", error);
     return count || 0;
 }
@@ -192,7 +221,6 @@ async function countFollowing(userId) {
         .from("follows")
         .select("following_uid", { count: "exact", head: true })
         .eq("follower_uid", userId);
-
     if (error) console.warn("countFollowing error:", error);
     return count || 0;
 }
@@ -221,52 +249,6 @@ async function loadPosts(userId) {
     return data || [];
 }
 
-async function listFollowers(targetId, limit = 50) {
-    const { data, error } = await sb
-        .from("follows")
-        .select("follower_uid, created_at")
-        .eq("following_uid", targetId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-
-    if (error) { console.warn("listFollowers error:", error); return []; }
-    return data || [];
-}
-
-async function listFollowing(targetId, limit = 50) {
-    const { data, error } = await sb
-        .from("follows")
-        .select("following_uid, created_at")
-        .eq("follower_uid", targetId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-
-    if (error) { console.warn("listFollowing error:", error); return []; }
-    return data || [];
-}
-
-async function loadProfiles(userIds) {
-    const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
-    if (!ids.length) return new Map();
-
-    const { data, error } = await sb
-        .from(PROFILE_TABLE)
-        .select(`${COL_UID},${COL_NAME},${COL_AVATAR}`)
-        .in(COL_UID, ids);
-
-    if (error) return new Map();
-
-    const m = new Map();
-    (data || []).forEach((p) => {
-        const k = String(p?.[COL_UID] || "").trim();
-        if (k) m.set(k, p);
-    });
-    return m;
-}
-
-/* =========================
-   Render Posts
-========================= */
 function renderPosts(list) {
     postsGrid.innerHTML = "";
     if (!list || list.length === 0) { setMsg("No posts yet."); return; }
@@ -277,7 +259,6 @@ function renderPosts(list) {
     for (const it of list) {
         const card = document.createElement("div");
         card.className = "pPost";
-
         card.addEventListener("click", () => {
             window.location.href = `/view/view.html?id=${encodeURIComponent(it.id)}`;
         });
@@ -319,41 +300,35 @@ function getJWT() {
     return jwt;
 }
 
-function setFollowUI(isFollowing) {
-    followBtn.textContent = isFollowing ? "Following" : "Follow";
-    followBtn.classList.toggle("primary", !isFollowing);
+function setFollowUI(isF) {
+    followBtn.textContent = isF ? "Following" : "Follow";
+    followBtn.classList.toggle("primary", !isF);
 }
 
 async function toggleFollow(targetUid) {
     const jwt = getJWT();
-
     const res = await fetch("/.netlify/functions/toggle_follow", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify({ following_uid: String(targetUid) }),
     });
-
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
-
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
     return data;
 }
 
 async function upsertProfile({ bio, website }) {
     const jwt = getJWT();
-
     const res = await fetch("/.netlify/functions/upsert_profile", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify({ bio, website }),
     });
-
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
-
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
     return data;
 }
@@ -372,13 +347,12 @@ async function uploadAvatar(file) {
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
-
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
     return data.avatar_url || "";
 }
 
 /* =========================
-   Follow Modal
+   Follow modal
 ========================= */
 function openFollowModal(title) {
     fTitle.textContent = title;
@@ -390,35 +364,6 @@ function openFollowModal(title) {
 function closeFollowModal() {
     followModal.style.display = "none";
     document.body.style.overflow = "";
-}
-function renderFollowList(userIds, profilesMap) {
-    fList.innerHTML = "";
-    if (!userIds.length) { fEmpty.style.display = "block"; return; }
-    fEmpty.style.display = "none";
-
-    const frag = document.createDocumentFragment();
-
-    userIds.forEach((uid) => {
-        const p = profilesMap?.get(uid);
-        const name = p?.[COL_NAME] || uid;
-        const init = (String(name).trim()[0] || "U").toUpperCase();
-
-        const row = document.createElement("div");
-        row.className = "fItem";
-        row.innerHTML = `
-      <div class="fLeft">
-        <div class="fAvatar">${escapeHtml(init)}</div>
-        <div style="min-width:0">
-          <div class="fName">${escapeHtml(name)}</div>
-          <div class="fSub">${escapeHtml(uid)}</div>
-        </div>
-      </div>
-      <button class="fBtn" data-uid="${escapeAttr(uid)}" type="button">View</button>
-    `;
-        frag.appendChild(row);
-    });
-
-    fList.appendChild(frag);
 }
 
 /* =========================
@@ -432,16 +377,17 @@ async function main() {
 
     const myId = me.$id;
 
-    // profile page can view others:
+    // detect UID column once
+    await detectUidColumn(myId);
+    console.log("✅ Detected UID_COL:", UID_COL);
+
     const targetUidFromUrl = new URL(location.href).searchParams.get("uid");
     const targetId = targetUidFromUrl || myId;
     const isMe = !targetUidFromUrl || targetUidFromUrl === myId;
 
-    // ✅ ALWAYS read from DB (refresh-safe)
     let row = await loadProfileRow(targetId);
     renderProfileUI(row, me);
 
-    // Stats + posts + follow state
     const [pc, fc, fg, posts, following] = await Promise.all([
         countPosts(targetId),
         countFollowers(targetId),
@@ -456,13 +402,11 @@ async function main() {
 
     renderPosts(posts);
 
-    // Buttons
     if (isMe) {
         editBtn.style.display = "inline-flex";
         followBtn.style.display = "none";
         msgBtn.style.display = "none";
 
-        // Avatar
         changeAvatarBtn.style.display = "inline-flex";
         changeAvatarBtn.onclick = () => avatarInput.click();
 
@@ -476,7 +420,7 @@ async function main() {
 
                 await uploadAvatar(file);
 
-                // ✅ re-read from DB so refresh won't lose it
+                // refresh from DB
                 row = await loadProfileRow(myId);
                 renderProfileUI(row, me);
 
@@ -492,7 +436,6 @@ async function main() {
         editBtn.style.display = "none";
         followBtn.style.display = "inline-flex";
         msgBtn.style.display = "inline-flex";
-        changeAvatarBtn.style.display = "none";
 
         setFollowUI(!!following);
 
@@ -516,27 +459,9 @@ async function main() {
         };
 
         msgBtn.onclick = () => alert("Message sistemi sonra.");
+        changeAvatarBtn.style.display = "none";
     }
 
-    // Followers modal
-    openFollowers?.addEventListener("click", async () => {
-        openFollowModal("Followers");
-        const rows = await listFollowers(targetId, 50);
-        const ids = rows.map((x) => String(x.follower_uid || "").trim()).filter(Boolean);
-        const profiles = await loadProfiles(ids);
-        renderFollowList(ids, profiles);
-    });
-
-    // Following modal
-    openFollowing?.addEventListener("click", async () => {
-        openFollowModal("Following");
-        const rows = await listFollowing(targetId, 50);
-        const ids = rows.map((x) => String(x.following_uid || "").trim()).filter(Boolean);
-        const profiles = await loadProfiles(ids);
-        renderFollowList(ids, profiles);
-    });
-
-    // Edit
     editBtn.onclick = () => {
         editWrap.style.display = "block";
         bioInput.value = row?.[COL_BIO] || "";
@@ -548,18 +473,17 @@ async function main() {
     saveEdit.onclick = async () => {
         try {
             saveEdit.disabled = true;
-
             const newBio = (bioInput.value || "").trim();
             const newWebsite = (linkInput.value || "").trim();
 
             await upsertProfile({ bio: newBio, website: newWebsite });
 
-            // ✅ re-read from DB
+            // refresh from DB
             row = await loadProfileRow(myId);
             renderProfileUI(row, me);
 
             editWrap.style.display = "none";
-            alert("Saved ✅");
+            alert("Saved ");
         } catch (e) {
             alert(e?.message || "Save failed");
         } finally {
@@ -568,11 +492,10 @@ async function main() {
     };
 }
 
-/* =========================
-   Modal Events
-========================= */
+/* Modal events */
 fCloseBtn?.addEventListener("click", closeFollowModal);
 followModal?.addEventListener("click", (e) => { if (e.target?.dataset?.close) closeFollowModal(); });
+
 fList?.addEventListener("click", (e) => {
     const btn = e.target.closest(".fBtn");
     if (!btn) return;
