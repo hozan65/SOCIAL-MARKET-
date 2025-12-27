@@ -1,184 +1,279 @@
-// /u/u.js (NO MODULE)
-// Public profile viewer + follow/unfollow (SAFE)
-// - READ: Supabase anon
-// - WRITE: Netlify Function toggle_follow (Appwrite JWT)
+console.log("✅ u.js loaded");
 
-console.log("✅ u.js running");
-
-const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
-
-const sb = window.supabase?.createClient
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
-
+const FN_GET_PROFILE   = "/.netlify/functions/get_profile";
 const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";
+const FN_LIST_FOLLOWERS = "/.netlify/functions/list_followers";
+const FN_LIST_FOLLOWING = "/.netlify/functions/list_following";
 
-const $ = (id) => document.getElementById(id);
+const el = (id) => document.getElementById(id);
 
-function avatarFromEmail(email) {
-    const seed = encodeURIComponent(String(email || "user").trim().toLowerCase());
-    return `https://api.dicebear.com/7.x/identicon/svg?seed=${seed}`;
+const $avatar = el("uAvatar");
+const $name = el("uName");
+const $bio = el("uBio");
+const $followers = el("uFollowers");
+const $following = el("uFollowing");
+const $postsCount = el("uPostsCount");
+const $links = el("uLinks");
+const $grid = el("uPostsGrid");
+const $msg = el("uMsg");
+const $followBtn = el("uFollowBtn");
+
+const $followersBtn = el("uFollowersBtn");
+const $followingBtn = el("uFollowingBtn");
+
+const $modal = el("uModal");
+const $modalTitle = el("uModalTitle");
+const $modalBody = el("uModalBody");
+const $modalClose = el("uModalClose");
+
+const esc = (s) =>
+    String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+function qs(name){
+    return new URLSearchParams(location.search).get(name);
 }
 
-function getTargetUserId() {
-    const u = new URLSearchParams(location.search).get("u");
-    return u && u.trim() ? u.trim() : null;
+/**
+ * Senin auth sistemin Appwrite JWT idi.
+ * Bu projede genelde localStorage'da token tutuluyordu.
+ * Aşağıdaki key adını kendi projenle aynı yap:
+ */
+function getJWT(){
+    return localStorage.getItem("appwrite_jwt") || localStorage.getItem("jwt") || "";
 }
 
-function getViewerId() {
-    // auth-ui.js logged-in olunca set ediyor: localStorage.setItem("sm_uid", user.$id)
-    return localStorage.getItem("sm_uid") || "";
+function setMsg(t){ $msg.textContent = t || ""; }
+
+function openModal(title, html){
+    $modalTitle.textContent = title;
+    $modalBody.innerHTML = html;
+    $modal.hidden = false;
+}
+function closeModal(){
+    $modal.hidden = true;
+    $modalTitle.textContent = "—";
+    $modalBody.innerHTML = "";
 }
 
-function getJWT() {
-    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt");
-    if (!jwt) throw new Error("Login required");
-    return jwt;
-}
+$modalClose?.addEventListener("click", closeModal);
+$modal?.addEventListener("click", (e) => {
+    if (e.target === $modal) closeModal();
+});
 
-async function fnPost(url, body) {
+let profileId = null;
+let isMe = false;
+let isFollowing = false;
+
+async function loadProfile(){
+    const id = qs("id");
+    const u = qs("u"); // username support (opsiyonel)
+
+    if (!id && !u){
+        setMsg("No user selected.");
+        return;
+    }
+
+    setMsg("Loading...");
+
+    const url = new URL(FN_GET_PROFILE, location.origin);
+    if (id) url.searchParams.set("id", id);
+    if (u)  url.searchParams.set("username", u);
+
     const jwt = getJWT();
-    const r = await fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify(body || {}),
+
+    const res = await fetch(url.toString(), {
+        headers: jwt ? { "Authorization": `Bearer ${jwt}` } : {}
     });
 
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
-    return j;
-}
+    const data = await res.json().catch(()=> ({}));
 
-async function getFollowCounts(targetId) {
-    const [a, b] = await Promise.all([
-        sb.from("follows").select("*", { count: "exact", head: true }).eq("following_id", targetId),
-        sb.from("follows").select("*", { count: "exact", head: true }).eq("follower_id", targetId),
-    ]);
-
-    return {
-        followers: Number(a.count || 0),
-        following: Number(b.count || 0),
-    };
-}
-
-async function isFollowing(viewerId, targetId) {
-    // READ ok (anon)
-    const { data, error } = await sb
-        .from("follows")
-        .select("follower_id")
-        .eq("follower_id", viewerId)
-        .eq("following_id", targetId)
-        .maybeSingle();
-
-    if (error) throw error;
-    return !!data;
-}
-
-async function toggleFollow(targetId) {
-    // WRITE via function
-    return fnPost(FN_TOGGLE_FOLLOW, { following_id: String(targetId) }); // { ok, following }
-}
-
-(async function boot() {
-    if (!sb) {
-        console.error("❌ Supabase CDN not loaded (missing <script src='@supabase/supabase-js@2'>)");
-        alert("Supabase CDN not loaded");
+    if (!res.ok){
+        console.error("get_profile error", res.status, data);
+        setMsg(data?.error || "Profile load failed.");
         return;
     }
 
-    const targetId = getTargetUserId();
-    if (!targetId) {
-        alert("Missing user id. Use /u/u.html?u=USER_ID");
+    /**
+     * Beklenen response örneği:
+     * {
+     *  profile: { id, name, bio, avatar_url, links:[{label,url}] },
+     *  counts: { followers: 12, following: 3, posts: 8 },
+     *  viewer: { is_me: false, is_following: true },
+     *  posts: [ { id, image_url, caption } ]
+     * }
+     */
+    const p = data.profile || {};
+    const c = data.counts || {};
+    const v = data.viewer || {};
+
+    profileId = p.id;
+    isMe = !!v.is_me;
+    isFollowing = !!v.is_following;
+
+    $name.textContent = p.name || "—";
+    $bio.textContent = p.bio || "";
+
+    $avatar.src = p.avatar_url || "/assets/img/avatar-placeholder.png";
+
+    $followers.textContent = String(c.followers ?? 0);
+    $following.textContent = String(c.following ?? 0);
+    $postsCount.textContent = String(c.posts ?? 0);
+
+    renderLinks(p.links || []);
+    renderPosts(data.posts || []);
+
+    // Follow button show/hide
+    if (isMe){
+        $followBtn.hidden = true;
+    } else {
+        $followBtn.hidden = false;
+        syncFollowBtn();
+    }
+
+    setMsg("");
+}
+
+function syncFollowBtn(){
+    if (!$followBtn) return;
+    if (isFollowing){
+        $followBtn.textContent = "Following";
+        $followBtn.classList.add("isFollowing");
+    } else {
+        $followBtn.textContent = "Follow";
+        $followBtn.classList.remove("isFollowing");
+    }
+}
+
+function renderLinks(list){
+    $links.innerHTML = "";
+    (list || []).forEach((x) => {
+        if (!x?.url) return;
+        const a = document.createElement("a");
+        a.className = "uLink";
+        a.href = x.url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = x.label ? x.label : new URL(x.url).hostname;
+        $links.appendChild(a);
+    });
+}
+
+function renderPosts(posts){
+    $grid.innerHTML = "";
+    (posts || []).forEach((post) => {
+        const wrap = document.createElement("div");
+        wrap.className = "uPost";
+        wrap.innerHTML = `
+      ${post.image_url ? `<img src="${esc(post.image_url)}" alt="post">` : ""}
+      ${post.caption ? `<div class="uPostCap">${esc(post.caption)}</div>` : ""}
+    `;
+        $grid.appendChild(wrap);
+    });
+}
+
+$followBtn?.addEventListener("click", async () => {
+    if (!profileId) return;
+
+    const jwt = getJWT();
+    if (!jwt){
+        alert("Login required.");
         return;
     }
 
-    const viewerId = getViewerId();
+    $followBtn.disabled = true;
 
-    // Load profile (profiles table must exist)
-    const { data: profile, error } = await sb
-        .from("profiles")
-        .select("*")
-        .eq("appwrite_user_id", targetId)
-        .maybeSingle();
+    try{
+        const res = await fetch(FN_TOGGLE_FOLLOW, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${jwt}`,
+            },
+            body: JSON.stringify({ target_id: profileId })
+        });
 
-    if (error) {
-        console.error(error);
-        alert(error.message || "Profile load error");
-        return;
-    }
-    if (!profile) {
-        alert("Profile not found");
-        return;
-    }
+        const data = await res.json().catch(()=> ({}));
 
-    $("nameText").textContent = profile.name || "User";
-    $("emailText").textContent = profile.email || "";
-
-    $("skillsInput").value = profile.skills || "";
-    $("descInput").value = profile.description || "";
-    $("bioInput").value = profile.bio || "";
-
-    $("xInput").value = profile.x || "";
-    $("ytInput").value = profile.youtube || "";
-    $("fbInput").value = profile.facebook || "";
-    $("igInput").value = profile.instagram || "";
-    $("webInput").value = profile.website || "";
-
-    $("avatarImg").src = profile.avatar_url || avatarFromEmail(profile.email);
-
-    // Counts
-    async function refreshCounts() {
-        try {
-            const counts = await getFollowCounts(targetId);
-            $("followersNum").textContent = String(counts.followers);
-            $("followingNum").textContent = String(counts.following);
-        } catch (e) {
-            console.warn("Count load failed:", e?.message || e);
+        if (!res.ok){
+            console.error("toggle_follow error", res.status, data);
+            alert(data?.error || "Follow failed.");
+            return;
         }
-    }
-    await refreshCounts();
 
-    const followBtn = $("followBtn");
-
-    // not logged in
-    if (!viewerId) {
-        followBtn.textContent = "Login to follow";
-        followBtn.onclick = () => (location.href = "/auth/login.html");
-        return;
-    }
-
-    // viewing own profile -> disable follow
-    if (viewerId === targetId) {
-        followBtn.textContent = "This is you";
-        followBtn.disabled = true;
-        return;
-    }
-
-    async function refreshFollowState() {
-        const ok = await isFollowing(viewerId, targetId);
-        followBtn.textContent = ok ? "Following" : "Follow";
-        followBtn.classList.toggle("isFollowing", ok);
-    }
-
-    await refreshFollowState();
-
-    followBtn.onclick = async () => {
-        followBtn.disabled = true;
-        try {
-            const res = await toggleFollow(targetId); // { following: true/false }
-            followBtn.textContent = res?.following ? "Following" : "Follow";
-            followBtn.classList.toggle("isFollowing", !!res?.following);
-
-            await refreshCounts();
-        } catch (e) {
-            console.error(e);
-            alert(e?.message || "Follow action failed");
-        } finally {
-            followBtn.disabled = false;
+        // beklenen: { following: true/false, followers_count: n }
+        isFollowing = !!data.following;
+        if (typeof data.followers_count === "number"){
+            $followers.textContent = String(data.followers_count);
+        } else {
+            // fallback
+            const current = parseInt($followers.textContent || "0", 10) || 0;
+            $followers.textContent = String(isFollowing ? current + 1 : Math.max(0, current - 1));
         }
-    };
-})();
+
+        syncFollowBtn();
+    } finally{
+        $followBtn.disabled = false;
+    }
+});
+
+// Followers list
+$followersBtn?.addEventListener("click", async () => {
+    if (!profileId) return;
+
+    openModal("Followers", `<div class="uMsg">Loading...</div>`);
+    const res = await fetch(`${FN_LIST_FOLLOWERS}?id=${encodeURIComponent(profileId)}`);
+    const data = await res.json().catch(()=> ({}));
+
+    if (!res.ok){
+        openModal("Followers", `<div class="uMsg">${esc(data?.error || "Failed")}</div>`);
+        return;
+    }
+    openModal("Followers", renderUserListHTML(data.list || []));
+});
+
+// Following list
+$followingBtn?.addEventListener("click", async () => {
+    if (!profileId) return;
+
+    openModal("Following", `<div class="uMsg">Loading...</div>`);
+    const res = await fetch(`${FN_LIST_FOLLOWING}?id=${encodeURIComponent(profileId)}`);
+    const data = await res.json().catch(()=> ({}));
+
+    if (!res.ok){
+        openModal("Following", `<div class="uMsg">${esc(data?.error || "Failed")}</div>`);
+        return;
+    }
+    openModal("Following", renderUserListHTML(data.list || []));
+});
+
+function renderUserListHTML(list){
+    if (!list.length) return `<div class="uMsg">No users.</div>`;
+
+    return list.map(u => `
+    <div class="uUserRow">
+      <img class="uUserAva" src="${esc(u.avatar_url || "/assets/img/avatar-placeholder.png")}" alt="">
+      <div class="uUserName">${esc(u.name || "User")}</div>
+      <button class="uUserGo" data-id="${esc(u.id)}">Visit</button>
+    </div>
+  `).join("") + attachVisitHandlers();
+}
+
+function attachVisitHandlers(){
+    setTimeout(() => {
+        document.querySelectorAll(".uUserGo").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const id = btn.getAttribute("data-id");
+                if (!id) return;
+                location.href = `/u/?id=${encodeURIComponent(id)}`;
+            });
+        });
+    }, 0);
+    return "";
+}
+
+loadProfile();
