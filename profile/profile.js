@@ -1,94 +1,130 @@
 // /profile/profile.js
 import { account } from "/assets/appwrite.js";
 
-console.log("✅ profile.js loaded");
+console.log("✅ profile.js (clean + working)");
 
+const FN_GET = "/.netlify/functions/get_profile";
 const FN_UPSERT = "/.netlify/functions/upsert_profile";
-const FN_GET = "/.netlify/functions/get_profile"; // public
+const FN_ENSURE = "/.netlify/functions/ensure_profile";
+const FN_UPLOAD = "/.netlify/functions/upload_avatar";
+const FN_DELETE = "/.netlify/functions/delete_avatar";
 
 const $ = (id) => document.getElementById(id);
 
-const pMsg = $("pMsg");
-const pAvatarImg = $("pAvatarImg");
-const pAvatarTxt = $("pAvatarTxt");
-const pName = $("pName");
-
+const avatarImg = $("pAvatarImg");
+const avatarTxt = $("pAvatarTxt");
 const bioInput = $("bioInput");
-const link1Input = $("link1Input"); // biz bunu "website" gibi kullanacağız
-const link2Input = $("link2Input"); // bunu istersen boş bırak (istersen sonra 2. alan ekleriz)
+const linkInput = $("link1Input");
 
+const uploadBtn = $("uploadBtn");
+const deleteBtn = $("deleteBtn");
+const avatarInput = $("avatarInput");
 const saveBtn = $("saveBtn");
+const msg = $("pMsg");
 
-function setMsg(t){ pMsg.textContent = t || ""; }
-function esc(s){
-    return String(s ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
+function setMsg(t){ msg.textContent = t || ""; }
+
+function toBase64(file){
+    return new Promise(res=>{
+        const r = new FileReader();
+        r.onload = ()=>res(r.result.split(",")[1]);
+        r.readAsDataURL(file);
+    });
 }
 
 (async function boot(){
+    let user;
     try{
-        const user = await account.get(); // ✅ login şart
-        const uid = user.$id;
-
-        pName.textContent = user.name || "User";
-        pAvatarTxt.textContent = (user.name || "SM").slice(0,2).toUpperCase();
-
-        // ✅ profil verisini çek (public function)
-        const r = await fetch(`${FN_GET}?id=${encodeURIComponent(uid)}`, { cache: "no-store" });
-        const j = await r.json().catch(()=> ({}));
-
-        if (r.ok && j?.profile){
-            const p = j.profile;
-            bioInput.value = p.bio || "";
-
-            // get_profile website'i links[] içinde döndürüyor
-            const first = (p.links && p.links[0] && p.links[0].url) ? p.links[0].url : "";
-            link1Input.value = first;
-            link2Input.value = ""; // şimdilik kullanılmıyor
-
-            if (p.avatar_url){
-                pAvatarImg.src = p.avatar_url;
-                pAvatarImg.style.display = "block";
-                pAvatarTxt.style.display = "none";
-            }
-        }
-
-        saveBtn.disabled = false;
-
-        saveBtn.onclick = async () => {
-            saveBtn.disabled = true;
-            setMsg("Saving...");
-
-            const website = (link1Input.value || "").trim();
-
-            const res = await fetch(FN_UPSERT, {
-                method:"POST",
-                headers:{ "Content-Type":"application/json" },
-                body: JSON.stringify({
-                    appwrite_user_id: uid,
-                    name: user.name || "",
-                    bio: bioInput.value || "",
-                    website,
-                    // avatar upload varsa ayrıca bağlarız
-                })
-            });
-
-            const out = await res.json().catch(()=> ({}));
-            saveBtn.disabled = false;
-
-            if (!res.ok){
-                setMsg(out?.error || "Save failed");
-                return;
-            }
-            setMsg("✅ Saved");
-        };
-
-    } catch (e){
-        console.warn("profile settings needs login", e);
+        user = await account.get();
+    }catch{
         location.href = "/auth/login.html";
+        return;
     }
+
+    const uid = user.$id;
+
+    // ✅ ensure profile
+    await fetch(FN_ENSURE,{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ appwrite_user_id: uid, name: user.name })
+    });
+
+    // load
+    const r = await fetch(`${FN_GET}?id=${uid}`);
+    if (r.ok){
+        const d = await r.json();
+        bioInput.value = d.profile.bio || "";
+        linkInput.value = d.profile.links?.[0]?.url || "";
+
+        if (d.profile.avatar_url){
+            avatarImg.src = d.profile.avatar_url;
+            avatarImg.style.display = "block";
+            avatarTxt.style.display = "none";
+        }
+    }
+
+    // upload
+    uploadBtn.onclick = ()=> avatarInput.click();
+
+    avatarInput.onchange = async ()=>{
+        const file = avatarInput.files[0];
+        if (!file) return;
+
+        setMsg("Uploading...");
+        const b64 = await toBase64(file);
+
+        const r = await fetch(FN_UPLOAD,{
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({
+                appwrite_user_id: uid,
+                file_base64: b64,
+                content_type: file.type
+            })
+        });
+
+        const j = await r.json();
+        if (r.ok){
+            avatarImg.src = j.avatar_url;
+            avatarImg.style.display = "block";
+            avatarTxt.style.display = "none";
+            setMsg("✅ Uploaded");
+        }else{
+            setMsg(j.error || "Upload failed");
+        }
+    };
+
+    // delete
+    deleteBtn.onclick = async ()=>{
+        setMsg("Deleting...");
+        const r = await fetch(FN_DELETE,{
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({ appwrite_user_id: uid })
+        });
+        if (r.ok){
+            avatarImg.style.display = "none";
+            avatarTxt.style.display = "block";
+            setMsg("✅ Deleted");
+        }else{
+            setMsg("Delete failed");
+        }
+    };
+
+    // save
+    saveBtn.onclick = async ()=>{
+        setMsg("Saving...");
+        const r = await fetch(FN_UPSERT,{
+            method:"POST",
+            headers:{ "Content-Type":"application/json" },
+            body: JSON.stringify({
+                appwrite_user_id: uid,
+                name: user.name,
+                bio: bioInput.value,
+                website: linkInput.value
+            })
+        });
+        setMsg(r.ok ? "✅ Saved" : "Save failed");
+    };
 })();

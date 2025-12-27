@@ -1,60 +1,48 @@
 // /u/u.js
-console.log("✅ u.js loaded (fast + mobile safe)");
+console.log("✅ u.js (clean + instant)");
 
-const FN_GET_PROFILE = "/.netlify/functions/get_profile";
-const FN_LIST_FOLLOWERS = "/.netlify/functions/list_followers";
-const FN_LIST_FOLLOWING = "/.netlify/functions/list_following";
+const FN_GET = "/.netlify/functions/get_profile";
+const FN_ENSURE = "/.netlify/functions/ensure_profile";
 
-const el = (id) => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 const qs = (k) => new URLSearchParams(location.search).get(k);
 
-const $avatar = el("uAvatar");
-const $name = el("uName");
-const $bio = el("uBio");
-const $followers = el("uFollowers");
-const $following = el("uFollowing");
-const $postsCount = el("uPostsCount");
-const $links = el("uLinks");
-const $grid = el("uPostsGrid");
-const $msg = el("uMsg");
-
-const $followersBtn = el("uFollowersBtn");
-const $followingBtn = el("uFollowingBtn");
-
-const $modal = el("uModal");
-const $modalTitle = el("uModalTitle");
-const $modalBody = el("uModalBody");
-const $modalClose = el("uModalClose");
+const $avatar = $("uAvatar");
+const $name = $("uName");
+const $bio = $("uBio");
+const $followers = $("uFollowers");
+const $following = $("uFollowing");
+const $posts = $("uPostsCount");
+const $links = $("uLinks");
+const $grid = $("uPostsGrid");
 
 function esc(s){
-    return String(s ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;");
+    return String(s ?? "").replaceAll("<","&lt;").replaceAll(">","&gt;");
 }
 
-function closeModal(){
-    $modal.hidden = true;
-    $modalBody.innerHTML = "";
-}
-$modalClose?.addEventListener("click", closeModal);
-$modal?.addEventListener("click", e => e.target === $modal && closeModal());
+function render(profile){
+    $name.textContent = profile.name || "User";
+    $bio.textContent = profile.bio || "";
+    $avatar.src = profile.avatar_url || "/assets/img/avatar-placeholder.png";
 
-function renderLinks(list){
+    $followers.textContent = profile.counts.followers;
+    $following.textContent = profile.counts.following;
+    $posts.textContent = profile.counts.posts;
+
+    // links
     $links.innerHTML = "";
-    (list || []).forEach(l => {
+    (profile.profile.links || []).forEach(l=>{
         const a = document.createElement("a");
         a.className = "uLink";
         a.href = l.url;
         a.target = "_blank";
-        a.textContent = l.label || new URL(l.url).hostname;
+        a.textContent = new URL(l.url).hostname;
         $links.appendChild(a);
     });
-}
 
-function renderPosts(posts){
+    // posts (image only)
     $grid.innerHTML = "";
-    (posts || []).forEach(p => {
+    (profile.posts || []).forEach(p=>{
         const d = document.createElement("div");
         d.className = "uPost";
         d.innerHTML = `<img src="${esc(p.image_url)}">`;
@@ -63,80 +51,34 @@ function renderPosts(posts){
 }
 
 (async function boot(){
-    let id = qs("id");
-    const me = qs("me");
-
-    if (!id && me === "1"){
-        id = localStorage.getItem("sm_uid");
+    // ✅ LOGIN ID
+    let uid = qs("id");
+    if (!uid && qs("me") === "1"){
+        uid = localStorage.getItem("sm_uid");
     }
-    if (!id){
-        $msg.textContent = "Login required";
-        return;
-    }
+    if (!uid) return;
 
-    const cacheKey = `profile_cache_${id}`;
+    // ✅ CACHE → ANINDA AÇILIR
+    const cacheKey = "profile_cache_" + uid;
     const cached = localStorage.getItem(cacheKey);
     if (cached){
         try{
-            const data = JSON.parse(cached);
-            paint(data);
+            render(JSON.parse(cached));
         }catch{}
     }
 
-    const res = await fetch(`${FN_GET_PROFILE}?id=${encodeURIComponent(id)}`);
-    const json = await res.json().catch(()=>null);
-    if (!res.ok || !json){
-        $msg.textContent = "Profile load failed";
-        return;
-    }
+    // ✅ PROFILE ROW YOKSA OLUŞTUR
+    fetch(FN_ENSURE, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ appwrite_user_id: uid })
+    }).catch(()=>{});
 
-    paint(json);
-    localStorage.setItem(cacheKey, JSON.stringify(json));
+    // ✅ GÜNCEL VERİ (sessiz)
+    const r = await fetch(`${FN_GET}?id=${uid}`);
+    if (!r.ok) return;
 
-    $followersBtn.onclick = async () => {
-        $modal.hidden = false;
-        $modalTitle.textContent = "Followers";
-        const r = await fetch(`${FN_LIST_FOLLOWERS}?id=${id}`);
-        const j = await r.json();
-        $modalBody.innerHTML = renderUserList(j.list || []);
-        attachVisit();
-    };
-
-    $followingBtn.onclick = async () => {
-        $modal.hidden = false;
-        $modalTitle.textContent = "Following";
-        const r = await fetch(`${FN_LIST_FOLLOWING}?id=${id}`);
-        const j = await r.json();
-        $modalBody.innerHTML = renderUserList(j.list || []);
-        attachVisit();
-    };
-
-    function paint(data){
-        const p = data.profile;
-        const c = data.counts;
-        $name.textContent = p.name || "—";
-        $bio.textContent = p.bio || "";
-        $avatar.src = p.avatar_url || "/assets/img/avatar-placeholder.png";
-        $followers.textContent = c.followers;
-        $following.textContent = c.following;
-        $postsCount.textContent = c.posts;
-        renderLinks(p.links);
-        renderPosts(data.posts);
-    }
-
-    function renderUserList(list){
-        return list.map(u => `
-      <div class="uUserRow">
-        <img src="${esc(u.avatar_url)}" class="uUserAva">
-        <div class="uUserName">${esc(u.name)}</div>
-        <button data-id="${u.id}" class="uUserGo">Visit</button>
-      </div>
-    `).join("");
-    }
-
-    function attachVisit(){
-        $modalBody.querySelectorAll(".uUserGo").forEach(b=>{
-            b.onclick = ()=>location.href = `/u/index.html?id=${b.dataset.id}`;
-        });
-    }
+    const data = await r.json();
+    render(data);
+    localStorage.setItem(cacheKey, JSON.stringify(data));
 })();
