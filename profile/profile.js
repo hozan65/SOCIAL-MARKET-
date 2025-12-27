@@ -1,94 +1,51 @@
-// /profile/profile.js (MODULE) ✅ FINAL (get_profile server read)
+// /profile/profile.js (MODULE) ✅ Settings UI
 import { account } from "/assets/appwrite.js";
 
-/* =========================
-   SUPABASE (READ ONLY for posts/follows)
-========================= */
-const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
+const FN_GET_PROFILE = "/.netlify/functions/get_profile";
+const FN_UPSERT_PROFILE = "/.netlify/functions/upsert_profile";
+const FN_UPLOAD_AVATAR = "/.netlify/functions/upload_avatar";
 
-const sb = window.supabase?.createClient
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
-
-/* =========================
-   DOM
-========================= */
+/* DOM */
 const $ = (id) => document.getElementById(id);
 
 const avatarImg = $("pAvatarImg");
 const avatarTxt = $("pAvatarTxt");
 const avatarInput = $("avatarInput");
-const changeAvatarBtn = $("changeAvatarBtn");
+
+const uploadBtn = $("uploadBtn");
+const deleteBtn = $("deleteBtn");
 
 const pName = $("pName");
-const pBio = $("pBio");
-const pLink = $("pLink");
-
-const postCount = $("postCount");
-const followerCount = $("followerCount");
-const followingCount = $("followingCount");
-const joined = $("joined");
-
-const editBtn = $("editBtn");
-const followBtn = $("followBtn");
-const msgBtn = $("msgBtn");
-
-const editWrap = $("editWrap");
 const bioInput = $("bioInput");
-const linkInput = $("linkInput");
-const cancelEdit = $("cancelEdit");
-const saveEdit = $("saveEdit");
+const link1Input = $("link1Input");
+const link2Input = $("link2Input");
 
-const postsGrid = $("postsGrid");
+const cancelBtn = $("cancelBtn");
+const saveBtn = $("saveBtn");
 const pMsg = $("pMsg");
 
-const openFollowers = $("openFollowers");
-const openFollowing = $("openFollowing");
-
-// modal (senin html’de varsa)
-const followModal = $("followModal");
-const fCloseBtn = $("fCloseBtn");
-const fTitle = $("fTitle");
-const fList = $("fList");
-const fEmpty = $("fEmpty");
-
-/* =========================
-   Helpers
-========================= */
-function setMsg(t) { if (pMsg) pMsg.textContent = t || ""; }
+function setMsg(t){ pMsg.textContent = t || ""; }
 
 function initials(name) {
     const s = String(name || "").trim();
     if (!s) return "SM";
-    return s.split(/\s+/).slice(0, 2).map((x) => (x[0] || "").toUpperCase()).join("") || "SM";
+    return s.split(/\s+/).slice(0, 2).map(x => (x[0]||"").toUpperCase()).join("") || "SM";
 }
 
-function fmtDate(iso) {
-    try {
-        const d = new Date(iso);
-        return d.toLocaleDateString("tr-TR", { year: "numeric", month: "short", day: "2-digit" });
-    } catch { return "—"; }
-}
-
-function safeUrl(u) {
-    const s = String(u || "").trim();
+function safeUrl(v){
+    const s = String(v || "").trim();
     if (!s) return "";
     if (s.startsWith("http://") || s.startsWith("https://")) return s;
     return "https://" + s;
 }
 
-function escapeHtml(s) {
-    return String(s ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+function getJWT(){
+    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt") || "";
+    if (!jwt) throw new Error("Missing sm_jwt (login required)");
+    return jwt;
 }
-function escapeAttr(s){ return escapeHtml(s).replaceAll("`",""); }
 
-function setAvatar(url, displayName) {
+function setAvatar(url, displayName){
     const u = String(url || "").trim();
     if (u) {
         avatarImg.src = u + (u.includes("?") ? "&" : "?") + "v=" + Date.now();
@@ -101,381 +58,228 @@ function setAvatar(url, displayName) {
     }
 }
 
-function setFollowUI(isFollowing) {
-    followBtn.textContent = isFollowing ? "Following" : "Follow";
-    followBtn.classList.toggle("primary", !isFollowing);
-}
-
-function getJWT() {
-    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt") || "";
-    if (!jwt) throw new Error("Missing JWT (sm_jwt)");
-    return jwt;
-}
-
-/* =========================
-   Auth
-========================= */
-async function getMe() {
+async function getMe(){
     try { return await account.get(); } catch { return null; }
 }
 
-/* =========================
-   PROFILE READ/WRITE (SERVER)
-========================= */
-async function getProfile(uid) {
+/* API */
+async function apiGetProfile(uid){
     const jwt = getJWT();
-    const res = await fetch(`/.netlify/functions/get_profile?uid=${encodeURIComponent(uid)}`, {
+    const res = await fetch(`${FN_GET_PROFILE}?uid=${encodeURIComponent(uid)}`, {
         method: "GET",
-        headers: { Authorization: `Bearer ${jwt}` },
+        headers: { Authorization: `Bearer ${jwt}` }
     });
-
-    const text = await res.text();
-    let j = {};
-    try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
-
-    if (!res.ok) throw new Error(j?.error || `get_profile HTTP ${res.status}`);
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j?.error || `get_profile ${res.status}`);
     return j.profile || null;
 }
 
-async function saveProfile({ name, bio, website }) {
+async function apiSaveProfile(payload){
     const jwt = getJWT();
-    const res = await fetch("/.netlify/functions/upsert_profile", {
+    const res = await fetch(FN_UPSERT_PROFILE, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-        body: JSON.stringify({ name, bio, website }),
+        body: JSON.stringify(payload),
     });
-
-    const text = await res.text();
-    let j = {};
-    try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
-
-    if (!res.ok) throw new Error(j?.error || `upsert_profile HTTP ${res.status}`);
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j?.error || `upsert_profile ${res.status}`);
     return j;
 }
 
-/* =========================
-   SUPABASE READS (posts + follows)
-========================= */
-async function countPosts(userId) {
-    const { count, error } = await sb
-        .from("analyses")
-        .select("id", { count: "exact", head: true })
-        .eq("author_id", userId);
-    if (error) console.warn("countPosts error:", error);
-    return count || 0;
-}
-
-async function countFollowers(userId) {
-    const { count, error } = await sb
-        .from("follows")
-        .select("follower_uid", { count: "exact", head: true })
-        .eq("following_uid", userId);
-    if (error) console.warn("countFollowers error:", error);
-    return count || 0;
-}
-
-async function countFollowing(userId) {
-    const { count, error } = await sb
-        .from("follows")
-        .select("following_uid", { count: "exact", head: true })
-        .eq("follower_uid", userId);
-    if (error) console.warn("countFollowing error:", error);
-    return count || 0;
-}
-
-async function isFollowing(meId, targetId) {
-    const { data, error } = await sb
-        .from("follows")
-        .select("follower_uid")
-        .eq("follower_uid", meId)
-        .eq("following_uid", targetId)
-        .limit(1);
-
-    if (error) { console.warn("isFollowing error:", error); return false; }
-    return Array.isArray(data) && data.length > 0;
-}
-
-async function loadPosts(userId) {
-    const { data, error } = await sb
-        .from("analyses")
-        .select("id, content, image_path, created_at")
-        .eq("author_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(12);
-
-    if (error) console.warn("loadPosts error:", error);
-    return data || [];
-}
-
-function renderPosts(list) {
-    postsGrid.innerHTML = "";
-    if (!list || list.length === 0) { setMsg("No posts yet."); return; }
-    setMsg("");
-
-    const frag = document.createDocumentFragment();
-
-    for (const it of list) {
-        const card = document.createElement("div");
-        card.className = "pPost";
-        card.addEventListener("click", () => {
-            window.location.href = `/view/view.html?id=${encodeURIComponent(it.id)}`;
-        });
-
-        if (it.image_path) {
-            const img = document.createElement("img");
-            img.className = "pPostImg";
-            img.src = it.image_path;
-            img.alt = "post";
-            card.appendChild(img);
-        }
-
-        const body = document.createElement("div");
-        body.className = "pPostBody";
-
-        const title = document.createElement("div");
-        title.className = "pPostTitle";
-        title.textContent = (it.content || "").slice(0, 90) || "Post";
-        body.appendChild(title);
-
-        const time = document.createElement("div");
-        time.className = "pPostTime";
-        time.textContent = fmtDate(it.created_at);
-        body.appendChild(time);
-
-        card.appendChild(body);
-        frag.appendChild(card);
-    }
-
-    postsGrid.appendChild(frag);
-}
-
-/* =========================
-   Follow + Avatar calls
-========================= */
-async function toggleFollow(targetUid) {
-    const jwt = getJWT();
-    const res = await fetch("/.netlify/functions/toggle_follow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-        body: JSON.stringify({ following_uid: String(targetUid) }),
-    });
-
-    const text = await res.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
-
-    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    return data; // { ok:true, following:true/false }
-}
-
-async function uploadAvatar(file) {
+async function apiUploadAvatar(file){
     const jwt = getJWT();
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", file); // field name must be 'file'
 
-    const res = await fetch("/.netlify/functions/upload_avatar", {
+    const res = await fetch(FN_UPLOAD_AVATAR, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}` },
         body: fd,
     });
-
-    const text = await res.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
-
-    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    return data.avatar_url || "";
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(j?.error || `upload_avatar ${res.status}`);
+    return j.avatar_url || "";
 }
 
-/* =========================
-   Modals (optional)
-========================= */
-function openFollowModal(title) {
-    if (!followModal) return;
-    fTitle.textContent = title;
-    fList.innerHTML = "";
-    fEmpty.style.display = "none";
-    followModal.style.display = "block";
-    document.body.style.overflow = "hidden";
-}
-function closeFollowModal() {
-    if (!followModal) return;
-    followModal.style.display = "none";
-    document.body.style.overflow = "";
+/* State */
+let me = null;
+let current = { name:"", bio:"", link1:"", link2:"", avatar_url:"" };
+let original = null;
+
+function setDirtyUI(dirty){
+    cancelBtn.disabled = !dirty;
+    saveBtn.disabled = !dirty;
 }
 
-/* =========================
-   Main
-========================= */
-async function main() {
-    if (!sb) { setMsg("Supabase CDN missing."); return; }
+function readInputs(){
+    return {
+        name: current.name, // name’i değiştirmiyoruz (istersen ekleriz)
+        bio: (bioInput.value || "").trim(),
+        link1: safeUrl(link1Input.value || "").trim(),
+        link2: safeUrl(link2Input.value || "").trim(),
+        avatar_url: current.avatar_url,
+    };
+}
 
-    const me = await getMe();
+function applyToInputs(state){
+    bioInput.value = state.bio || "";
+    link1Input.value = state.link1 || "";
+    link2Input.value = state.link2 || "";
+}
+
+function computeDirty(){
+    const now = readInputs();
+    return JSON.stringify(now) !== JSON.stringify(original);
+}
+
+function onAnyChange(){
+    setDirtyUI(computeDirty());
+}
+
+/* Main */
+async function main(){
+    me = await getMe();
     if (!me) { location.href = "/auth/login.html"; return; }
 
-    const myId = me.$id;
+    // show name
+    const displayName = (me?.name && String(me.name).trim()) || (me?.email ? me.email.split("@")[0] : "User");
+    pName.textContent = displayName;
 
-    // visiting others:
-    const targetUidFromUrl = new URL(location.href).searchParams.get("uid");
-    const targetId = targetUidFromUrl || myId;
-    const isMe = !targetUidFromUrl || targetUidFromUrl === myId;
+    setMsg("Loading...");
+    const row = await apiGetProfile(me.$id);
 
-    // ✅ read profile from server
-    let row = await getProfile(targetId);
-
-    const displayName =
-        (row?.name && String(row.name).trim()) ||
-        (me?.name && String(me.name).trim()) ||
-        (me?.email ? me.email.split("@")[0] : "User");
+    // DB -> current
+    current = {
+        name: (row?.name && String(row.name).trim()) || displayName,
+        bio: row?.bio || "",
+        link1: row?.website || "",     // 1. link: website
+        link2: row?.x || "",           // 2. link: x (yada youtube vs)
+        avatar_url: row?.avatar_url || "",
+    };
 
     // render
-    pName.textContent = displayName;
-    pBio.textContent = row?.bio || "No bio yet.";
+    setAvatar(current.avatar_url, current.name);
+    applyToInputs(current);
 
-    const link = safeUrl(row?.website || "");
-    if (link) {
-        pLink.style.display = "inline-block";
-        pLink.href = link;
-        pLink.textContent = link.replace(/^https?:\/\//, "");
-    } else {
-        pLink.style.display = "none";
-    }
+    // snapshot
+    original = readInputs();
+    setDirtyUI(false);
+    setMsg("");
 
-    setAvatar(row?.avatar_url || "", displayName);
-    joined.textContent = fmtDate(row?.created_at || row?.updated_at || me?.$createdAt);
+    // listeners
+    bioInput.addEventListener("input", onAnyChange);
+    link1Input.addEventListener("input", onAnyChange);
+    link2Input.addEventListener("input", onAnyChange);
 
-    // stats + posts + follow state
-    const [pc, fc, fg, posts, following] = await Promise.all([
-        countPosts(targetId),
-        countFollowers(targetId),
-        countFollowing(targetId),
-        loadPosts(targetId),
-        isMe ? Promise.resolve(false) : isFollowing(myId, targetId),
-    ]);
-
-    postCount.textContent = String(pc || 0);
-    followerCount.textContent = String(fc || 0);
-    followingCount.textContent = String(fg || 0);
-    renderPosts(posts);
-
-    // buttons
-    if (isMe) {
-        editBtn.style.display = "inline-flex";
-        followBtn.style.display = "none";
-        msgBtn.style.display = "none";
-
-        // avatar change
-        changeAvatarBtn.style.display = "inline-flex";
-        changeAvatarBtn.onclick = () => avatarInput.click();
-
-        avatarInput.onchange = async () => {
-            const file = avatarInput.files?.[0];
-            if (!file) return;
-
-            try {
-                changeAvatarBtn.disabled = true;
-                if (file.size > 3 * 1024 * 1024) throw new Error("Max 3MB");
-
-                await uploadAvatar(file);
-
-                // ✅ refresh from server so reload is consistent
-                row = await getProfile(myId);
-
-                pBio.textContent = row?.bio || "No bio yet.";
-                const link2 = safeUrl(row?.website || "");
-                if (link2) {
-                    pLink.style.display = "inline-block";
-                    pLink.href = link2;
-                    pLink.textContent = link2.replace(/^https?:\/\//, "");
-                } else {
-                    pLink.style.display = "none";
-                }
-                setAvatar(row?.avatar_url || "", displayName);
-
-                alert("Photo updated ✅");
-            } catch (e) {
-                alert(e?.message || "Upload failed");
-            } finally {
-                changeAvatarBtn.disabled = false;
-                avatarInput.value = "";
-            }
-        };
-    } else {
-        editBtn.style.display = "none";
-        followBtn.style.display = "inline-flex";
-        msgBtn.style.display = "inline-flex";
-        changeAvatarBtn.style.display = "none";
-
-        setFollowUI(!!following);
-        followBtn.onclick = async () => {
-            try {
-                followBtn.disabled = true;
-                const r = await toggleFollow(targetId);
-                setFollowUI(!!r.following);
-
-                const [fc2, fg2] = await Promise.all([
-                    countFollowers(targetId),
-                    countFollowing(targetId),
-                ]);
-                followerCount.textContent = String(fc2 || 0);
-                followingCount.textContent = String(fg2 || 0);
-            } catch (e) {
-                alert(e?.message || "Follow error");
-            } finally {
-                followBtn.disabled = false;
-            }
-        };
-
-        msgBtn.onclick = () => alert("Message sistemi sonra.");
-    }
-
-    // edit drawer
-    editBtn.onclick = () => {
-        editWrap.style.display = "block";
-        bioInput.value = row?.bio || "";
-        linkInput.value = row?.website || "";
+    cancelBtn.onclick = () => {
+        applyToInputs(current);         // current zaten DB’den gelen son değer
+        original = readInputs();        // reset dirty baseline
+        setDirtyUI(false);
+        setMsg("Canceled.");
+        setTimeout(() => setMsg(""), 800);
     };
-    cancelEdit.onclick = () => { editWrap.style.display = "none"; };
 
-    saveEdit.onclick = async () => {
-        try {
-            saveEdit.disabled = true;
+    saveBtn.onclick = async () => {
+        try{
+            saveBtn.disabled = true;
+            cancelBtn.disabled = true;
+            setMsg("Saving...");
 
-            const newBio = (bioInput.value || "").trim();
-            const newWebsite = (linkInput.value || "").trim();
+            const now = readInputs();
 
-            // ✅ save to DB
-            await saveProfile({ name: displayName, bio: newBio, website: newWebsite });
+            // ✅ DB schema’ya yaz: bio + website + x (2 link)
+            await apiSaveProfile({
+                name: current.name,
+                bio: now.bio,
+                website: now.link1,
+                x: now.link2,
+            });
 
-            // ✅ refresh from server
-            row = await getProfile(myId);
+            // refresh from server (kalıcı olsun)
+            const fresh = await apiGetProfile(me.$id);
 
-            // render again
-            pBio.textContent = row?.bio || "No bio yet.";
-            const link3 = safeUrl(row?.website || "");
-            if (link3) {
-                pLink.style.display = "inline-block";
-                pLink.href = link3;
-                pLink.textContent = link3.replace(/^https?:\/\//, "");
-            } else {
-                pLink.style.display = "none";
-            }
+            current = {
+                name: (fresh?.name && String(fresh.name).trim()) || current.name,
+                bio: fresh?.bio || "",
+                link1: fresh?.website || "",
+                link2: fresh?.x || "",
+                avatar_url: fresh?.avatar_url || current.avatar_url,
+            };
 
-            editWrap.style.display = "none";
-            alert("Saved ✅");
-        } catch (e) {
-            alert(e?.message || "Save failed");
-        } finally {
-            saveEdit.disabled = false;
+            applyToInputs(current);
+            setAvatar(current.avatar_url, current.name);
+
+            original = readInputs();
+            setDirtyUI(false);
+
+            setMsg("Saved ✅");
+            setTimeout(() => setMsg(""), 1200);
+        }catch(e){
+            setMsg(e?.message || "Save failed");
+            setDirtyUI(true);
         }
     };
 
-    // modal close
-    fCloseBtn?.addEventListener("click", closeFollowModal);
-    followModal?.addEventListener("click", (e) => { if (e.target?.dataset?.close) closeFollowModal(); });
+    // Upload
+    uploadBtn.onclick = () => avatarInput.click();
+    avatarInput.onchange = async () => {
+        const file = avatarInput.files?.[0];
+        if (!file) return;
+
+        try{
+            uploadBtn.disabled = true;
+            deleteBtn.disabled = true;
+            setMsg("Uploading...");
+
+            await apiUploadAvatar(file);
+
+            // refresh
+            const fresh = await apiGetProfile(me.$id);
+            current.avatar_url = fresh?.avatar_url || "";
+
+            setAvatar(current.avatar_url, current.name);
+            setMsg("Photo updated ✅");
+            setTimeout(() => setMsg(""), 1200);
+        }catch(e){
+            setMsg(e?.message || "Upload failed");
+        }finally{
+            uploadBtn.disabled = false;
+            deleteBtn.disabled = false;
+            avatarInput.value = "";
+        }
+    };
+
+    // Delete photo
+    deleteBtn.onclick = async () => {
+        try{
+            uploadBtn.disabled = true;
+            deleteBtn.disabled = true;
+            setMsg("Deleting...");
+
+            await apiSaveProfile({
+                name: current.name,
+                bio: (bioInput.value || "").trim(),
+                website: safeUrl(link1Input.value || ""),
+                x: safeUrl(link2Input.value || ""),
+                avatar_url: "", // clear
+            });
+
+            const fresh = await apiGetProfile(me.$id);
+            current.avatar_url = fresh?.avatar_url || "";
+
+            setAvatar("", current.name);
+            setMsg("Deleted ✅");
+            setTimeout(() => setMsg(""), 1200);
+        }catch(e){
+            setMsg(e?.message || "Delete failed");
+        }finally{
+            uploadBtn.disabled = false;
+            deleteBtn.disabled = false;
+        }
+    };
 }
 
 main().catch((e) => {
     console.error(e);
-    setMsg("Profile load error.");
+    setMsg("Page error.");
 });
