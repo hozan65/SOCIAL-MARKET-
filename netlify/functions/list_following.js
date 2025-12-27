@@ -7,13 +7,15 @@ const sb = createClient(
 
 export const handler = async (event) => {
     try {
-        const id = event.queryStringParameters?.id;
-        if (!id) return json(400, { error: "Missing id" });
+        const uid = event.queryStringParameters?.id;
+        if (!uid) return json(400, { error: "Missing id" });
 
+        // follows.follower_id = uid
+        // target_id -> profiles.appwrite_user_id ile join
         const { data, error } = await sb
             .from("follows")
-            .select("target_id, profiles:target_id(id, name, avatar_url)")
-            .eq("follower_id", id)
+            .select("target_id, profiles:target_id(appwrite_user_id, name, avatar_url)")
+            .eq("follower_id", uid)
             .order("created_at", { ascending: false })
             .limit(200);
 
@@ -21,7 +23,12 @@ export const handler = async (event) => {
 
         const list = (data || [])
             .map((x) => x.profiles)
-            .filter(Boolean);
+            .filter(Boolean)
+            .map((p) => ({
+                id: p.appwrite_user_id,
+                name: p.name,
+                avatar_url: p.avatar_url
+            }));
 
         return json(200, { list });
     } catch (e) {
