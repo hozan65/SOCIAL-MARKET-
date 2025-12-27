@@ -3,7 +3,6 @@ import { account } from "/assets/appwrite.js";
 
 console.log("✅ auth-ui.js loaded");
 
-// Wait for header slot
 waitFor("#authSlot", 6000).then(init).catch((e) => {
     console.warn("❌ auth-ui: authSlot not found", e);
 });
@@ -21,16 +20,15 @@ function waitFor(selector, timeoutMs = 4000) {
     });
 }
 
-let ctrl = null; // abort old listeners on rerender
+let ctrl = null;
 
 async function init(slot) {
     slot.classList.add("authSlot");
 
-    // ✅ KALAN ESKİ SETTINGS VARSA TEMİZLE (duplicate fix)
+    // eski kalıntıları temizle
     document
         .querySelectorAll("#settingsBtn,#settingsMenu,.settingsMenu,.smIconCircle")
         .forEach((el) => {
-            // authSlot içindekini silme
             if (!el.closest("#authSlot")) el.remove();
         });
 
@@ -52,12 +50,12 @@ function renderLoggedOut(slot) {
         ctrl = null;
     }
 
-    slot.innerHTML = `
-    <button class="authBtn" id="getStartedBtn">Get Started</button>
-  `;
+    slot.innerHTML = `<button class="authBtn" id="getStartedBtn">Get Started</button>`;
     slot.querySelector("#getStartedBtn").onclick = () => {
         location.href = "/auth/login.html";
     };
+
+    injectStylesOnce();
 }
 
 function renderLoggedIn(slot, user) {
@@ -70,151 +68,147 @@ function renderLoggedIn(slot, user) {
 
     const name = escapeHtml(user?.name || "Profile");
 
-    // ✅ ÜST BAR: My Profile + Settings menu (Logout yok)
     slot.innerHTML = `
-    <div class="authWrap">
-      <button class="authBtn" id="profileBtn">👤 ${name}</button>
-
-      <button class="authIconCircle" id="authSettingsBtn" type="button"
-        aria-haspopup="true" aria-expanded="false" title="Settings">
-        <span class="emoji">⚙️</span>
+    <div class="tvAuth">
+      <button class="tvProfileBtn" id="tvProfileBtn" type="button" aria-haspopup="true" aria-expanded="false">
+        <span class="tvAvatar">👤</span>
+        <span class="tvName">${name}</span>
       </button>
 
-      <div class="authSettingsMenu" id="authSettingsMenu" aria-hidden="true">
-        <div class="settingsRow">
-          <span>Dark mode</span>
-          <button type="button" id="themeToggle" class="toggleBtn">OFF</button>
+      <div class="tvMenu" id="tvMenu" aria-hidden="true">
+        <div class="tvMenuHead">
+          <div class="tvMenuUser">${name}</div>
         </div>
 
-        <div class="settingsRow">
-          <span>Language</span>
-          <select id="langSelect" class="selectBtn">
-            <option value="tr">TR</option>
-            <option value="en">EN</option>
-          </select>
-        </div>
+        <a class="tvItem" href="/u/?me=1" id="tvMyProfile">My Profile</a>
+        <a class="tvItem" href="/profile/index.html" id="tvSettings">Profile Settings</a>
+        <a class="tvItem" href="/about/index.html" id="tvAbout">About Us</a>
+
+        <div class="tvDivider"></div>
+
+        <button class="tvItemBtn danger" id="tvSignOut" type="button">Sign Out</button>
       </div>
     </div>
   `;
 
-    // ✅ FIX: Profile artık My Profile açar
-    slot.querySelector("#profileBtn").onclick = () => {
-        location.href = "/u/?me=1";
-    };
-
-    // Settings open/close
-    const settingsBtn = slot.querySelector("#authSettingsBtn");
-    const settingsMenu = slot.querySelector("#authSettingsMenu");
+    const btn = slot.querySelector("#tvProfileBtn");
+    const menu = slot.querySelector("#tvMenu");
 
     const open = () => {
-        settingsMenu.classList.add("open");
-        settingsMenu.setAttribute("aria-hidden", "false");
-        settingsBtn.setAttribute("aria-expanded", "true");
+        menu.classList.add("open");
+        menu.setAttribute("aria-hidden", "false");
+        btn.setAttribute("aria-expanded", "true");
     };
 
     const close = () => {
-        settingsMenu.classList.remove("open");
-        settingsMenu.setAttribute("aria-hidden", "true");
-        settingsBtn.setAttribute("aria-expanded", "false");
+        menu.classList.remove("open");
+        menu.setAttribute("aria-hidden", "true");
+        btn.setAttribute("aria-expanded", "false");
     };
 
-    settingsBtn.onclick = (e) => {
+    btn.onclick = (e) => {
         e.stopPropagation();
-        settingsMenu.classList.contains("open") ? close() : open();
+        menu.classList.contains("open") ? close() : open();
     };
 
-    // ✅ listenerlar her render'da çoğalmasın
+    // menü içi tıklamada kapanmasın
+    menu.addEventListener("click", (e) => e.stopPropagation());
+
+    // dışarı tıklayınca kapa + ESC
     ctrl = new AbortController();
     const { signal } = ctrl;
     document.addEventListener("click", close, { signal });
-    settingsMenu.addEventListener("click", (e) => e.stopPropagation(), { signal });
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") close();
+    }, { signal });
 
-    // Theme
-    const THEME_KEY = "sm_theme";
-    const themeToggle = slot.querySelector("#themeToggle");
-
-    const applyTheme = (theme) => {
-        const t = theme === "dark" ? "dark" : "light";
-        document.documentElement.setAttribute("data-theme", t);
-        document.documentElement.classList.toggle("dark", t === "dark");
+    // SIGN OUT
+    slot.querySelector("#tvSignOut").onclick = async () => {
+        try {
+            await account.deleteSession("current");
+        } catch (e) {
+            console.warn("signout warn:", e);
+        }
+        localStorage.removeItem("sm_uid");
+        close();
+        location.href = "/auth/login.html";
     };
-
-    const getTheme = () => (localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light");
-
-    const syncTheme = () => {
-        const t = getTheme();
-        applyTheme(t);
-        themeToggle.textContent = t === "dark" ? "ON" : "OFF";
-    };
-
-    themeToggle.onclick = () => {
-        const next = getTheme() === "dark" ? "light" : "dark";
-        localStorage.setItem(THEME_KEY, next);
-        syncTheme();
-    };
-
-    syncTheme();
-
-    // Language
-    const LANG_KEY = "sm_lang";
-    const langSelect = slot.querySelector("#langSelect");
-    langSelect.value = localStorage.getItem(LANG_KEY) || "tr";
-    langSelect.onchange = () => localStorage.setItem(LANG_KEY, langSelect.value);
 
     injectStylesOnce();
 }
 
 function injectStylesOnce() {
-    if (document.getElementById("authUiStyles")) return;
+    if (document.getElementById("tvAuthStyles")) return;
+
     const st = document.createElement("style");
-    st.id = "authUiStyles";
+    st.id = "tvAuthStyles";
     st.textContent = `
-    .authWrap{display:flex;gap:10px;align-items:center;justify-content:flex-end;position:relative}
+    .tvAuth{ position:relative; display:flex; align-items:center; justify-content:flex-end; }
 
-    /* ✅ settings icon sadece auth’a özel */
-    .authIconCircle{
-      width:40px;height:40px;border-radius:999px;
-      display:flex;align-items:center;justify-content:center;
-      border:1px solid var(--border);
-      background:var(--card);
-      box-shadow: var(--softShadow);
+    .tvProfileBtn{
+      display:flex; align-items:center; gap:10px;
+      padding:8px 12px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.12);
+      background: rgba(255,255,255,.90);
+      font-weight:900;
       cursor:pointer;
-      transition: transform .12s ease, background .12s ease;
+      box-shadow: var(--softShadow);
     }
-    .authIconCircle:hover{ transform: translateY(-1px); }
-    .authIconCircle:active{ transform: translateY(0px) scale(.98); }
-    .authIconCircle .emoji{font-size:18px;line-height:1}
+    .tvProfileBtn:hover{ transform: translateY(-1px); }
+    .tvProfileBtn:active{ transform: translateY(0px); }
 
-    /* ✅ menu */
-    .authSettingsMenu{
-      position:absolute;right:0;top:48px;min-width:220px;
-      background: var(--panel);
-      border:1px solid var(--border);
+    .tvAvatar{ width:28px; height:28px; display:grid; place-items:center; border-radius:999px; background: rgba(0,0,0,.06); }
+    .tvName{ max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+    .tvMenu{
+      position:absolute;
+      right:0;
+      top:46px;
+      width:260px;
       border-radius:14px;
-      padding:10px;
+      border:1px solid rgba(0,0,0,.10);
+      background: #fff;
       box-shadow: var(--shadow);
+      overflow:hidden;
       display:none;
       z-index:9999;
-      backdrop-filter: blur(10px);
     }
-    .authSettingsMenu.open{display:block}
+    .tvMenu.open{ display:block; }
 
-    .settingsRow{
-      display:flex;align-items:center;justify-content:space-between;
-      gap:12px;padding:8px 4px;
-      font-weight:800;color:var(--text)
+    .tvMenuHead{
+      padding:10px 12px;
+      background: rgba(0,0,0,.03);
+      border-bottom:1px solid rgba(0,0,0,.06);
     }
-    .toggleBtn{
-      padding:6px 10px;border-radius:999px;
-      border:1px solid var(--border);
-      background: var(--card);
-      font-weight:900;cursor:pointer;color:var(--text);
+    .tvMenuUser{ font-weight:1000; }
+
+    .tvItem{
+      display:block;
+      padding:10px 12px;
+      text-decoration:none;
+      color:#111;
+      font-weight:900;
+      background:#fff;
     }
-    .selectBtn{
-      padding:6px 10px;border-radius:10px;
-      border:1px solid var(--border);
-      background: var(--card);
-      font-weight:900;color:var(--text);
+    .tvItem:hover{ background: rgba(0,0,0,.04); }
+
+    .tvItemBtn{
+      width:100%;
+      text-align:left;
+      padding:10px 12px;
+      border:none;
+      background:#fff;
+      cursor:pointer;
+      font-weight:1000;
+    }
+    .tvItemBtn:hover{ background: rgba(0,0,0,.04); }
+    .tvItemBtn.danger{ color:#c01818; }
+
+    .tvDivider{
+      height:1px;
+      background: rgba(0,0,0,.08);
+      margin:6px 0;
     }
   `;
     document.head.appendChild(st);
