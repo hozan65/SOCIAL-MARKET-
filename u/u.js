@@ -74,19 +74,13 @@ function renderPosts(posts){
     (posts || []).forEach((p) => {
         const d = document.createElement("div");
         d.className = "uPost";
-
-        // sadece resim (caption yok)
         d.innerHTML = `
       ${p.image_url ? `<img src="${esc(p.image_url)}" alt="post">` : ""}
+      ${p.caption ? `<div class="uPostCap">${esc(p.caption)}</div>` : ""}
     `;
-
-        // (opsiyonel) tıklayınca post detay sayfasına gitmek istersen:
-        // d.onclick = () => location.href = `/post/view.html?id=${encodeURIComponent(p.id)}`;
-
         $grid.appendChild(d);
     });
 }
-
 
 // ✅ JWT helper: senin projende JWT genelde localStorage’da duruyor.
 // Eğer farklı yerdeyse burayı senin sisteme göre değiştiririz.
