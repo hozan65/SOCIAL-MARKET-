@@ -1,22 +1,15 @@
-// /profile/profile.js (MODULE) ✅ AUTO-COLUMN FIX for 400
+// /profile/profile.js (MODULE) ✅ FINAL (get_profile server read)
 import { account } from "/assets/appwrite.js";
 
+/* =========================
+   SUPABASE (READ ONLY for posts/follows)
+========================= */
 const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
 
 const sb = window.supabase?.createClient
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
-
-const PROFILE_TABLE = "profiles";
-
-// UI columns (these exist in your table)
-const COL_NAME = "name";
-const COL_BIO = "bio";
-const COL_WEBSITE = "website";
-const COL_AVATAR = "avatar_url";
-const COL_CREATED = "created_at";
-const COL_UPDATED = "updated_at";
 
 /* =========================
    DOM
@@ -53,6 +46,7 @@ const pMsg = $("pMsg");
 const openFollowers = $("openFollowers");
 const openFollowing = $("openFollowing");
 
+// modal (senin html’de varsa)
 const followModal = $("followModal");
 const fCloseBtn = $("fCloseBtn");
 const fTitle = $("fTitle");
@@ -107,28 +101,15 @@ function setAvatar(url, displayName) {
     }
 }
 
-function renderProfileUI(row, me) {
-    const displayName =
-        (row?.[COL_NAME] && String(row[COL_NAME]).trim()) ||
-        (me?.name && String(me.name).trim()) ||
-        (me?.email ? me.email.split("@")[0] : "User");
+function setFollowUI(isFollowing) {
+    followBtn.textContent = isFollowing ? "Following" : "Follow";
+    followBtn.classList.toggle("primary", !isFollowing);
+}
 
-    pName.textContent = displayName;
-
-    pBio.textContent = row?.[COL_BIO] || "No bio yet.";
-
-    const link = safeUrl(row?.[COL_WEBSITE] || "");
-    if (link) {
-        pLink.style.display = "inline-block";
-        pLink.href = link;
-        pLink.textContent = link.replace(/^https?:\/\//, "");
-    } else {
-        pLink.style.display = "none";
-    }
-
-    setAvatar(row?.[COL_AVATAR] || "", displayName);
-
-    joined.textContent = fmtDate(row?.[COL_CREATED] || row?.[COL_UPDATED] || me?.$createdAt);
+function getJWT() {
+    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt") || "";
+    if (!jwt) throw new Error("Missing JWT (sm_jwt)");
+    return jwt;
 }
 
 /* =========================
@@ -139,64 +120,41 @@ async function getMe() {
 }
 
 /* =========================
-   IMPORTANT: Detect correct UID column
-   Because your request is 400, likely wrong column.
+   PROFILE READ/WRITE (SERVER)
 ========================= */
-let UID_COL = null;
-const UID_COL_CANDIDATES = ["appwrite_user", "appwrite_user_id", "user_id"];
+async function getProfile(uid) {
+    const jwt = getJWT();
+    const res = await fetch(`/.netlify/functions/get_profile?uid=${encodeURIComponent(uid)}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${jwt}` },
+    });
 
-async function tryLoadWithCol(col, uid) {
-    const { data, error } = await sb
-        .from(PROFILE_TABLE)
-        .select(`${col},${COL_NAME},${COL_BIO},${COL_WEBSITE},${COL_AVATAR},${COL_CREATED},${COL_UPDATED}`)
-        .eq(col, uid)
-        .maybeSingle();
+    const text = await res.text();
+    let j = {};
+    try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
 
-    return { data: data || null, error };
+    if (!res.ok) throw new Error(j?.error || `get_profile HTTP ${res.status}`);
+    return j.profile || null;
 }
 
-async function detectUidColumn(uid) {
-    for (const col of UID_COL_CANDIDATES) {
-        const { data, error } = await tryLoadWithCol(col, uid);
+async function saveProfile({ name, bio, website }) {
+    const jwt = getJWT();
+    const res = await fetch("/.netlify/functions/upsert_profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ name, bio, website }),
+    });
 
-        // If error exists and is a "column not found / bad request" -> try next.
-        // Supabase-js error shape differs, so check loosely:
-        const msg = String(error?.message || error?.hint || "");
-        const bad =
-            error &&
-            (msg.includes("column") ||
-                msg.includes("failed to parse") ||
-                msg.includes("not found") ||
-                msg.includes("bad request") ||
-                msg.includes("PGRST"));
+    const text = await res.text();
+    let j = {};
+    try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
 
-        if (!error || !bad) {
-            // even if row doesn't exist, no column error means column is valid
-            UID_COL = col;
-            return { col, row: data };
-        }
-    }
-
-    // fallback to first candidate
-    UID_COL = UID_COL_CANDIDATES[0];
-    return { col: UID_COL, row: null };
-}
-
-async function loadProfileRow(uid) {
-    if (!UID_COL) await detectUidColumn(uid);
-
-    const { data, error } = await sb
-        .from(PROFILE_TABLE)
-        .select(`${UID_COL},${COL_NAME},${COL_BIO},${COL_WEBSITE},${COL_AVATAR},${COL_CREATED},${COL_UPDATED}`)
-        .eq(UID_COL, uid)
-        .maybeSingle();
-
-    if (error) console.warn("loadProfileRow error:", error);
-    return data || null;
+    if (!res.ok) throw new Error(j?.error || `upsert_profile HTTP ${res.status}`);
+    return j;
 }
 
 /* =========================
-   Stats + Posts
+   SUPABASE READS (posts + follows)
 ========================= */
 async function countPosts(userId) {
     const { count, error } = await sb
@@ -292,19 +250,8 @@ function renderPosts(list) {
 }
 
 /* =========================
-   Netlify calls
+   Follow + Avatar calls
 ========================= */
-function getJWT() {
-    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt") || "";
-    if (!jwt) throw new Error("Missing JWT (sm_jwt)");
-    return jwt;
-}
-
-function setFollowUI(isF) {
-    followBtn.textContent = isF ? "Following" : "Follow";
-    followBtn.classList.toggle("primary", !isF);
-}
-
 async function toggleFollow(targetUid) {
     const jwt = getJWT();
     const res = await fetch("/.netlify/functions/toggle_follow", {
@@ -312,25 +259,13 @@ async function toggleFollow(targetUid) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify({ following_uid: String(targetUid) }),
     });
-    const text = await res.text();
-    let data = {};
-    try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
-    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    return data;
-}
 
-async function upsertProfile({ bio, website }) {
-    const jwt = getJWT();
-    const res = await fetch("/.netlify/functions/upsert_profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
-        body: JSON.stringify({ bio, website }),
-    });
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    return data;
+    return data; // { ok:true, following:true/false }
 }
 
 async function uploadAvatar(file) {
@@ -347,14 +282,16 @@ async function uploadAvatar(file) {
     const text = await res.text();
     let data = {};
     try { data = text ? JSON.parse(text) : {}; } catch { data = { error: text }; }
+
     if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
     return data.avatar_url || "";
 }
 
 /* =========================
-   Follow modal
+   Modals (optional)
 ========================= */
 function openFollowModal(title) {
+    if (!followModal) return;
     fTitle.textContent = title;
     fList.innerHTML = "";
     fEmpty.style.display = "none";
@@ -362,6 +299,7 @@ function openFollowModal(title) {
     document.body.style.overflow = "hidden";
 }
 function closeFollowModal() {
+    if (!followModal) return;
     followModal.style.display = "none";
     document.body.style.overflow = "";
 }
@@ -377,17 +315,36 @@ async function main() {
 
     const myId = me.$id;
 
-    // detect UID column once
-    await detectUidColumn(myId);
-    console.log("✅ Detected UID_COL:", UID_COL);
-
+    // visiting others:
     const targetUidFromUrl = new URL(location.href).searchParams.get("uid");
     const targetId = targetUidFromUrl || myId;
     const isMe = !targetUidFromUrl || targetUidFromUrl === myId;
 
-    let row = await loadProfileRow(targetId);
-    renderProfileUI(row, me);
+    // ✅ read profile from server
+    let row = await getProfile(targetId);
 
+    const displayName =
+        (row?.name && String(row.name).trim()) ||
+        (me?.name && String(me.name).trim()) ||
+        (me?.email ? me.email.split("@")[0] : "User");
+
+    // render
+    pName.textContent = displayName;
+    pBio.textContent = row?.bio || "No bio yet.";
+
+    const link = safeUrl(row?.website || "");
+    if (link) {
+        pLink.style.display = "inline-block";
+        pLink.href = link;
+        pLink.textContent = link.replace(/^https?:\/\//, "");
+    } else {
+        pLink.style.display = "none";
+    }
+
+    setAvatar(row?.avatar_url || "", displayName);
+    joined.textContent = fmtDate(row?.created_at || row?.updated_at || me?.$createdAt);
+
+    // stats + posts + follow state
     const [pc, fc, fg, posts, following] = await Promise.all([
         countPosts(targetId),
         countFollowers(targetId),
@@ -399,14 +356,15 @@ async function main() {
     postCount.textContent = String(pc || 0);
     followerCount.textContent = String(fc || 0);
     followingCount.textContent = String(fg || 0);
-
     renderPosts(posts);
 
+    // buttons
     if (isMe) {
         editBtn.style.display = "inline-flex";
         followBtn.style.display = "none";
         msgBtn.style.display = "none";
 
+        // avatar change
         changeAvatarBtn.style.display = "inline-flex";
         changeAvatarBtn.onclick = () => avatarInput.click();
 
@@ -420,9 +378,19 @@ async function main() {
 
                 await uploadAvatar(file);
 
-                // refresh from DB
-                row = await loadProfileRow(myId);
-                renderProfileUI(row, me);
+                // ✅ refresh from server so reload is consistent
+                row = await getProfile(myId);
+
+                pBio.textContent = row?.bio || "No bio yet.";
+                const link2 = safeUrl(row?.website || "");
+                if (link2) {
+                    pLink.style.display = "inline-block";
+                    pLink.href = link2;
+                    pLink.textContent = link2.replace(/^https?:\/\//, "");
+                } else {
+                    pLink.style.display = "none";
+                }
+                setAvatar(row?.avatar_url || "", displayName);
 
                 alert("Photo updated ✅");
             } catch (e) {
@@ -436,9 +404,9 @@ async function main() {
         editBtn.style.display = "none";
         followBtn.style.display = "inline-flex";
         msgBtn.style.display = "inline-flex";
+        changeAvatarBtn.style.display = "none";
 
         setFollowUI(!!following);
-
         followBtn.onclick = async () => {
             try {
                 followBtn.disabled = true;
@@ -459,50 +427,53 @@ async function main() {
         };
 
         msgBtn.onclick = () => alert("Message sistemi sonra.");
-        changeAvatarBtn.style.display = "none";
     }
 
+    // edit drawer
     editBtn.onclick = () => {
         editWrap.style.display = "block";
-        bioInput.value = row?.[COL_BIO] || "";
-        linkInput.value = row?.[COL_WEBSITE] || "";
+        bioInput.value = row?.bio || "";
+        linkInput.value = row?.website || "";
     };
-
     cancelEdit.onclick = () => { editWrap.style.display = "none"; };
 
     saveEdit.onclick = async () => {
         try {
             saveEdit.disabled = true;
+
             const newBio = (bioInput.value || "").trim();
             const newWebsite = (linkInput.value || "").trim();
 
-            await upsertProfile({ bio: newBio, website: newWebsite });
+            // ✅ save to DB
+            await saveProfile({ name: displayName, bio: newBio, website: newWebsite });
 
-            // refresh from DB
-            row = await loadProfileRow(myId);
-            renderProfileUI(row, me);
+            // ✅ refresh from server
+            row = await getProfile(myId);
+
+            // render again
+            pBio.textContent = row?.bio || "No bio yet.";
+            const link3 = safeUrl(row?.website || "");
+            if (link3) {
+                pLink.style.display = "inline-block";
+                pLink.href = link3;
+                pLink.textContent = link3.replace(/^https?:\/\//, "");
+            } else {
+                pLink.style.display = "none";
+            }
 
             editWrap.style.display = "none";
-            alert("Saved ");
+            alert("Saved ✅");
         } catch (e) {
             alert(e?.message || "Save failed");
         } finally {
             saveEdit.disabled = false;
         }
     };
+
+    // modal close
+    fCloseBtn?.addEventListener("click", closeFollowModal);
+    followModal?.addEventListener("click", (e) => { if (e.target?.dataset?.close) closeFollowModal(); });
 }
-
-/* Modal events */
-fCloseBtn?.addEventListener("click", closeFollowModal);
-followModal?.addEventListener("click", (e) => { if (e.target?.dataset?.close) closeFollowModal(); });
-
-fList?.addEventListener("click", (e) => {
-    const btn = e.target.closest(".fBtn");
-    if (!btn) return;
-    const uid = btn.dataset.uid;
-    if (!uid) return;
-    window.location.href = `/profile/index.html?uid=${encodeURIComponent(uid)}`;
-});
 
 main().catch((e) => {
     console.error(e);

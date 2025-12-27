@@ -1,4 +1,5 @@
 // netlify/functions/upsert_profile.js
+const { createClient } = require("@supabase/supabase-js");
 const { authUser } = require("./_auth_user");
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
@@ -46,50 +47,31 @@ exports.handler = async (event) => {
         if (!jwt) return json(401, { error: "Missing JWT" });
 
         const user = await authUser(jwt); // { uid, email }
+
         const body = JSON.parse(event.body || "{}");
 
+        // ✅ Table schema: profiles(appwrite_user_id, name, bio, website, avatar_url, created_at, updated_at)
         const payload = {
-            name: s(body.name) || (user.email ? user.email.split("@")[0] : "User"),
-            bio: s(body.bio),
-            website: cleanUrl(body.website),
+            appwrite_user_id: user.uid,
+            name: s(body.name || ""),              // istersen frontend gönderebilir; göndermese de sorun değil
+            bio: s(body.bio || ""),
+            website: cleanUrl(body.website || ""),
             updated_at: new Date().toISOString(),
         };
 
-        // 1) PATCH update
-        const patch = await fetch(
-            `${SUPABASE_URL}/rest/v1/profiles?appwrite_user_id=eq.${user.uid}`,
-            {
-                method: "PATCH",
-                headers: {
-                    Authorization: `Bearer ${SERVICE_KEY}`,
-                    apikey: SERVICE_KEY,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(payload),
-            }
-        );
+        // name boşsa DB’deki name’i ezmemek için: boşsa kaldır
+        if (!payload.name) delete payload.name;
 
-        if (patch.ok) return json(200, { ok: true, mode: "updated" });
+        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-        // 2) POST insert (first time)
-        const insert = await fetch(`${SUPABASE_URL}/rest/v1/profiles`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${SERVICE_KEY}`,
-                apikey: SERVICE_KEY,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                appwrite_user_id: user.uid,
-                email: user.email,
-                ...payload,
-            }),
+        // ✅ upsert = insert or update
+        const { error } = await sb.from("profiles").upsert(payload, {
+            onConflict: "appwrite_user_id",
         });
 
-        const t = await insert.text();
-        if (!insert.ok) return json(insert.status, { error: t || "Insert failed" });
+        if (error) throw error;
 
-        return json(200, { ok: true, mode: "inserted" });
+        return json(200, { ok: true });
     } catch (e) {
         console.error("upsert_profile error:", e);
         return json(500, { error: e?.message || "Server error" });
