@@ -25,8 +25,6 @@ function getBearer(event) {
 }
 
 const s = (v) => String(v ?? "").trim();
-
-// URL sanitize (boş ise "" döner)
 const cleanUrl = (v) => {
     const x = s(v);
     if (!x) return "";
@@ -52,28 +50,22 @@ exports.handler = async (event) => {
 
         const body = JSON.parse(event.body || "{}");
 
-        // ✅ BURASI ÖNEMLİ:
-        // avatar_url alanını HER ZAMAN set ediyoruz (delete için "" gelsin)
+        // ✅ x YOK
+        // ✅ avatar_url boş gelirse bile yazıyoruz (delete için)
         const payload = {
             appwrite_user_id: user.uid,
             email: s(body.email || user.email),
-            name: s(body.name || body.display_name || user.email?.split("@")?.[0] || "user"),
+            name: s(body.name || user.email?.split("@")?.[0] || "user"),
 
             bio: s(body.bio),
             website: cleanUrl(body.website),
 
-            // 2.link olarak x kullanıyorsan:
-            x: cleanUrl(body.x),
-
-            // ✅ avatar_url boş da gelse yaz
-            avatar_url: cleanUrl(body.avatar_url), // "" ise DB'ye "" yazar
-
+            avatar_url: cleanUrl(body.avatar_url), // "" => DB'de siler
             updated_at: new Date().toISOString(),
         };
 
         const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-        // appwrite_user_id UNIQUE olmalı
         const { error } = await sb.from("profiles").upsert(payload, {
             onConflict: "appwrite_user_id",
         });

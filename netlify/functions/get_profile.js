@@ -5,7 +5,7 @@ const { authUser } = require("./_auth_user");
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
 const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
-function json(statusCode, obj) {
+function json(statusCode, bodyObj) {
     return {
         statusCode,
         headers: {
@@ -15,7 +15,7 @@ function json(statusCode, obj) {
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
         },
-        body: JSON.stringify(obj),
+        body: JSON.stringify(bodyObj),
     };
 }
 
@@ -34,18 +34,18 @@ exports.handler = async (event) => {
         const jwt = getBearer(event);
         if (!jwt) return json(401, { error: "Missing JWT" });
 
-        // ✅ verify jwt + get caller uid
-        const me = await authUser(jwt); // { uid, email }
+        // ✅ auth check (even if you fetch other uid)
+        await authUser(jwt);
 
-        // allow reading other user's profile by uid (for visiting others)
-        const url = new URL(event.rawUrl);
-        const uid = (url.searchParams.get("uid") || me.uid).trim();
+        const uid = (event.queryStringParameters?.uid || "").trim();
+        if (!uid) return json(400, { error: "Missing uid" });
 
         const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
+        // ✅ x YOK
         const { data, error } = await sb
             .from("profiles")
-            .select("appwrite_user_id, name, bio, website, avatar_url, created_at, updated_at")
+            .select("appwrite_user_id,name,bio,website,avatar_url,created_at,updated_at")
             .eq("appwrite_user_id", uid)
             .maybeSingle();
 
@@ -57,4 +57,3 @@ exports.handler = async (event) => {
         return json(500, { error: e?.message || "Server error" });
     }
 };
-

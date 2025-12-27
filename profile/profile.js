@@ -1,17 +1,10 @@
-// /profile/profile.js (MODULE) ✅ FULL (Upload + Delete + Save + Cancel)
-// Uses:
-//  - /.netlify/functions/get_profile?uid=...
-//  - /.netlify/functions/upsert_profile
-//  - /.netlify/functions/upload_avatar
+// /profile/profile.js (MODULE) ✅ FULL (NO x column)
 import { account } from "/assets/appwrite.js";
 
 const FN_GET_PROFILE = "/.netlify/functions/get_profile";
 const FN_UPSERT_PROFILE = "/.netlify/functions/upsert_profile";
 const FN_UPLOAD_AVATAR = "/.netlify/functions/upload_avatar";
 
-/* =========================
-   DOM
-========================= */
 const $ = (id) => document.getElementById(id);
 
 const avatarImg = $("pAvatarImg");
@@ -23,25 +16,18 @@ const deleteBtn = $("deleteBtn");
 
 const pName = $("pName");
 const bioInput = $("bioInput");
-const link1Input = $("link1Input"); // only website for now
+const link1Input = $("link1Input");
 
 const cancelBtn = $("cancelBtn");
 const saveBtn = $("saveBtn");
 const pMsg = $("pMsg");
 
-/* =========================
-   Helpers
-========================= */
 function setMsg(t) { if (pMsg) pMsg.textContent = t || ""; }
 
 function initials(name) {
     const s = String(name || "").trim();
     if (!s) return "SM";
-    return s
-        .split(/\s+/)
-        .slice(0, 2)
-        .map((x) => (x[0] || "").toUpperCase())
-        .join("") || "SM";
+    return s.split(/\s+/).slice(0, 2).map(x => (x[0] || "").toUpperCase()).join("") || "SM";
 }
 
 function safeUrl(v) {
@@ -74,20 +60,15 @@ async function getMe() {
     try { return await account.get(); } catch { return null; }
 }
 
-/* =========================
-   API
-========================= */
 async function apiGetProfile(uid) {
     const jwt = getJWT();
     const res = await fetch(`${FN_GET_PROFILE}?uid=${encodeURIComponent(uid)}`, {
         method: "GET",
         headers: { Authorization: `Bearer ${jwt}` },
     });
-
     const text = await res.text();
     let j = {};
     try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
-
     if (!res.ok) throw new Error(j?.error || `get_profile ${res.status}`);
     return j.profile || null;
 }
@@ -99,11 +80,9 @@ async function apiUpsertProfile(payload) {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
         body: JSON.stringify(payload),
     });
-
     const text = await res.text();
     let j = {};
     try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
-
     if (!res.ok) throw new Error(j?.error || `upsert_profile ${res.status}`);
     return j;
 }
@@ -111,35 +90,23 @@ async function apiUpsertProfile(payload) {
 async function apiUploadAvatar(file) {
     const jwt = getJWT();
     const fd = new FormData();
-    fd.append("file", file); // ✅ must be 'file'
-
+    fd.append("file", file); // must be 'file'
     const res = await fetch(FN_UPLOAD_AVATAR, {
         method: "POST",
         headers: { Authorization: `Bearer ${jwt}` },
         body: fd,
     });
-
     const text = await res.text();
     let j = {};
     try { j = text ? JSON.parse(text) : {}; } catch { j = { error: text }; }
-
     if (!res.ok) throw new Error(j?.error || `upload_avatar ${res.status}`);
     return j.avatar_url || "";
 }
 
-/* =========================
-   State
-========================= */
+/* state */
 let me = null;
 let displayName = "User";
-
-// current DB snapshot (for cancel)
-let current = {
-    name: "User",
-    bio: "",
-    website: "",
-    avatar_url: "",
-};
+let current = { name: "User", bio: "", website: "", avatar_url: "" };
 
 function readForm() {
     return {
@@ -153,30 +120,21 @@ function applyForm(state) {
     link1Input.value = state.website || "";
 }
 
-function setDirty(dirty) {
-    cancelBtn.disabled = !dirty;
-    saveBtn.disabled = !dirty;
+function setDirty(d) {
+    cancelBtn.disabled = !d;
+    saveBtn.disabled = !d;
 }
 
 function computeDirty() {
     const now = readForm();
-    return (now.bio !== (current.bio || "")) || (now.website !== (current.website || ""));
+    return now.bio !== (current.bio || "") || now.website !== (current.website || "");
 }
 
-function bindDirtyListeners() {
-    bioInput.addEventListener("input", () => setDirty(computeDirty()));
-    link1Input.addEventListener("input", () => setDirty(computeDirty()));
-}
+function onChange() { setDirty(computeDirty()); }
 
-/* =========================
-   Main
-========================= */
 async function main() {
     me = await getMe();
-    if (!me) {
-        location.href = "/auth/login.html";
-        return;
-    }
+    if (!me) { location.href = "/auth/login.html"; return; }
 
     displayName =
         (me?.name && String(me.name).trim()) ||
@@ -187,7 +145,6 @@ async function main() {
     setMsg("Loading...");
     const row = await apiGetProfile(me.$id);
 
-    // load current from DB
     current = {
         name: (row?.name && String(row.name).trim()) || displayName,
         bio: row?.bio || "",
@@ -195,7 +152,6 @@ async function main() {
         avatar_url: row?.avatar_url || "",
     };
 
-    // render
     pName.textContent = current.name || displayName;
     setAvatar(current.avatar_url, current.name || displayName);
     applyForm(current);
@@ -203,11 +159,11 @@ async function main() {
     setDirty(false);
     setMsg("");
 
-    bindDirtyListeners();
+    bioInput.addEventListener("input", onChange);
+    link1Input.addEventListener("input", onChange);
 
-    /* ===== Upload photo ===== */
+    // Upload
     uploadBtn.onclick = () => avatarInput.click();
-
     avatarInput.onchange = async () => {
         const file = avatarInput.files?.[0];
         if (!file) return;
@@ -221,7 +177,6 @@ async function main() {
 
             await apiUploadAvatar(file);
 
-            // ✅ refresh from server so reload is consistent
             const fresh = await apiGetProfile(me.$id);
             current.avatar_url = fresh?.avatar_url || "";
             setAvatar(current.avatar_url, current.name || displayName);
@@ -237,34 +192,35 @@ async function main() {
         }
     };
 
-    /* ===== Delete photo (DB: avatar_url = "") ===== */
+    // ✅ Delete photo
     deleteBtn.onclick = async () => {
         try {
             uploadBtn.disabled = true;
             deleteBtn.disabled = true;
             setMsg("Deleting...");
 
-            // ✅ 1) DB'ye avatar_url boş gönder
             const form = readForm();
+
+            // ✅ DB'ye avatar_url = "" yaz
             await apiUpsertProfile({
                 name: current.name || displayName,
                 bio: form.bio,
                 website: form.website,
-                avatar_url: "", // ✅ CRITICAL: clears DB
+                avatar_url: "", // CRITICAL
             });
 
-            // ✅ 2) serverdan tekrar oku (kesinleşsin)
+            // refresh
             const fresh = await apiGetProfile(me.$id);
 
             current = {
                 name: (fresh?.name && String(fresh.name).trim()) || (current.name || displayName),
                 bio: fresh?.bio || "",
                 website: fresh?.website || "",
-                avatar_url: fresh?.avatar_url || "", // should be ""
+                avatar_url: fresh?.avatar_url || "",
             };
 
-            // ✅ 3) UI temizle
             setAvatar(current.avatar_url, current.name || displayName);
+            setDirty(false);
 
             setMsg("Photo deleted ✅");
             setTimeout(() => setMsg(""), 1200);
@@ -276,7 +232,7 @@ async function main() {
         }
     };
 
-    /* ===== Cancel ===== */
+    // Cancel
     cancelBtn.onclick = () => {
         applyForm(current);
         setDirty(false);
@@ -284,7 +240,7 @@ async function main() {
         setTimeout(() => setMsg(""), 800);
     };
 
-    /* ===== Save ===== */
+    // Save
     saveBtn.onclick = async () => {
         try {
             saveBtn.disabled = true;
@@ -297,10 +253,9 @@ async function main() {
                 name: current.name || displayName,
                 bio: form.bio,
                 website: form.website,
-                // avatar_url göndermiyoruz -> mevcut değer kalsın
+                // avatar_url göndermiyoruz -> aynen kalsın
             });
 
-            // refresh from server (kalıcı)
             const fresh = await apiGetProfile(me.$id);
 
             current = {
@@ -320,10 +275,7 @@ async function main() {
             setMsg(e?.message || "Save failed");
             setDirty(true);
         } finally {
-            // only enable based on dirty again
             setDirty(computeDirty());
-            saveBtn.disabled = !computeDirty();
-            cancelBtn.disabled = !computeDirty();
         }
     };
 }
