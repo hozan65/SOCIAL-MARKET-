@@ -1,4 +1,5 @@
-console.log("✅ u.js loaded");
+// /u/u.js
+console.log("✅ u.js loaded (fast)");
 
 const FN_GET_PROFILE = "/.netlify/functions/get_profile";
 const FN_LIST_FOLLOWERS = "/.netlify/functions/list_followers";
@@ -74,16 +75,29 @@ function renderPosts(posts){
     (posts || []).forEach((p) => {
         const d = document.createElement("div");
         d.className = "uPost";
-        d.innerHTML = `
-      ${p.image_url ? `<img src="${esc(p.image_url)}" alt="post">` : ""}
-      ${p.caption ? `<div class="uPostCap">${esc(p.caption)}</div>` : ""}
-    `;
+        d.innerHTML = `${p.image_url ? `<img src="${esc(p.image_url)}" alt="post">` : ""}`;
         $grid.appendChild(d);
     });
 }
 
-// ✅ JWT helper: senin projende JWT genelde localStorage’da duruyor.
-// Eğer farklı yerdeyse burayı senin sisteme göre değiştiririz.
+function renderAll(data){
+    const p = data?.profile || {};
+    const c = data?.counts || {};
+    const posts = data?.posts || [];
+
+    $name.textContent = p.name || "—";
+    $bio.textContent = p.bio || "";
+    $avatar.src = p.avatar_url || "/assets/img/avatar-placeholder.png";
+
+    $followers.textContent = String(c.followers ?? 0);
+    $following.textContent = String(c.following ?? 0);
+    $postsCount.textContent = String(c.posts ?? 0);
+
+    renderLinks(p.links || []);
+    renderPosts(posts);
+}
+
+/* JWT helper (follow için) */
 function getJWT(){
     return (
         localStorage.getItem("sm_jwt") ||
@@ -96,7 +110,7 @@ function getJWT(){
 async function apiGet(url, params){
     const u = new URL(url, location.origin);
     Object.entries(params || {}).forEach(([k,v]) => v != null && u.searchParams.set(k, v));
-    const res = await fetch(u.toString());
+    const res = await fetch(u.toString(), { cache: "no-store" });
     const json = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, json };
 }
@@ -116,6 +130,7 @@ async function apiPost(url, body, withJwt=false){
     return { ok: res.ok, status: res.status, json };
 }
 
+/* Modal user list */
 function renderUserList(list){
     if (!list?.length) return `<div class="uMsg">No users</div>`;
 
@@ -127,7 +142,6 @@ function renderUserList(list){
     </div>
   `).join("");
 }
-
 function attachVisitHandlers(){
     $modalBody.querySelectorAll("[data-id]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -138,21 +152,24 @@ function attachVisitHandlers(){
     });
 }
 
-async function loadProfile(){
+/* ✅ FAST BOOT:
+   - /u/?me=1 -> redirect yok, id = myId
+   - cache -> hemen bas
+   - sonra network ile güncelle
+*/
+(async function boot(){
     closeModal();
 
     let id = qs("id");
     const me = qs("me");
 
-    // ✅ /u/?me=1 -> localStorage sm_uid ile /u/?id=... çevir
     if (!id && me === "1"){
         const myId = localStorage.getItem("sm_uid");
         if (!myId){
             setMsg("Login required.");
             return;
         }
-        location.replace(`/u/?id=${encodeURIComponent(myId)}`);
-        return;
+        id = myId; // ✅ redirect yok
     }
 
     if (!id){
@@ -160,42 +177,74 @@ async function loadProfile(){
         return;
     }
 
-    setMsg("Loading...");
-
-    // ✅ PUBLIC: JWT istemez
-    const r = await apiGet(FN_GET_PROFILE, { id });
-    if (!r.ok){
-        console.error("get_profile", r.status, r.json);
-        setMsg(r.json?.error || "Profile load failed.");
-        return;
-    }
-
-    const p = r.json.profile || {};
-    const c = r.json.counts || {};
-    const posts = r.json.posts || [];
-
-    $name.textContent = p.name || "—";
-    $bio.textContent = p.bio || "";
-    $avatar.src = p.avatar_url || "/assets/img/avatar-placeholder.png";
-
-    $followers.textContent = String(c.followers ?? 0);
-    $following.textContent = String(c.following ?? 0);
-    $postsCount.textContent = String(c.posts ?? 0);
-
-    renderLinks(p.links || []);
-    renderPosts(posts);
-
-    // ✅ Follow butonu: sadece başka user ise
     const myId = localStorage.getItem("sm_uid");
-    const isMe = myId && p.id && myId === p.id;
+    const isMe = myId && myId === id;
 
+    // ✅ CACHE: önce cache bas (anında açılır)
+    const cacheKey = `sm_profile_cache_${id}`;
+    try {
+        const cachedRaw = localStorage.getItem(cacheKey);
+        if (cachedRaw){
+            const cached = JSON.parse(cachedRaw);
+            if (cached?.data) renderAll(cached.data);
+        }
+    } catch {}
+
+    // UI: follow button visibility
     if (isMe){
         $followBtn.hidden = true;
     } else {
         $followBtn.hidden = false;
+        $followBtn.textContent = "Follow";
+        $followBtn.classList.remove("isFollowing");
+    }
+
+    // Followers/Following modal handlers (always)
+    $followersBtn.onclick = async () => {
+        openModal("Followers", `<div class="uMsg">Loading...</div>`);
+        const rr = await apiGet(FN_LIST_FOLLOWERS, { id });
+        if (!rr.ok){
+            $modalBody.innerHTML = `<div class="uMsg">${esc(rr.json?.error || "Load failed")}</div>`;
+            return;
+        }
+        $modalBody.innerHTML = renderUserList(rr.json.list || []);
+        attachVisitHandlers();
+    };
+
+    $followingBtn.onclick = async () => {
+        openModal("Following", `<div class="uMsg">Loading...</div>`);
+        const rr = await apiGet(FN_LIST_FOLLOWING, { id });
+        if (!rr.ok){
+            $modalBody.innerHTML = `<div class="uMsg">${esc(rr.json?.error || "Load failed")}</div>`;
+            return;
+        }
+        $modalBody.innerHTML = renderUserList(rr.json.list || []);
+        attachVisitHandlers();
+    };
+
+    // ✅ NETWORK: güncel veriyi çek (sessiz)
+    const r = await apiGet(FN_GET_PROFILE, { id });
+    if (!r.ok){
+        console.error("get_profile", r.status, r.json);
+        // cache yoksa mesaj göster
+        if (!$name.textContent || $name.textContent === "—") setMsg(r.json?.error || "Profile load failed.");
+        return;
+    }
+
+    // bas
+    renderAll(r.json);
+
+    // cache yaz (60sn ttl gibi davranacağız)
+    try {
+        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), data: r.json }));
+    } catch {}
+
+    // follow state (server false dönse bile buton çalışır)
+    if (!isMe){
         const isFollowing = !!r.json.is_following;
         $followBtn.classList.toggle("isFollowing", isFollowing);
         $followBtn.textContent = isFollowing ? "Following" : "Follow";
+
         $followBtn.onclick = async () => {
             const jwt = getJWT();
             if (!jwt){
@@ -203,7 +252,7 @@ async function loadProfile(){
                 return;
             }
             $followBtn.disabled = true;
-            const t = await apiPost(FN_TOGGLE_FOLLOW, { target_id: p.id }, true);
+            const t = await apiPost(FN_TOGGLE_FOLLOW, { target_id: id }, true);
             $followBtn.disabled = false;
 
             if (!t.ok){
@@ -215,36 +264,10 @@ async function loadProfile(){
             const nowFollowing = !!t.json.following;
             $followBtn.classList.toggle("isFollowing", nowFollowing);
             $followBtn.textContent = nowFollowing ? "Following" : "Follow";
-            $followers.textContent = String(t.json.followers_count ?? $followers.textContent);
+            if (t.json.followers_count != null) $followers.textContent = String(t.json.followers_count);
             setMsg("");
         };
     }
 
-    // Followers modal
-    $followersBtn.onclick = async () => {
-        openModal("Followers", `<div class="uMsg">Loading...</div>`);
-        const rr = await apiGet(FN_LIST_FOLLOWERS, { id: p.id });
-        if (!rr.ok){
-            $modalBody.innerHTML = `<div class="uMsg">${esc(rr.json?.error || "Load failed")}</div>`;
-            return;
-        }
-        $modalBody.innerHTML = renderUserList(rr.json.list || []);
-        attachVisitHandlers();
-    };
-
-    // Following modal
-    $followingBtn.onclick = async () => {
-        openModal("Following", `<div class="uMsg">Loading...</div>`);
-        const rr = await apiGet(FN_LIST_FOLLOWING, { id: p.id });
-        if (!rr.ok){
-            $modalBody.innerHTML = `<div class="uMsg">${esc(rr.json?.error || "Load failed")}</div>`;
-            return;
-        }
-        $modalBody.innerHTML = renderUserList(rr.json.list || []);
-        attachVisitHandlers();
-    };
-
     setMsg("");
-}
-
-loadProfile();
+})();
