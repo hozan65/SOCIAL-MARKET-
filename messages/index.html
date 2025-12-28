@@ -8,30 +8,48 @@
   <link rel="stylesheet" href="/styles/variables.css">
   <link rel="stylesheet" href="/styles/base.css">
   <link rel="stylesheet" href="/styles/layout.css">
-  <link rel="stylesheet" href="/messages/messages.css">
 
+  <link rel="stylesheet" href="/messages/messages.css">
 </head>
 <body>
 
 <div id="headerMount"></div>
 
-<main class="container msgPage">
-  <header class="msgTop">
-    <a class="msgBack" href="/feed/">← Back</a>
-    <div class="msgTitle" id="msgTitle">Chat</div>
-  </header>
+<main class="container msgShell">
+  <section class="msgCard">
 
-  <section class="msgBody" id="msgList"></section>
+    <header class="msgTop">
+      <button class="msgBackBtn" id="msgBackBtn" type="button">← Back</button>
+      <div class="msgTitleWrap">
+        <div class="msgTitle" id="msgTitle">Chat</div>
+        <div class="msgSub" id="msgSub">Direct messages</div>
+      </div>
+      <div class="msgTopRight"></div>
+    </header>
 
-  <form class="msgBar" id="msgForm">
-    <input id="msgInput" class="msgInput" placeholder="Type a message..." autocomplete="off" />
-    <button class="msgSend" type="submit">Send</button>
-  </form>
+    <div class="msgViewport">
+      <div class="msgBody" id="msgList"></div>
 
-  <div class="msgHint" id="msgHint"></div>
+      <form class="msgComposer" id="msgForm">
+        <input id="msgInput" class="msgInput" placeholder="Type a message..." autocomplete="off" />
+        <button class="msgSend" type="submit">Send</button>
+      </form>
+    </div>
+
+    <div class="msgHint" id="msgHint"></div>
+
+  </section>
 </main>
 
 <script src="/assets1/header.js"></script>
 <script type="module" src="/messages/messages.js"></script>
+
+<script>
+  document.getElementById("msgBackBtn")?.addEventListener("click", () => {
+    if (history.length > 1) history.back();
+    else location.href = "/feed/";
+  });
+</script>
+
 </body>
 </html>
