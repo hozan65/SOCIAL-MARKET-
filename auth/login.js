@@ -7,6 +7,11 @@ const msgEl = document.getElementById("msg");
 const tabLogin = document.getElementById("tabLogin");
 const tabRegister = document.getElementById("tabRegister");
 
+const firstNameEl = document.getElementById("firstName");
+const lastNameEl = document.getElementById("lastName");
+
+const FN_ENSURE = "/.netlify/functions/ensure_profile";
+
 let busy = false;
 let mode = "login"; // "login" | "register"
 
@@ -18,13 +23,25 @@ function getCreds(){
     return { email, password };
 }
 
+function getNames(){
+    const first = (firstNameEl?.value || "").trim();
+    const last = (lastNameEl?.value || "").trim();
+    const full = `${first} ${last}`.trim();
+    return { first, last, full };
+}
+
 function setMode(m){
     mode = m;
     tabLogin?.classList.toggle("active", m === "login");
     tabRegister?.classList.toggle("active", m === "register");
+
+    // ✅ register modunda name/surname göster
+    if (firstNameEl) firstNameEl.style.display = (m === "register") ? "block" : "none";
+    if (lastNameEl) lastNameEl.style.display = (m === "register") ? "block" : "none";
+
     if (submitBtn) submitBtn.textContent = m === "login" ? "Login" : "Register";
     setMsg("");
-    console.log("✅ MODE:", mode); // <-- switch test
+    console.log("✅ MODE:", mode);
 }
 
 tabLogin?.addEventListener("click", () => setMode("login"));
@@ -36,6 +53,21 @@ async function afterLogin(){
 
     const jwtObj = await account.createJWT();
     if (jwtObj?.jwt) localStorage.setItem("sm_jwt", jwtObj.jwt);
+
+    // ✅ Profil row garanti + name sync (User kalmasın)
+    try{
+        await fetch(FN_ENSURE, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${jwtObj?.jwt || ""}`,
+                "X-Appwrite-JWT": jwtObj?.jwt || ""
+            },
+            body: JSON.stringify({ ok: true })
+        });
+    } catch (e) {
+        console.warn("ensure_profile failed (non-blocking):", e?.message || e);
+    }
 }
 
 function goFeed(){ window.location.href = "/feed/feed.html"; }
@@ -51,9 +83,21 @@ submitBtn?.addEventListener("click", async () => {
         if (mode === "login"){
             setMsg("Logging in...");
             await account.createEmailPasswordSession(email, password);
+
         } else {
+            // ✅ register: name + surname zorunlu
+            const { full } = getNames();
+            if (!full){
+                alert("Please enter Name and Surname");
+                setMsg("");
+                busy = false;
+                return;
+            }
+
             setMsg("Creating account...");
-            await account.create(ID.unique(), email, password, email.split("@")[0]);
+
+            // ✅ Appwrite name = fullName (User kalmaz)
+            await account.create(ID.unique(), email, password, full);
 
             setMsg("Opening session...");
             await account.createEmailPasswordSession(email, password);
@@ -64,6 +108,7 @@ submitBtn?.addEventListener("click", async () => {
 
         setMsg("✅ Done");
         goFeed();
+
     } catch(e){
         console.error(e);
         alert(e?.message || "Auth error");

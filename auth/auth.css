@@ -148,3 +148,8 @@ input:focus{
     width: min(420px, 100%);
     display:block;
 }
+
+/* Register name/surname show/hide smoother (optional) */
+#firstName, #lastName{
+    transition: opacity .12s ease;
+}

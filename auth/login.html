@@ -18,6 +18,11 @@
     </div>
 
     <form id="authForm" class="soft" autocomplete="on">
+
+        <!-- 👇 SADECE REGISTER'DA GÖRÜNECEK -->
+        <input id="firstName" type="text" placeholder="Name" style="display:none">
+        <input id="lastName" type="text" placeholder="Surname" style="display:none">
+
         <input id="email" type="email" placeholder="Email" required>
         <input id="password" type="password" placeholder="Password" required>
 
@@ -35,6 +40,6 @@
     </button>
 </main>
 
-<script type="module" src="/auth/login.js?v=1"></script>
+<script type="module" src="/auth/login.js?v=2"></script>
 </body>
 </html>

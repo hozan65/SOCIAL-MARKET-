@@ -11,19 +11,39 @@ export const handler = async (event) => {
 
         const { user } = await getAppwriteUser(event);
         const uid = user.$id;
-        const name = user.name || "User";
 
-        // 1) önce var mı?
+        // ✅ Appwrite name (register’da artık fullName gelecek)
+        const appwriteName = String(user.name || "").trim();
+        const name = appwriteName || "User";
+
+        // 1) profil var mı? (name de çekiyoruz)
         const { data: existing, error: e1 } = await sb
             .from("profiles")
-            .select("appwrite_user_id")
+            .select("appwrite_user_id, name")
             .eq("appwrite_user_id", uid)
             .maybeSingle();
 
         if (e1) return json(500, { error: e1.message });
-        if (existing?.appwrite_user_id) return json(200, { ok: true });
 
-        // 2) yoksa insert (duplicate olursa OK say)
+        // 2) varsa: name boş / User ise, Appwrite name ile güncelle
+        if (existing?.appwrite_user_id) {
+            const currentName = String(existing?.name || "").trim();
+            const needsNameFix = !currentName || currentName.toLowerCase() === "user";
+
+            // ✅ sadece gerçek isim varsa güncelle (boşsa dokunma)
+            if (needsNameFix && appwriteName) {
+                const { error: ue } = await sb
+                    .from("profiles")
+                    .update({ name: appwriteName })
+                    .eq("appwrite_user_id", uid);
+
+                if (ue) return json(500, { error: ue.message });
+            }
+
+            return json(200, { ok: true });
+        }
+
+        // 3) yoksa insert (duplicate olursa OK say)
         const { error: e2 } = await sb.from("profiles").insert([{
             appwrite_user_id: uid,
             name,
@@ -33,6 +53,7 @@ export const handler = async (event) => {
         }]);
 
         if (e2) {
+            // duplicate -> ok
             if (e2.code === "23505") return json(200, { ok: true });
             const msg = String(e2.message || "");
             if (msg.toLowerCase().includes("duplicate")) return json(200, { ok: true });
