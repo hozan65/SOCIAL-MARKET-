@@ -6,7 +6,9 @@
   - NEW:
     ✅ Post card: TradingView-like
     ✅ Whole card click -> /view/view.html?id=POST_ID (buttons 제외)
-    ✅ Follow state hydrate on refresh (Supabase check + localStorage fallback)
+    ✅ Follow state hydrate on refresh:
+       - cache first
+       - ✅ definitive check via Netlify function is_following (JWT)
 ========================= */
 
 console.log("✅ feed.js running");
@@ -27,6 +29,7 @@ const sb = window.supabase?.createClient
 const FN_TOGGLE_LIKE = "/.netlify/functions/toggle_like";
 const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";
 const FN_AUTH_USER = "/.netlify/functions/_auth_user";
+const FN_IS_FOLLOWING = "/.netlify/functions/is_following";
 
 // =========================
 // DOM
@@ -180,40 +183,45 @@ async function getLikeCount(postId) {
 
 /**
  * Follow check (hydrate)
- * table: follows
- * columns: follower_uid (me), following_uid (target)
+ * ✅ cache first
+ * ✅ definitive check via Netlify is_following (JWT) because RLS blocks anon reads
  */
 async function isFollowingUser(targetUserId) {
-    const myId = await getMyUserId();
     const target = String(targetUserId || "").trim();
     if (!target) return false;
 
-    // 1) Try Supabase read
-    if (sb) {
+    // 1) fast cache
+    try {
+        const myId = await getMyUserId();
+        const set = getFollowingSetFromCache(myId);
+        if (set.has(target)) return true;
+    } catch {}
+
+    // 2) definitive via function (JWT)
+    try {
+        const jwt = getJWT();
+        const r = await fetch(`${FN_IS_FOLLOWING}?id=${encodeURIComponent(target)}`, {
+            headers: { Authorization: `Bearer ${jwt}` },
+            cache: "no-store"
+        });
+
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out?.error || `HTTP ${r.status}`);
+        return !!out.is_following;
+    } catch (e) {
+        // 3) fallback cache
         try {
-            const { data, error } = await sb
-                .from("follows")
-                .select("id")
-                .eq("follower_uid", myId)
-                .eq("following_uid", target)
-                .limit(1);
-
-            if (!error) return !!(data && data.length);
-        } catch {}
+            const myId = await getMyUserId();
+            const set = getFollowingSetFromCache(myId);
+            return set.has(target);
+        } catch {
+            return false;
+        }
     }
-
-    // 2) fallback cache
-    const set = getFollowingSetFromCache(myId);
-    return set.has(target);
 }
 
 // =========================
-// RENDER POST (TradingView-like) ✅ senin istediğin
-// - Resim hafif oval
-// - Pair / Market / TF / Date
-// - Açıklama 1 satır + "Show more" (yazı)
-// - Like + Follow altta
-// - Feed’de comments yok
+// RENDER POST (TradingView-like)
 // =========================
 function renderPost(row) {
     const postIdRaw = String(row.id || "").trim();
@@ -298,6 +306,17 @@ async function hydrateNewPosts(justAddedRows) {
 
             const btn = grid.querySelector(`.followBtn[data-user-id="${CSS.escape(authorId)}"]`);
             if (!btn || btn.disabled) continue;
+
+            // self follow disable (opsiyonel ama faydalı)
+            try {
+                const myId = await getMyUserId();
+                if (myId && authorId === myId) {
+                    btn.textContent = "You";
+                    btn.disabled = true;
+                    btn.classList.add("isDisabled");
+                    continue;
+                }
+            } catch {}
 
             const following = await isFollowingUser(authorId);
             btn.textContent = following ? "Following" : "Follow";
@@ -391,7 +410,6 @@ async function loadFeedMore() {
         await hydrateNewPosts(rows);
 
         // ✅ card click => view (butonlar hariç)
-        // (sadece yeni eklenenler için bağlayalım)
         for (const r of rows) {
             const pid = String(r.id || "").trim();
             const card = grid.querySelector(`.tvCard[data-post-id="${CSS.escape(pid)}"]`);

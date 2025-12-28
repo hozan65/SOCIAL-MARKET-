@@ -1,51 +1,59 @@
-// netlify/functions/list_following.js
-import { createClient } from "@supabase/supabase-js";
+// netlify/functions/is_following.js
+const { createClient } = require("@supabase/supabase-js");
+const { authUser } = require("./_auth_user");
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
-export const handler = async (event) => {
-    try {
-        const uid = event.queryStringParameters?.id;
-        if (!uid) return json(400, { error: "Missing id" });
-
-        // ben kimi takip ediyorum? follower_uid = uid => following_uid list
-        const { data: rel, error: e1 } = await sb
-            .from("follows")
-            .select("following_uid")
-            .eq("follower_uid", uid)
-            .order("created_at", { ascending: false })
-            .limit(200);
-
-        if (e1) return json(500, { error: e1.message });
-
-        const ids = (rel || []).map(r => r.following_uid).filter(Boolean);
-        if (!ids.length) return json(200, { list: [] });
-
-        const { data: profs, error: e2 } = await sb
-            .from("profiles")
-            .select("appwrite_user_id, name, avatar_url")
-            .in("appwrite_user_id", ids)
-            .limit(200);
-
-        if (e2) return json(500, { error: e2.message });
-
-        const map = new Map((profs || []).map(p => [p.appwrite_user_id, p]));
-        const list = ids.map(id => map.get(id)).filter(Boolean).map(p => ({
-            id: p.appwrite_user_id,
-            name: p.name,
-            avatar_url: p.avatar_url
-        }));
-
-        return json(200, { list });
-    } catch (e) {
-        return json(500, { error: String(e?.message || e) });
-    }
-};
-
-function json(statusCode, body) {
+function json(statusCode, bodyObj) {
     return {
         statusCode,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        body: JSON.stringify(body)
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+        },
+        body: JSON.stringify(bodyObj),
     };
 }
+
+function getBearer(event) {
+    const h = event.headers?.authorization || event.headers?.Authorization || "";
+    return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
+}
+
+exports.handler = async (event) => {
+    try {
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+        if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
+
+        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
+
+        const jwt = getBearer(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
+
+        const user = await authUser(jwt);
+
+        const target = String(event.queryStringParameters?.id || "").trim();
+        if (!target) return json(400, { error: "Missing id" });
+        if (target === user.uid) return json(200, { ok: true, is_following: false });
+
+        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+        const { data, error } = await sb
+            .from("follows")
+            .select("id")
+            .eq("follower_uid", user.uid)
+            .eq("following_uid", target)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        return json(200, { ok: true, is_following: !!data?.id });
+    } catch (e) {
+        console.error("is_following error:", e);
+        return json(500, { error: e?.message || "Server error" });
+    }
+};
