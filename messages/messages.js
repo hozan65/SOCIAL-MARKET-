@@ -1,3 +1,4 @@
+// /messages/messages.js
 import { account } from "/assets/appwrite.js";
 
 const qs = new URLSearchParams(location.search);
@@ -15,17 +16,33 @@ const esc = (s) => String(s ?? "")
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
     .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 
+// ✅ JWT headers (same style as your u.js)
+async function getJwtHeaders(){
+    const jwtObj = await account.createJWT();
+    const jwt = jwtObj?.jwt;
+    if (!jwt) throw new Error("JWT could not be created");
+
+    return {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${jwt}`,
+        "X-Appwrite-JWT": jwt,
+        "x-jwt": jwt
+    };
+}
+
 async function apiGet(url){
-    const r = await fetch(url, { cache:"no-store" });
+    const headers = await getJwtHeaders();
+    const r = await fetch(url, { headers, cache:"no-store" });
     const j = await r.json().catch(()=> ({}));
     if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
     return j;
 }
 
 async function apiPost(url, body){
+    const headers = await getJwtHeaders();
     const r = await fetch(url, {
         method:"POST",
-        headers:{ "Content-Type":"application/json" },
+        headers,
         body: JSON.stringify(body || {}),
         cache:"no-store"
     });
@@ -37,7 +54,9 @@ async function apiPost(url, body){
 function render(list){
     const html = (list || []).map(m => {
         const mine = m.sender_id === meId;
-        const t = m.created_at ? new Date(m.created_at).toLocaleString("tr-TR",{ dateStyle:"short", timeStyle:"short" }) : "";
+        const t = m.created_at
+            ? new Date(m.created_at).toLocaleString("tr-TR",{ dateStyle:"short", timeStyle:"short" })
+            : "";
         return `
       <div class="bubble ${mine ? "me" : ""}">
         <div>${esc(m.body)}</div>
@@ -77,6 +96,10 @@ async function boot(){
         if (!to) throw new Error("Missing ?to=USER_ID");
         hint.textContent = "Loading...";
         await loadMe();
+
+        // ✅ quick sanity: JWT üretilebiliyor mu?
+        await getJwtHeaders();
+
         await getConversation();
         await loadMessages();
         hint.textContent = "";
@@ -93,13 +116,14 @@ form?.addEventListener("submit", async (e) => {
     input.value = "";
     try{
         await sendMessage(text);
+        hint.textContent = "";
     }catch(err){
         console.error(err);
         hint.textContent = "❌ " + (err?.message || err);
     }
 });
 
-// basit polling (2.5s) - realtime sonra ekleriz
+// ✅ polling (2.5s)
 setInterval(() => {
     if (conversationId) loadMessages().catch(()=>{});
 }, 2500);
