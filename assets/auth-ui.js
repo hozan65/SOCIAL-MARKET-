@@ -63,6 +63,9 @@ function renderLoggedIn(slot, user) {
 
     const name = escapeHtml(user?.name || "Profile");
 
+    // ✅ Messages page (DM)
+    const MESSAGES_HREF = "/messages/";
+
     slot.innerHTML = `
     <div class="tvAuth">
       <button class="tvProfileBtn" id="tvProfileBtn" type="button">
@@ -73,8 +76,12 @@ function renderLoggedIn(slot, user) {
       <div class="tvMenu" id="tvMenu" aria-hidden="true">
         <div class="tvMenuHead">${name}</div>
 
-        <!-- ✅ MOBILE FIX: direct index.html -->
+        <!-- ✅ links -->
         <a class="tvItem" href="/u/index.html?me=1">My Profile</a>
+
+        <!-- ✅ NEW: Messages -->
+        <a class="tvItem" href="${MESSAGES_HREF}">Messages</a>
+
         <a class="tvItem" href="/profile/index.html">Profile Settings</a>
         <a class="tvItem" href="/about/index.html">About Us</a>
 
@@ -89,9 +96,11 @@ function renderLoggedIn(slot, user) {
 
     const open = () => {
         menu.classList.add("open");
+        menu.setAttribute("aria-hidden", "false");
     };
     const close = () => {
         menu.classList.remove("open");
+        menu.setAttribute("aria-hidden", "true");
     };
 
     btn.onclick = (e) => {
@@ -136,11 +145,29 @@ function injectStylesOnce() {
       display:none;z-index:9999;
     }
     .tvMenu.open{display:block}
-    .tvMenuHead{padding:10px 12px;font-weight:1000;border-bottom:1px solid rgba(0,0,0,.08)}
-    .tvItem{display:block;padding:10px 12px;text-decoration:none;color:#111;font-weight:900}
+    .tvMenuHead{
+      padding:10px 12px;
+      font-weight:1000;
+      border-bottom:1px solid rgba(0,0,0,.08)
+    }
+    .tvItem{
+      display:block;
+      padding:10px 12px;
+      text-decoration:none;
+      color:#111;
+      font-weight:900
+    }
     .tvItem:hover{background:rgba(0,0,0,.05)}
     .tvDivider{height:1px;background:rgba(0,0,0,.08);margin:6px 0}
-    .tvItemBtn{width:100%;text-align:left;padding:10px 12px;border:none;background:#fff;font-weight:1000;cursor:pointer}
+    .tvItemBtn{
+      width:100%;
+      text-align:left;
+      padding:10px 12px;
+      border:none;
+      background:#fff;
+      font-weight:1000;
+      cursor:pointer
+    }
     .tvItemBtn.danger{color:#c01818}
   `;
     document.head.appendChild(st);
