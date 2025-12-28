@@ -1,35 +1,40 @@
+// netlify/functions/list_following.js
 import { createClient } from "@supabase/supabase-js";
 
-const sb = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export const handler = async (event) => {
     try {
         const uid = event.queryStringParameters?.id;
         if (!uid) return json(400, { error: "Missing id" });
 
-        // follower_uid = uid  => ben kimi takip ediyorum?
-        const { data, error } = await sb
+        // ben kimi takip ediyorum? follower_uid = uid => following_uid list
+        const { data: rel, error: e1 } = await sb
             .from("follows")
-            .select(
-                "following_uid, p:profiles!follows_following_uid_fk(appwrite_user_id,name,avatar_url)"
-            )
+            .select("following_uid")
             .eq("follower_uid", uid)
             .order("created_at", { ascending: false })
             .limit(200);
 
-        if (error) return json(500, { error: error.message });
+        if (e1) return json(500, { error: e1.message });
 
-        const list = (data || [])
-            .map((x) => x.p)
-            .filter(Boolean)
-            .map((p) => ({
-                id: p.appwrite_user_id,
-                name: p.name,
-                avatar_url: p.avatar_url
-            }));
+        const ids = (rel || []).map(r => r.following_uid).filter(Boolean);
+        if (!ids.length) return json(200, { list: [] });
+
+        const { data: profs, error: e2 } = await sb
+            .from("profiles")
+            .select("appwrite_user_id, name, avatar_url")
+            .in("appwrite_user_id", ids)
+            .limit(200);
+
+        if (e2) return json(500, { error: e2.message });
+
+        const map = new Map((profs || []).map(p => [p.appwrite_user_id, p]));
+        const list = ids.map(id => map.get(id)).filter(Boolean).map(p => ({
+            id: p.appwrite_user_id,
+            name: p.name,
+            avatar_url: p.avatar_url
+        }));
 
         return json(200, { list });
     } catch (e) {
@@ -40,10 +45,7 @@ export const handler = async (event) => {
 function json(statusCode, body) {
     return {
         statusCode,
-        headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
-        },
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         body: JSON.stringify(body)
     };
 }

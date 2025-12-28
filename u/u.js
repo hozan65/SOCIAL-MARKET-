@@ -8,6 +8,9 @@ const FN_ENSURE = "/.netlify/functions/ensure_profile";
 const FN_LIST_FOLLOWERS = "/.netlify/functions/list_followers";
 const FN_LIST_FOLLOWING = "/.netlify/functions/list_following";
 
+// sayfa linki (sende screenshot /u/index.html görünüyor)
+const PROFILE_PAGE = "/u/index.html";
+
 const qs = (k) => new URLSearchParams(location.search).get(k);
 const $ = (id) => document.getElementById(id);
 
@@ -42,11 +45,7 @@ function esc(s) {
 }
 
 function safeHost(url) {
-    try {
-        return new URL(url).hostname;
-    } catch {
-        return url || "";
-    }
+    try { return new URL(url).hostname; } catch { return url || ""; }
 }
 
 function setMsg(t) {
@@ -70,26 +69,24 @@ function renderUserList(list) {
         return;
     }
 
-    $modalBody.innerHTML = list
-        .map((u) => {
-            const name = esc(u?.name || "User");
-            const av = u?.avatar_url ? esc(u.avatar_url) : "";
-            const id = u?.id || "";
-            return `
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08);">
-          ${
-                av
-                    ? `<img src="${av}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">`
-                    : `<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);"></div>`
-            }
-          <div style="flex:1;">
-            <div style="font-weight:600;">${name}</div>
-          </div>
-          <a href="/u/u.html?id=${encodeURIComponent(id)}" style="text-decoration:none;opacity:.9;">View</a>
+    $modalBody.innerHTML = list.map((u) => {
+        const name = esc(u?.name || "User");
+        const av = u?.avatar_url ? esc(u.avatar_url) : "";
+        const id = u?.id || "";
+        return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08);">
+        ${
+            av
+                ? `<img src="${av}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">`
+                : `<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);"></div>`
+        }
+        <div style="flex:1;">
+          <div style="font-weight:600;">${name}</div>
         </div>
-      `;
-        })
-        .join("");
+        <a href="${PROFILE_PAGE}?id=${encodeURIComponent(id)}" style="text-decoration:none;opacity:.9;">View</a>
+      </div>
+    `;
+    }).join("");
 }
 
 // ---- render profile ----
@@ -146,7 +143,7 @@ async function fetchProfile(uid) {
     return r.json();
 }
 
-// ensure_profile (JWT gerektirebilir; bu sayfada en azından deniyoruz)
+// ensure_profile (JWT gerektirir)
 async function getJwtHeaders() {
     const jwtObj = await account.createJWT();
     const jwt = jwtObj?.jwt;
@@ -168,7 +165,6 @@ async function ensureProfile() {
             body: JSON.stringify({ ok: true })
         });
     } catch (e) {
-        // ensure fail olsa da sayfa çalışsın
         console.warn("ensure_profile failed:", e?.message || e);
     }
 }
@@ -187,7 +183,6 @@ async function loadList(url) {
     // me=1 => kendi profil
     if (!uid && qs("me") === "1") {
         uid = localStorage.getItem("sm_uid");
-
         if (!uid) {
             try {
                 const me = await account.get();
@@ -200,7 +195,7 @@ async function loadList(url) {
         }
     }
 
-    // hiç uid yoksa: login kontrol edip kendi uid
+    // uid yoksa: login kontrol edip kendi uid
     if (!uid) {
         try {
             const me = await account.get();
@@ -221,9 +216,7 @@ async function loadList(url) {
     const cacheKey = "profile_cache_" + uid;
     const cachedRaw = localStorage.getItem(cacheKey);
     if (cachedRaw) {
-        try {
-            renderProfile(JSON.parse(cachedRaw));
-        } catch {}
+        try { renderProfile(JSON.parse(cachedRaw)); } catch {}
     }
 
     // ✅ load fresh

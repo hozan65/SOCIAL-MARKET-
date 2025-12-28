@@ -24,16 +24,21 @@ function getBearer(event) {
   return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
 }
 
-// ✅ PROFİL VARSA DOKUNMA, YOKSA OLUŞTUR
+// ✅ FK var diye: profiles row yoksa oluştur, varsa dokunma.
+// ✅ Duplicate (23505) gelirse OK say.
 async function ensureProfileRow(sb, uid) {
   const { error } = await sb
       .from("profiles")
-      .insert([{ appwrite_user_id: uid, name: "User" }], {
-        onConflict: "appwrite_user_id",
-        ignoreDuplicates: true
-      });
+      .insert([{ appwrite_user_id: uid, name: "User" }]); // sadece yoksa gerekli
 
-  if (error) throw error;
+  if (error) {
+    // PostgREST duplicate code genelde 23505
+    if (error.code === "23505") return;
+    // bazen message içinde duplicate geçer
+    const msg = String(error.message || "");
+    if (msg.toLowerCase().includes("duplicate")) return;
+    throw error;
+  }
 }
 
 exports.handler = async (event) => {
@@ -46,11 +51,13 @@ exports.handler = async (event) => {
     const jwt = getBearer(event);
     if (!jwt) return json(401, { error: "Missing JWT" });
 
+    // Appwrite JWT -> user
     const user = await authUser(jwt);
 
     let body = {};
     try { body = JSON.parse(event.body || "{}"); } catch { body = {}; }
 
+    // ✅ frontend eski key gönderirse de kabul
     const following_uid = String(body.following_uid || body.following_id || "").trim();
 
     if (!following_uid) return json(400, { error: "Missing following_uid" });
@@ -58,10 +65,11 @@ exports.handler = async (event) => {
 
     const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // ✅ FK için row garanti (ama var olan profili EZMEZ)
+    // ✅ FK için iki profile row'u garanti et (duplicate-safe, overwrite yok)
     await ensureProfileRow(sb, user.uid);
     await ensureProfileRow(sb, following_uid);
 
+    // check existing
     const { data: existing, error: e1 } = await sb
         .from("follows")
         .select("id")
@@ -71,6 +79,7 @@ exports.handler = async (event) => {
 
     if (e1) throw e1;
 
+    // toggle
     if (existing?.id) {
       const { error: delErr } = await sb.from("follows").delete().eq("id", existing.id);
       if (delErr) throw delErr;
