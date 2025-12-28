@@ -40,7 +40,75 @@ document.addEventListener("DOMContentLoaded", async () => {
             if ((a.dataset.page || "").trim() === page) a.classList.add("active");
         });
 
+        // =========================
+        // ✅ ADD "Messages" LINK (Desktop dropdown + Mobile menu)
+        // =========================
+        const addMessagesLink = () => {
+            // Link target
+            const href = "/messages/"; // istersen "/inbox/" yaparsın
+
+            // 1) Desktop dropdown menu (olası selector'lar)
+            const desktopMenus = [
+                mount.querySelector("#profileMenu"),
+                mount.querySelector(".profileMenu"),
+                mount.querySelector(".userMenu"),
+                mount.querySelector(".menuDropdown"),
+                mount.querySelector("[data-menu='profile']"),
+            ].filter(Boolean);
+
+            desktopMenus.forEach((menu) => {
+                // zaten ekliyse dokunma
+                if (menu.querySelector(`a[href="${href}"]`)) return;
+
+                const a = document.createElement("a");
+                a.href = href;
+                a.textContent = "Messages";
+                // dropdown item class'ı varsa onu koru
+                a.className = "menuItem";
+
+                // Sign Out'tan önce ekle
+                const items = Array.from(menu.querySelectorAll("a,button"));
+                const signOut = items.find((x) =>
+                    (x.textContent || "").toLowerCase().includes("sign out")
+                );
+
+                if (signOut && signOut.parentElement === menu) {
+                    menu.insertBefore(a, signOut);
+                } else {
+                    menu.appendChild(a);
+                }
+            });
+
+            // 2) Mobile menu (#mobileMenu) içine de ekle
+            const mobileMenu = document.getElementById("mobileMenu");
+            if (mobileMenu) {
+                if (!mobileMenu.querySelector(`a[href="${href}"]`)) {
+                    const a2 = document.createElement("a");
+                    a2.href = href;
+                    a2.textContent = "Messages";
+                    a2.className = "mItem"; // mobil menü class'ın farklıysa "mItem" yerine onu yaz
+
+                    // mobilde de Sign Out varsa ondan önce ekle
+                    const links = Array.from(mobileMenu.querySelectorAll("a,button"));
+                    const signOut2 = links.find((x) =>
+                        (x.textContent || "").toLowerCase().includes("sign out")
+                    );
+
+                    if (signOut2 && signOut2.parentElement === mobileMenu) {
+                        mobileMenu.insertBefore(a2, signOut2);
+                    } else {
+                        mobileMenu.appendChild(a2);
+                    }
+                }
+            }
+        };
+
+        // Header mount olur olmaz ekle
+        addMessagesLink();
+
+        // =========================
         // 3) hamburger / mobile menu
+        // =========================
         const btn = document.getElementById("hamburgerBtn");
         const menu = document.getElementById("mobileMenu");
         const backdrop = document.getElementById("menuBackdrop");
