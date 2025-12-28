@@ -24,6 +24,19 @@ function getBearer(event) {
   return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
 }
 
+// ✅ FK yüzünden follow insert patlamasın diye: profiles row garanti
+async function ensureProfileRow(sb, uid) {
+  // profiles tablon: appwrite_user_id (text) + name + avatar_url ... varsayıyoruz
+  // name zorunlu değilse bile koymak güvenli
+  const { error } = await sb
+      .from("profiles")
+      .upsert(
+          [{ appwrite_user_id: uid, name: "User" }],
+          { onConflict: "appwrite_user_id" }
+      );
+  if (error) throw error;
+}
+
 exports.handler = async (event) => {
   try {
     // CORS preflight
@@ -59,7 +72,11 @@ exports.handler = async (event) => {
 
     const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // check existing
+    // ✅ 1) FK için iki profile row’u da garanti et
+    await ensureProfileRow(sb, user.uid);
+    await ensureProfileRow(sb, following_uid);
+
+    // ✅ 2) check existing
     const { data: existing, error: e1 } = await sb
         .from("follows")
         .select("id")
@@ -69,7 +86,7 @@ exports.handler = async (event) => {
 
     if (e1) throw e1;
 
-    // toggle
+    // ✅ 3) toggle
     if (existing?.id) {
       const { error: delErr } = await sb.from("follows").delete().eq("id", existing.id);
       if (delErr) throw delErr;
