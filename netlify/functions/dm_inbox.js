@@ -22,84 +22,92 @@ export const handler = async (event) => {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
 
+        // 🔐 current user
         const { user } = await getAppwriteUser(event);
         const me = user?.$id;
         if (!me) return json(401, { error: "Unauthorized" });
 
-        const limit = Math.min(parseInt(new URLSearchParams(event.queryStringParameters || {}).get("limit") || "50", 10), 100);
-
-        // conversations: me taraf olduğu
+        // 📌 conversations where I'm user_id OR user2_id
         const { data: convs, error: e1 } = await supabase
             .from("conversations")
-            .select("id,user1_id,user2_id,updated_at,created_at")
-            .or(`user1_id.eq.${me},user2_id.eq.${me}`)
-            .order("updated_at", { ascending: false })
-            .limit(limit);
+            .select("id, user_id, user2_id, created_at, updated_at")
+            .or(`user_id.eq.${me},user2_id.eq.${me}`)
+            .order("updated_at", { ascending: false });
 
         if (e1) return json(500, { error: e1.message });
-        const convList = convs || [];
-        if (!convList.length) return json(200, { ok: true, list: [] });
+        if (!convs || !convs.length) {
+            return json(200, { ok: true, list: [] });
+        }
 
-        const convIds = convList.map(c => c.id);
-        const otherIds = convList.map(c => (c.user1_id === me ? c.user2_id : c.user1_id));
+        // 👤 other user ids
+        const otherIds = convs.map(c =>
+            c.user_id === me ? c.user2_id : c.user_id
+        );
 
-        // profiles (other side)
+        // 👤 profiles
         const { data: profs, error: e2 } = await supabase
             .from("profiles")
-            .select("id,name,avatar_url")
+            .select("id, name, avatar_url")
             .in("id", otherIds);
 
         if (e2) return json(500, { error: e2.message });
+
         const profMap = new Map((profs || []).map(p => [p.id, p]));
 
-        // last messages: tüm conv mesajlarını desc çek -> her conv için ilkini al
+        // 💬 last messages
+        const convIds = convs.map(c => c.id);
+
         const { data: msgs, error: e3 } = await supabase
             .from("messages")
-            .select("id,conversation_id,sender_id,body,created_at,read_at")
+            .select("conversation_id, body, created_at, sender_id, read_at")
             .in("conversation_id", convIds)
-            .order("created_at", { ascending: false })
-            .limit(500);
+            .order("created_at", { ascending: false });
 
         if (e3) return json(500, { error: e3.message });
-        const lastMap = new Map();
-        for (const m of (msgs || [])) {
-            if (!lastMap.has(m.conversation_id)) lastMap.set(m.conversation_id, m);
+
+        const lastMsgMap = new Map();
+        for (const m of msgs || []) {
+            if (!lastMsgMap.has(m.conversation_id)) {
+                lastMsgMap.set(m.conversation_id, m);
+            }
         }
 
-        // unread: read_at null + sender != me
+        // 🔵 unread counts
         const { data: unreadRows, error: e4 } = await supabase
             .from("messages")
             .select("conversation_id")
             .in("conversation_id", convIds)
             .is("read_at", null)
-            .neq("sender_id", me)
-            .limit(2000);
+            .neq("sender_id", me);
 
         if (e4) return json(500, { error: e4.message });
 
         const unreadMap = new Map();
-        for (const r of (unreadRows || [])) {
-            unreadMap.set(r.conversation_id, (unreadMap.get(r.conversation_id) || 0) + 1);
+        for (const r of unreadRows || []) {
+            unreadMap.set(
+                r.conversation_id,
+                (unreadMap.get(r.conversation_id) || 0) + 1
+            );
         }
 
-        // build list (same order as convs)
-        const out = convList.map(c => {
-            const other_id = c.user1_id === me ? c.user2_id : c.user1_id;
-            const p = profMap.get(other_id) || {};
-            const last = lastMap.get(c.id) || null;
+        // 🧠 final list
+        const list = convs.map(c => {
+            const otherId = c.user_id === me ? c.user2_id : c.user_id;
+            const profile = profMap.get(otherId) || {};
+            const last = lastMsgMap.get(c.id) || {};
 
             return {
                 conversation_id: c.id,
-                other_id,
-                other_name: p.name || "User",
-                other_avatar_url: p.avatar_url || "",
-                last_body: last?.body || "",
-                last_at: last?.created_at || c.updated_at || c.created_at || null,
+                other_id: otherId,
+                other_name: profile.name || "User",
+                other_avatar_url: profile.avatar_url || "",
+                last_body: last.body || "",
+                last_at: last.created_at || c.updated_at || c.created_at,
                 unread: unreadMap.get(c.id) || 0
             };
         });
 
-        return json(200, { ok: true, list: out });
+        return json(200, { ok: true, list });
     } catch (e) {
         return json(500, { error: String(e?.message || e) });
     }
