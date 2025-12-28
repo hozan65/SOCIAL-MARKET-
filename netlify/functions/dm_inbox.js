@@ -17,6 +17,51 @@ const json = (status, body) => ({
     body: JSON.stringify(body)
 });
 
+// ✅ profiles primary-key auto-detect: tries user_id -> uid -> id
+async function fetchProfilesByOtherIds(otherIds) {
+    // 1) user_id
+    {
+        const { data, error } = await supabase
+            .from("profiles")
+            .select("user_id,name,avatar_url")
+            .in("user_id", otherIds);
+
+        if (!error) {
+            const map = new Map((data || []).map((p) => [p.user_id, p]));
+            return { key: "user_id", map };
+        }
+    }
+
+    // 2) uid
+    {
+        const { data, error } = await supabase
+            .from("profiles")
+            .select("uid,name,avatar_url")
+            .in("uid", otherIds);
+
+        if (!error) {
+            const map = new Map((data || []).map((p) => [p.uid, p]));
+            return { key: "uid", map };
+        }
+    }
+
+    // 3) id (fallback)
+    {
+        const { data, error } = await supabase
+            .from("profiles")
+            .select("id,name,avatar_url")
+            .in("id", otherIds);
+
+        if (!error) {
+            const map = new Map((data || []).map((p) => [p.id, p]));
+            return { key: "id", map };
+        }
+
+        // none worked
+        throw new Error(error?.message || "profiles key column not found (user_id/uid/id)");
+    }
+}
+
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
@@ -29,7 +74,7 @@ export const handler = async (event) => {
         const q = event.queryStringParameters || {};
         const limit = Math.min(parseInt(q.limit || "60", 10), 100);
 
-        // ✅ conversations where I'm user1_id or user2_id
+        // ✅ conversations where I'm user1_id OR user2_id
         const { data: convs, error: e1 } = await supabase
             .from("conversations")
             .select("id,user1_id,user2_id,created_at,updated_at")
@@ -41,17 +86,17 @@ export const handler = async (event) => {
         const convList = convs || [];
         if (!convList.length) return json(200, { ok: true, list: [] });
 
-        const convIds = convList.map(c => c.id);
-        const otherIds = convList.map(c => (c.user1_id === me ? c.user2_id : c.user1_id));
+        const convIds = convList.map((c) => c.id);
+        const otherIds = convList.map((c) => (c.user1_id === me ? c.user2_id : c.user1_id));
 
-        // ✅ other profiles
-        const { data: profs, error: e2 } = await supabase
-            .from("profiles")
-            .select("id,name,avatar_url")
-            .in("id", otherIds);
-
-        if (e2) return json(500, { error: e2.message });
-        const profMap = new Map((profs || []).map(p => [p.id, p]));
+        // ✅ profiles (auto-detect key column)
+        let profMap;
+        try {
+            const out = await fetchProfilesByOtherIds(otherIds);
+            profMap = out.map;
+        } catch (e) {
+            return json(500, { error: String(e?.message || e) });
+        }
 
         // ✅ last message per conversation
         const { data: msgs, error: e3 } = await supabase
@@ -84,8 +129,9 @@ export const handler = async (event) => {
             unreadMap.set(r.conversation_id, (unreadMap.get(r.conversation_id) || 0) + 1);
         }
 
-        const out = convList.map(c => {
-            const other_id = (c.user1_id === me ? c.user2_id : c.user1_id);
+        // ✅ build list
+        const list = convList.map((c) => {
+            const other_id = c.user1_id === me ? c.user2_id : c.user1_id;
             const p = profMap.get(other_id) || {};
             const last = lastMap.get(c.id) || null;
 
@@ -100,7 +146,7 @@ export const handler = async (event) => {
             };
         });
 
-        return json(200, { ok: true, list: out });
+        return json(200, { ok: true, list });
     } catch (e) {
         return json(500, { error: String(e?.message || e) });
     }

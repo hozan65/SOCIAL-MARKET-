@@ -2,7 +2,6 @@ import { account } from "/assets/appwrite.js";
 
 console.log("✅ messages.js loaded (inbox + chat)");
 
-const qs = () => new URLSearchParams(location.search);
 const esc = (s) => String(s ?? "")
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
     .replaceAll('"',"&quot;").replaceAll("'","&#039;");
@@ -12,6 +11,9 @@ const fmtTime = (iso) => {
     catch { return ""; }
 };
 
+const qs = () => new URLSearchParams(location.search);
+
+// App nodes
 const $app = document.querySelector(".msgApp");
 const $inboxList = document.getElementById("inboxList");
 const $inboxHint = document.getElementById("inboxHint");
@@ -32,6 +34,9 @@ const $backFeedBtn = document.getElementById("backFeedBtn");
 let meId = null;
 let activeTo = null;
 let activeConversationId = null;
+let inboxCache = [];
+let pollTimer = null;
+let lastPollOk = true;
 
 async function getJwtHeaders(){
     const jwtObj = await account.createJWT();
@@ -67,9 +72,9 @@ async function apiPost(url, body){
 }
 
 /* ---------- Inbox ---------- */
-let inboxCache = [];
-
 function renderInbox(list){
+    if (!$inboxList) return;
+
     if (!list?.length){
         $inboxList.innerHTML = `<div style="opacity:.7;padding:12px;font-weight:900;">No chats yet.</div>`;
         return;
@@ -108,20 +113,6 @@ function renderInbox(list){
     });
 }
 
-async function loadInbox(){
-    $inboxHint.textContent = "Loading...";
-    try{
-        const j = await apiGet("/.netlify/functions/dm_inbox?limit=60");
-        inboxCache = j?.list || [];
-        $inboxHint.textContent = "";
-
-        applySearch();
-    }catch(e){
-        console.error(e);
-        $inboxHint.textContent = "❌ " + (e?.message || e);
-    }
-}
-
 function applySearch(){
     const q = ($search?.value || "").trim().toLowerCase();
     const filtered = !q ? inboxCache : inboxCache.filter(x =>
@@ -130,18 +121,28 @@ function applySearch(){
     renderInbox(filtered);
 }
 
+async function loadInbox(){
+    if ($inboxHint) $inboxHint.textContent = "Loading...";
+    const j = await apiGet("/.netlify/functions/dm_inbox?limit=60");
+    inboxCache = j?.list || [];
+    if ($inboxHint) $inboxHint.textContent = "";
+    applySearch();
+}
+
 /* ---------- Chat ---------- */
 function renderEmptyChat(){
-    $peerName.textContent = "Select a chat";
-    $peerSub.textContent = "Choose someone from the left";
-    $peerAva.innerHTML = "";
-    $msgList.innerHTML = `<div style="opacity:.7;padding:14px;font-weight:900;">No chat selected.</div>`;
-    $msgHint.textContent = "";
+    if ($peerName) $peerName.textContent = "Select a chat";
+    if ($peerSub) $peerSub.textContent = "Choose someone from the left";
+    if ($peerAva) $peerAva.innerHTML = "";
+    if ($msgList) $msgList.innerHTML = `<div style="opacity:.7;padding:14px;font-weight:900;">No chat selected.</div>`;
+    if ($msgHint) $msgHint.textContent = "";
     activeTo = null;
     activeConversationId = null;
 }
 
 function renderMessages(list){
+    if (!$msgList) return;
+
     const html = (list || []).map(m => {
         const mine = m.sender_id === meId;
         const t = m.created_at ? fmtTime(m.created_at) : "";
@@ -182,6 +183,7 @@ async function loadMessages(){
 }
 
 async function openChat(to, knownCid, pushUrl){
+    if (!to) return;
     activeTo = to;
 
     // mobile: show chat pane
@@ -189,24 +191,27 @@ async function openChat(to, knownCid, pushUrl){
 
     // header info from inbox cache if possible
     const row = inboxCache.find(x => x.other_id === to);
-    $peerName.textContent = row?.other_name || "Chat";
-    $peerSub.textContent = "Direct messages";
-    $peerAva.innerHTML = row?.other_avatar_url ? `<img src="${esc(row.other_avatar_url)}" alt="">` : "";
+    if ($peerName) $peerName.textContent = row?.other_name || "Chat";
+    if ($peerSub) $peerSub.textContent = "Direct messages";
+    if ($peerAva) $peerAva.innerHTML = row?.other_avatar_url ? `<img src="${esc(row.other_avatar_url)}" alt="">` : "";
 
     try{
-        $msgHint.textContent = "Loading...";
+        if ($msgHint) $msgHint.textContent = "Loading...";
         activeConversationId = knownCid || await getConversation(to);
-        $msgHint.textContent = "";
+        if ($msgHint) $msgHint.textContent = "";
+
         if (pushUrl) {
             const u = new URL(location.href);
             u.searchParams.set("to", to);
             history.pushState({}, "", u.toString());
         }
-        renderInbox(inboxCache); // active highlight
+
+        // active highlight
+        applySearch();
         await loadMessages();
     }catch(e){
         console.error(e);
-        $msgHint.textContent = "❌ " + (e?.message || e);
+        if ($msgHint) $msgHint.textContent = "❌ " + (e?.message || e);
     }
 }
 
@@ -235,12 +240,23 @@ async function sendMessage(text){
             renderEmptyChat();
         }
 
-        // search
         $search?.addEventListener("input", applySearch);
+
+        // polling (reduced spam if errors)
+        pollTimer = setInterval(async () => {
+            try{
+                await loadInbox();
+                lastPollOk = true;
+                if (activeConversationId) await loadMessages();
+            }catch(e){
+                lastPollOk = false;
+                // sessiz geç, UI’yı kilitleme
+            }
+        }, 3500);
 
     }catch(e){
         console.error(e);
-        $msgHint.textContent = "❌ " + (e?.message || e);
+        if ($msgHint) $msgHint.textContent = "❌ " + (e?.message || e);
     }
 })();
 
@@ -252,25 +268,19 @@ $msgForm?.addEventListener("submit", async (e) => {
     $msgInput.value = "";
     try{
         await sendMessage(text);
-        $msgHint.textContent = "";
+        if ($msgHint) $msgHint.textContent = "";
     }catch(err){
         console.error(err);
-        $msgHint.textContent = "❌ " + (err?.message || err);
+        if ($msgHint) $msgHint.textContent = "❌ " + (err?.message || err);
     }
 });
-
-// polling
-setInterval(() => {
-    if (activeConversationId) loadMessages().catch(()=>{});
-    loadInbox().catch(()=>{});
-}, 3500);
 
 // mobile back to list
 $chatBackBtn?.addEventListener("click", () => {
     $app?.classList.remove("showChat");
 });
 
-// back to feed
+// back button
 $backFeedBtn?.addEventListener("click", () => {
     if (history.length > 1) history.back();
     else location.href = "/feed/feed.html";
