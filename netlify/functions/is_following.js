@@ -10,67 +10,30 @@ const sb = createClient(
 export const handler = async (event) => {
   try {
     if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-    if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
+    if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
 
-    // ✅ JWT -> Appwrite user
     const { user } = await getAppwriteUser(event);
     const myUid = user.$id;
 
-    // body
-    let body = {};
-    try { body = JSON.parse(event.body || "{}"); } catch { body = {}; }
+    const target = String(event.queryStringParameters?.id || "").trim();
+    if (!target) return json(400, { error: "Missing id" });
 
-    const following_uid = String(body.following_uid || body.following_id || "").trim();
-    if (!following_uid) return json(400, { error: "Missing following_uid" });
-    if (following_uid === myUid) return json(400, { error: "Cannot follow yourself" });
-
-    // ✅ FK için profiles satırı garanti (var olanı ezmez)
-    await ensureProfileRow(myUid, user.name || "User");
-    await ensureProfileRow(following_uid, "User");
-
-    // mevcut follow var mı?
-    const { data: existing, error: e1 } = await sb
+    const { data, error } = await sb
         .from("follows")
         .select("id")
         .eq("follower_uid", myUid)
-        .eq("following_uid", following_uid)
+        .eq("following_uid", target)
         .maybeSingle();
 
-    if (e1) return json(500, { error: e1.message });
+    if (error) return json(500, { error: error.message });
 
-    // toggle
-    if (existing?.id) {
-      const { error: delErr } = await sb.from("follows").delete().eq("id", existing.id);
-      if (delErr) return json(500, { error: delErr.message });
-      return json(200, { ok: true, following: false });
-    } else {
-      const { error: insErr } = await sb
-          .from("follows")
-          .insert([{ follower_uid: myUid, following_uid }]);
-
-      if (insErr) return json(500, { error: insErr.message });
-      return json(200, { ok: true, following: true });
-    }
+    return json(200, { ok: true, is_following: !!data?.id });
   } catch (e) {
     const msg = String(e?.message || e);
-    const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
+    const status = msg.toLowerCase().includes("jwt") ? 401 : 502;
     return json(status, { error: msg });
   }
 };
-
-async function ensureProfileRow(uid, name) {
-  // ✅ varsa dokunmaz, yoksa oluşturur
-  const { error } = await sb
-      .from("profiles")
-      .upsert(
-          [{ appwrite_user_id: uid, name: name || "User" }],
-          { onConflict: "appwrite_user_id" }
-      );
-
-  // upsert bazen update yapabilir; ama name="User" yazmak istemiyorsan:
-  // burada sadece insert istiyorsan ayrıca "select then insert" yöntemi kullanırız.
-  if (error) throw error;
-}
 
 function json(statusCode, body) {
   return {
@@ -80,7 +43,7 @@ function json(statusCode, body) {
       "Cache-Control": "no-store",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
-      "Access-Control-Allow-Methods": "POST, OPTIONS"
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
     },
     body: JSON.stringify(body),
   };
