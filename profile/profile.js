@@ -1,7 +1,7 @@
 // /profile/profile.js
 import { account } from "/assets/appwrite.js";
 
-console.log("✅ profile.js (FULL working)");
+console.log("✅ profile.js (FAST cache-first)");
 
 const FN_ENSURE = "/.netlify/functions/ensure_profile";
 const FN_GET = "/.netlify/functions/get_profile";
@@ -30,29 +30,8 @@ const cancelBtn = $("cancelBtn");
 let uid = null;
 let initial = { bio: "", link1: "", link2: "", avatar_url: "" };
 
+// --------- UI helpers ----------
 function setMsg(t) { pMsg.textContent = t || ""; }
-
-function fileToBase64(file){
-    return new Promise((resolve, reject)=>{
-        const fr = new FileReader();
-        fr.onload = ()=> resolve(String(fr.result).split(",")[1] || "");
-        fr.onerror = reject;
-        fr.readAsDataURL(file);
-    });
-}
-
-async function getJwtHeaders(){
-    const jwtObj = await account.createJWT();
-    const jwt = jwtObj?.jwt;
-    if (!jwt) throw new Error("Missing JWT");
-
-    return {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${jwt}`,
-        "X-Appwrite-JWT": jwt,
-        "x-jwt": jwt
-    };
-}
 
 function setAvatar(url){
     if (url){
@@ -90,22 +69,102 @@ function isDirty(){
 }
 
 function updateButtons(){
-    saveBtn.disabled = !isDirty();
-    cancelBtn.disabled = !isDirty();
+    const dirty = isDirty();
+    saveBtn.disabled = !dirty;
+    cancelBtn.disabled = !dirty;
 }
 
-async function ensureProfile(){
-    const headers = await getJwtHeaders();
-    const res = await fetch(FN_ENSURE, { method:"POST", headers, body: JSON.stringify({ ok:true }) });
-    // ensure fail bile olsa devam edelim (ama loglayalım)
-    if (!res.ok){
-        const out = await res.json().catch(()=> ({}));
-        console.warn("ensure_profile failed:", res.status, out);
+// --------- cache ----------
+function cacheKey(){
+    return uid ? `sm_profile_cache:${uid}` : null;
+}
+
+function readCachedProfile(){
+    try{
+        const k = cacheKey();
+        if (!k) return null;
+        const raw = localStorage.getItem(k);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        // basit koruma: profile alanı yoksa ignore
+        return obj?.profile ? obj : null;
+    }catch{
+        return null;
     }
 }
 
-async function loadProfile(){
-    const r = await fetch(`${FN_GET}?id=${encodeURIComponent(uid)}`, { cache:"no-store" });
+function writeCachedProfile(payload){
+    try{
+        const k = cacheKey();
+        if (!k) return;
+        localStorage.setItem(k, JSON.stringify(payload));
+    }catch{}
+}
+
+// --------- file helper ----------
+function fileToBase64(file){
+    return new Promise((resolve, reject)=>{
+        const fr = new FileReader();
+        fr.onload = ()=> resolve(String(fr.result).split(",")[1] || "");
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+    });
+}
+
+// --------- JWT headers (memory cached) ----------
+let _jwtCache = { jwt: null, ts: 0 };
+const JWT_TTL_MS = 60_000; // 60sn aynı sayfada tekrar JWT üretmesin
+
+async function getJwtHeaders(){
+    const now = Date.now();
+    if (_jwtCache.jwt && (now - _jwtCache.ts) < JWT_TTL_MS){
+        const jwt = _jwtCache.jwt;
+        return {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${jwt}`,
+            "X-Appwrite-JWT": jwt,
+            "x-jwt": jwt
+        };
+    }
+
+    const jwtObj = await account.createJWT();
+    const jwt = jwtObj?.jwt;
+    if (!jwt) throw new Error("Missing JWT");
+
+    _jwtCache = { jwt, ts: now };
+
+    return {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${jwt}`,
+        "X-Appwrite-JWT": jwt,
+        "x-jwt": jwt
+    };
+}
+
+// --------- API ----------
+async function ensureProfile(){
+    try{
+        const headers = await getJwtHeaders();
+        const res = await fetch(FN_ENSURE, {
+            method:"POST",
+            headers,
+            body: JSON.stringify({ ok:true })
+        });
+        if (!res.ok){
+            const out = await res.json().catch(()=> ({}));
+            console.warn("ensure_profile failed:", res.status, out);
+        }
+    }catch(e){
+        console.warn("ensure_profile error:", e);
+    }
+}
+
+async function loadProfile({ fresh = false } = {}){
+    // fresh=false => tarayıcı cache kullanabilir (hız)
+    // fresh=true  => no-store (taze veri)
+    const url = `${FN_GET}?id=${encodeURIComponent(uid)}`;
+    const r = await fetch(url, { cache: fresh ? "no-store" : "default" });
+
     if (!r.ok){
         const out = await r.json().catch(()=> ({}));
         throw new Error(out?.error || `get_profile failed (${r.status})`);
@@ -116,7 +175,6 @@ async function loadProfile(){
 async function saveProfile(){
     const headers = await getJwtHeaders();
 
-    // senin DB tasarımında website tek alan, link2’yi şimdilik ignore ediyoruz
     const body = {
         bio: bioInput.value || "",
         website: link1Input.value || ""
@@ -126,11 +184,16 @@ async function saveProfile(){
     const out = await res.json().catch(()=> ({}));
     if (!res.ok) throw new Error(out?.error || `Save failed (${res.status})`);
 
-    // saved -> initial güncelle
     initial.bio = body.bio;
     initial.link1 = body.website;
     initial.link2 = link2Input.value || "";
     updateButtons();
+
+    // cache’i de güncelle
+    const cached = readCachedProfile();
+    const profile = { ...(cached?.profile || {}), bio: body.bio, website: body.website };
+    writeCachedProfile({ profile });
+
     return out;
 }
 
@@ -150,7 +213,14 @@ async function uploadAvatar(file){
 
     const out = await res.json().catch(()=> ({}));
     if (!res.ok) throw new Error(out?.error || `Upload failed (${res.status})`);
-    return out?.avatar_url;
+
+    // cache güncelle
+    const url = out?.avatar_url || "";
+    const cached = readCachedProfile();
+    const profile = { ...(cached?.profile || {}), avatar_url: url };
+    writeCachedProfile({ profile });
+
+    return url;
 }
 
 async function deleteAvatar(){
@@ -162,6 +232,12 @@ async function deleteAvatar(){
     });
     const out = await res.json().catch(()=> ({}));
     if (!res.ok) throw new Error(out?.error || `Delete failed (${res.status})`);
+
+    // cache güncelle
+    const cached = readCachedProfile();
+    const profile = { ...(cached?.profile || {}), avatar_url: "" };
+    writeCachedProfile({ profile });
+
     return true;
 }
 
@@ -178,27 +254,36 @@ async function deleteAvatar(){
     uid = user.$id;
     localStorage.setItem("sm_uid", uid);
 
-    // name göster
     const fallbackName = user?.name || (user?.email ? user.email.split("@")[0] : "") || "User";
     pName.textContent = fallbackName;
-
     setMsg("");
 
-    // ✅ profil row garanti
-    await ensureProfile();
-
-    // ✅ yükle
-    try{
-        const data = await loadProfile();
-        markInitialFromData(data?.profile);
-        setFormFromData(data?.profile);
+    // ✅ 1) CACHE-FIRST: anında ekrana bas
+    const cached = readCachedProfile();
+    if (cached?.profile){
+        markInitialFromData(cached.profile);
+        setFormFromData({ ...cached.profile, name: cached.profile.name || fallbackName });
         updateButtons();
-    }catch(e){
-        console.warn(e);
-        // boş ama çalışır kalsın
+    } else {
+        // skeleton hissi için minimal doldur
         markInitialFromData({});
         setFormFromData({ name: fallbackName });
         updateButtons();
+    }
+
+    // ✅ 2) ensureProfile BLOKLAMASIN (arka planda)
+    ensureProfile();
+
+    // ✅ 3) arka planda taze profile çek + cache yaz + UI güncelle
+    try{
+        const data = await loadProfile({ fresh: true });
+        writeCachedProfile(data);
+
+        markInitialFromData(data?.profile);
+        setFormFromData(data?.profile || { name: fallbackName });
+        updateButtons();
+    }catch(e){
+        console.warn("loadProfile fresh failed:", e);
     }
 
     // input değişince butonlar
@@ -206,17 +291,18 @@ async function deleteAvatar(){
         el.addEventListener("input", updateButtons);
     });
 
-    // cancel: initial geri yükle
+    // cancel
     cancelBtn.onclick = async ()=>{
         try{
             setMsg("Reverting...");
-            const data = await loadProfile();
+            const data = await loadProfile({ fresh: true });
+            writeCachedProfile(data);
+
             markInitialFromData(data?.profile);
             setFormFromData(data?.profile);
             updateButtons();
             setMsg("");
         }catch{
-            // fallback: initial state
             bioInput.value = initial.bio || "";
             link1Input.value = initial.link1 || "";
             link2Input.value = initial.link2 || "";
@@ -243,6 +329,7 @@ async function deleteAvatar(){
     avatarInput.onchange = async ()=>{
         const file = avatarInput.files?.[0];
         if (!file) return;
+
         try{
             setMsg("Uploading...");
             const url = await uploadAvatar(file);
