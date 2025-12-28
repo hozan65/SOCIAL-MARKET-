@@ -24,47 +24,33 @@ function getBearer(event) {
   return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
 }
 
-// ✅ FK yüzünden follow insert patlamasın diye: profiles row garanti
+// ✅ PROFİL VARSA DOKUNMA, YOKSA OLUŞTUR
 async function ensureProfileRow(sb, uid) {
-  // profiles tablon: appwrite_user_id (text) + name + avatar_url ... varsayıyoruz
-  // name zorunlu değilse bile koymak güvenli
   const { error } = await sb
       .from("profiles")
-      .upsert(
-          [{ appwrite_user_id: uid, name: "User" }],
-          { onConflict: "appwrite_user_id" }
-      );
+      .insert([{ appwrite_user_id: uid, name: "User" }], {
+        onConflict: "appwrite_user_id",
+        ignoreDuplicates: true
+      });
+
   if (error) throw error;
 }
 
 exports.handler = async (event) => {
   try {
-    // CORS preflight
     if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+    if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-    if (event.httpMethod !== "POST") {
-      return json(405, { error: "Method not allowed" });
-    }
-
-    if (!SUPABASE_URL || !SERVICE_KEY) {
-      return json(500, { error: "Missing Supabase env" });
-    }
+    if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
 
     const jwt = getBearer(event);
     if (!jwt) return json(401, { error: "Missing JWT" });
 
-    // Appwrite JWT -> user
     const user = await authUser(jwt);
 
-    // Body parse (safe)
     let body = {};
-    try {
-      body = JSON.parse(event.body || "{}");
-    } catch {
-      body = {};
-    }
+    try { body = JSON.parse(event.body || "{}"); } catch { body = {}; }
 
-    // ✅ Accept BOTH names to avoid 400 when frontend sends old key
     const following_uid = String(body.following_uid || body.following_id || "").trim();
 
     if (!following_uid) return json(400, { error: "Missing following_uid" });
@@ -72,11 +58,10 @@ exports.handler = async (event) => {
 
     const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    // ✅ 1) FK için iki profile row’u da garanti et
+    // ✅ FK için row garanti (ama var olan profili EZMEZ)
     await ensureProfileRow(sb, user.uid);
     await ensureProfileRow(sb, following_uid);
 
-    // ✅ 2) check existing
     const { data: existing, error: e1 } = await sb
         .from("follows")
         .select("id")
@@ -86,7 +71,6 @@ exports.handler = async (event) => {
 
     if (e1) throw e1;
 
-    // ✅ 3) toggle
     if (existing?.id) {
       const { error: delErr } = await sb.from("follows").delete().eq("id", existing.id);
       if (delErr) throw delErr;

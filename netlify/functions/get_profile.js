@@ -24,12 +24,22 @@ export const handler = async (event) => {
         const links = [];
         if (prof.website) links.push({ url: prof.website, label: "" });
 
-        // counts
-        const [{ count: followers }, { count: following }, { count: posts }] = await Promise.all([
-            sb.from("follows").select("id", { count: "exact", head: true }).eq("target_id", uid),
-            sb.from("follows").select("id", { count: "exact", head: true }).eq("follower_id", uid),
+        // ✅ counts (SENİN TABLOYA GÖRE)
+        // followers: beni takip eden kişi sayısı -> following_uid = benim uid
+        // following: benim takip ettiklerim -> follower_uid = benim uid
+        const [
+            { count: followers, error: fe },
+            { count: following, error: foe },
+            { count: posts, error: poe }
+        ] = await Promise.all([
+            sb.from("follows").select("id", { count: "exact", head: true }).eq("following_uid", uid),
+            sb.from("follows").select("id", { count: "exact", head: true }).eq("follower_uid", uid),
             sb.from("analyses").select("id", { count: "exact", head: true }).eq("author_id", uid),
         ]);
+
+        if (fe) return json(500, { error: fe.message });
+        if (foe) return json(500, { error: foe.message });
+        if (poe) return json(500, { error: poe.message });
 
         // posts (analyses)
         const { data: postList, error: ae } = await sb
