@@ -1,99 +1,175 @@
 /* /messages/messages.css */
 
-.msgShell{
-    padding: 16px 12px 22px;
-    max-width: 980px;
+.msgShell{ padding: 14px 12px 18px; max-width: 1100px; }
+
+.msgApp{
+    display:grid;
+    grid-template-columns: 360px 1fr;
+    gap: 14px;
+    height: min(78vh, 690px);
 }
 
-/* card */
-.msgCard{
-    border-radius: 18px;
-    background: rgba(255,255,255,.86);
+/* LEFT */
+.msgLeft{
+    border-radius: 16px;
+    background: rgba(255,255,255,.90);
     border: 1px solid rgba(0,0,0,.08);
     box-shadow: 0 12px 30px rgba(0,0,0,.06);
-    overflow: hidden;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
 }
 
-/* top bar */
-.msgTop{
+.leftTop{
+    padding: 12px 12px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+}
+.leftTitle{ font-weight: 1100; font-size: 16px; margin-bottom: 10px; }
+.leftSearch{
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,.12);
+    background:#fff;
+    outline:none;
+    font-weight: 800;
+}
+.leftList{ overflow:auto; padding: 6px 6px; flex:1; }
+.leftHint{ padding: 10px 12px; opacity:.75; font-weight: 900; border-top: 1px solid rgba(0,0,0,.06); }
+
+.chatItem{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    padding: 10px 10px;
+    border-radius: 14px;
+    cursor:pointer;
+}
+.chatItem:hover{ background: rgba(0,0,0,.05); }
+.chatItem.active{ background: rgba(0,180,255,.10); border: 1px solid rgba(0,180,255,.18); }
+
+.chatAva{
+    width: 44px; height: 44px; border-radius: 999px;
+    background: rgba(0,0,0,.06);
+    flex: 0 0 auto;
+    overflow:hidden;
+}
+.chatAva img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+.chatMain{ flex:1; min-width:0; }
+.chatRow1{ display:flex; align-items:center; gap:10px; }
+.chatName{
+    font-weight: 1100;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.chatTime{
+    margin-left:auto;
+    font-size: 12px;
+    font-weight: 900;
+    opacity:.6;
+}
+.chatLast{
+    margin-top: 2px;
+    font-size: 13px;
+    opacity:.75;
+    font-weight: 800;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+.badge{
+    margin-left:auto;
+    background: #1da1f2;
+    color:#fff;
+    font-weight: 1100;
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 999px;
+}
+
+/* RIGHT */
+.msgRight{
+    border-radius: 16px;
+    background: rgba(255,255,255,.90);
+    border: 1px solid rgba(0,0,0,.08);
+    box-shadow: 0 12px 30px rgba(0,0,0,.06);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+}
+
+.chatTop{
     display:flex;
     align-items:center;
     gap:12px;
-    padding: 14px 14px;
+    padding: 12px 12px;
     border-bottom: 1px solid rgba(0,0,0,.08);
     background: rgba(255,255,255,.92);
 }
 
-.msgBackBtn{
+.chatBack{
+    display:none;
     border:none;
-    background: rgba(0,0,0,.04);
+    background: rgba(0,0,0,.05);
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    cursor:pointer;
+    font-weight: 1100;
+}
+
+.topBackFeed{
+    margin-left:auto;
+    border:none;
+    background: rgba(0,0,0,.05);
     padding: 10px 12px;
     border-radius: 12px;
-    font-weight: 1000;
     cursor:pointer;
+    font-weight: 1000;
 }
-.msgBackBtn:hover{ background: rgba(0,0,0,.07); }
 
-.msgTitleWrap{
-    display:flex;
-    flex-direction:column;
-    min-width:0;
+.chatPeer{ display:flex; align-items:center; gap:10px; min-width:0; }
+.peerAva{
+    width: 40px; height: 40px; border-radius: 999px;
+    background: rgba(0,0,0,.06);
+    overflow:hidden;
 }
-.msgTitle{
-    font-weight: 1100;
-    font-size: 16px;
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.msgSub{
-    font-size: 12px;
-    opacity: .7;
-    font-weight: 800;
-}
-.msgTopRight{ margin-left:auto; }
+.peerAva img{ width:100%; height:100%; object-fit:cover; display:block; }
+.peerMeta{ min-width:0; }
+.peerName{ font-weight: 1100; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.peerSub{ font-size: 12px; font-weight: 800; opacity:.65; }
 
-/* viewport */
-.msgViewport{
+.chatViewport{
     position: relative;
-    height: min(72vh, 620px);
+    flex:1;
     background:
             radial-gradient(circle at 20% 10%, rgba(0,180,255,.08), transparent 36%),
             radial-gradient(circle at 80% 20%, rgba(0,0,0,.03), transparent 40%),
             rgba(240, 246, 255, .6);
 }
 
-/* list */
 .msgBody{
     height: 100%;
-    overflow: auto;
-    padding: 14px 14px 84px; /* composer space */
+    overflow:auto;
+    padding: 14px 14px 82px;
     scroll-behavior: smooth;
 }
 
-/* ✅ BUBBLES (PC’de şişikliği kaldırdık) */
 .bubble{
     max-width: 62%;
-    padding: 8px 10px;           /* daha ince */
+    padding: 8px 10px;
     border-radius: 14px;
-    margin: 6px 0;               /* aralık az */
+    margin: 6px 0;
     border: 1px solid rgba(0,0,0,.07);
     background: rgba(255,255,255,.92);
-    box-shadow: 0 2px 10px rgba(0,0,0,.03); /* daha soft */
+    box-shadow: 0 2px 10px rgba(0,0,0,.03);
     word-wrap: break-word;
-
-    font-size: 14px;             /* daha profesyonel */
+    font-size: 14px;
     line-height: 1.25;
 }
-
 .bubble.me{
     margin-left:auto;
     background: rgba(0,180,255,.10);
     border-color: rgba(0,180,255,.18);
 }
-
-/* footer row */
 .bubble .metaRow{
     display:flex;
     justify-content:flex-end;
@@ -106,52 +182,39 @@
     font-weight: 900;
     opacity: .60;
 }
-
-/* ✅ Tick renkleri: normal gri, okundu mavi */
 .tick{
     display:inline-flex;
     gap:2px;
     font-weight:1100;
     font-size: 12px;
-    color: rgba(0,0,0,.45);   /* normal: gri */
+    color: rgba(0,0,0,.45);
 }
-.tick .t1, .tick .t2{ opacity: 1; }
+.tick.read{ color:#1da1f2; }
 
-.tick.read{
-    color: #1da1f2;            /* okundu: mavi */
-}
-
-/* composer */
 .msgComposer{
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position:absolute;
+    left:0; right:0; bottom:0;
     display:flex;
-    gap: 10px;
+    gap:10px;
     align-items:center;
     padding: 12px 12px;
     border-top: 1px solid rgba(0,0,0,.08);
     background: rgba(255,255,255,.92);
     backdrop-filter: blur(10px);
 }
-
 .msgInput{
-    flex: 1;
+    flex:1;
     padding: 12px 14px;
     border-radius: 14px;
     border: 1px solid rgba(0,0,0,.12);
-    background: rgba(255,255,255,.98);
-    color: inherit;
-    outline: none;
+    background:#fff;
+    outline:none;
     font-weight: 800;
 }
 .msgInput:focus{ border-color: rgba(0,0,0,.22); }
 
-/* ✅ Send button: Telegram-like icon button */
 .msgSend{
-    width: 46px;
-    height: 46px;
+    width: 46px; height: 46px;
     border-radius: 14px;
     border: 1px solid rgba(0,0,0,.10);
     background: rgba(0,0,0,.06);
@@ -161,47 +224,25 @@
     cursor:pointer;
 }
 .msgSend:hover{ background: rgba(0,0,0,.09); }
+.sendIcon{ width:20px; height:20px; fill: rgba(0,0,0,.70); }
 
-.sendIcon{
-    width: 20px;
-    height: 20px;
-    fill: rgba(0,0,0,.70);
-}
-
-/* hint */
 .msgHint{
-    padding: 10px 14px;
+    padding: 10px 12px;
     min-height: 18px;
     font-weight: 900;
-    opacity: .75;
-    background: rgba(255,255,255,.92);
+    opacity:.75;
     border-top: 1px solid rgba(0,0,0,.06);
+    background: rgba(255,255,255,.92);
 }
 
-/* Mobile */
-@media (max-width: 720px){
-    .msgShell{ padding: 10px 8px 16px; }
-
-    .msgViewport{
-        height: calc(100vh - 190px);
-    }
-
-    .msgBody{
-        padding: 12px 10px 86px;
-    }
-
-    .bubble{
-        max-width: 86%;
-        padding: 8px 10px;
-        font-size: 14px;
-    }
-
-    /* iOS zoom fix */
-    .msgInput{ font-size: 16px; }
-
-    .msgSend{
-        width: 44px;
-        height: 44px;
-        border-radius: 14px;
-    }
+/* Mobile: sol liste <-> chat geçiş */
+@media (max-width: 860px){
+    .msgApp{ grid-template-columns: 1fr; height: calc(100vh - 190px); }
+    .chatBack{ display:inline-flex; align-items:center; justify-content:center; }
+    .msgLeft{ height: calc(100vh - 190px); }
+    .msgRight{ height: calc(100vh - 190px); display:none; }
+    .msgApp.showChat .msgLeft{ display:none; }
+    .msgApp.showChat .msgRight{ display:flex; }
+    .msgInput{ font-size: 16px; } /* iOS zoom fix */
+    .bubble{ max-width: 86%; }
 }

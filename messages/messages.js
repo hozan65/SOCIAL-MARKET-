@@ -1,32 +1,38 @@
-// /messages/messages.js
 import { account } from "/assets/appwrite.js";
 
-const qs = new URLSearchParams(location.search);
-const to = (qs.get("to") || "").trim();
+console.log("✅ messages.js loaded (inbox + chat)");
 
-const listEl = document.getElementById("msgList");
-const form = document.getElementById("msgForm");
-const input = document.getElementById("msgInput");
-const hint = document.getElementById("msgHint");
-const backBtn = document.getElementById("msgBackBtn");
-
-let conversationId = null;
-let meId = null;
-
+const qs = () => new URLSearchParams(location.search);
 const esc = (s) => String(s ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 
-function fmtTime(iso){
-    try{
-        return new Date(iso).toLocaleString("tr-TR",{ dateStyle:"short", timeStyle:"short" });
-    }catch{ return ""; }
-}
+const fmtTime = (iso) => {
+    try { return new Date(iso).toLocaleString("tr-TR",{ dateStyle:"short", timeStyle:"short" }); }
+    catch { return ""; }
+};
 
-// ✅ JWT headers (Appwrite JWT)
+const $app = document.querySelector(".msgApp");
+const $inboxList = document.getElementById("inboxList");
+const $inboxHint = document.getElementById("inboxHint");
+const $search = document.getElementById("leftSearch");
+
+const $msgList = document.getElementById("msgList");
+const $msgForm = document.getElementById("msgForm");
+const $msgInput = document.getElementById("msgInput");
+const $msgHint = document.getElementById("msgHint");
+
+const $peerName = document.getElementById("peerName");
+const $peerSub = document.getElementById("peerSub");
+const $peerAva = document.getElementById("peerAva");
+
+const $chatBackBtn = document.getElementById("chatBackBtn");
+const $backFeedBtn = document.getElementById("backFeedBtn");
+
+let meId = null;
+let activeTo = null;
+let activeConversationId = null;
+
 async function getJwtHeaders(){
     const jwtObj = await account.createJWT();
     const jwt = jwtObj?.jwt;
@@ -60,17 +66,89 @@ async function apiPost(url, body){
     return j;
 }
 
-function render(list){
+/* ---------- Inbox ---------- */
+let inboxCache = [];
+
+function renderInbox(list){
+    if (!list?.length){
+        $inboxList.innerHTML = `<div style="opacity:.7;padding:12px;font-weight:900;">No chats yet.</div>`;
+        return;
+    }
+
+    $inboxList.innerHTML = list.map((c) => {
+        const active = (c.other_id === activeTo) ? "active" : "";
+        const ava = c.other_avatar_url
+            ? `<img src="${esc(c.other_avatar_url)}" alt="">`
+            : "";
+        const last = esc(c.last_body || "");
+        const time = c.last_at ? fmtTime(c.last_at) : "";
+        const badge = c.unread ? `<div class="badge">${c.unread}</div>` : "";
+
+        return `
+      <div class="chatItem ${active}" data-to="${esc(c.other_id)}" data-cid="${esc(c.conversation_id)}">
+        <div class="chatAva">${ava}</div>
+        <div class="chatMain">
+          <div class="chatRow1">
+            <div class="chatName">${esc(c.other_name || "User")}</div>
+            <div class="chatTime">${esc(time)}</div>
+          </div>
+          <div class="chatLast">${last || " "}</div>
+        </div>
+        ${badge}
+      </div>
+    `;
+    }).join("");
+
+    $inboxList.querySelectorAll(".chatItem").forEach((row) => {
+        row.addEventListener("click", () => {
+            const to = row.getAttribute("data-to");
+            const cid = row.getAttribute("data-cid");
+            openChat(to, cid, true);
+        });
+    });
+}
+
+async function loadInbox(){
+    $inboxHint.textContent = "Loading...";
+    try{
+        const j = await apiGet("/.netlify/functions/dm_inbox?limit=60");
+        inboxCache = j?.list || [];
+        $inboxHint.textContent = "";
+
+        applySearch();
+    }catch(e){
+        console.error(e);
+        $inboxHint.textContent = "❌ " + (e?.message || e);
+    }
+}
+
+function applySearch(){
+    const q = ($search?.value || "").trim().toLowerCase();
+    const filtered = !q ? inboxCache : inboxCache.filter(x =>
+        String(x.other_name || "").toLowerCase().includes(q)
+    );
+    renderInbox(filtered);
+}
+
+/* ---------- Chat ---------- */
+function renderEmptyChat(){
+    $peerName.textContent = "Select a chat";
+    $peerSub.textContent = "Choose someone from the left";
+    $peerAva.innerHTML = "";
+    $msgList.innerHTML = `<div style="opacity:.7;padding:14px;font-weight:900;">No chat selected.</div>`;
+    $msgHint.textContent = "";
+    activeTo = null;
+    activeConversationId = null;
+}
+
+function renderMessages(list){
     const html = (list || []).map(m => {
         const mine = m.sender_id === meId;
         const t = m.created_at ? fmtTime(m.created_at) : "";
 
-        // ✅ Tick logic:
-        // mine: always show ✓✓, but blue when read_at exists
         const tickHtml = mine ? `
       <span class="tick ${m.read_at ? "read" : ""}">
-        <span class="t1">✓</span>
-        <span class="t2">✓</span>
+        <span>✓</span><span>✓</span>
       </span>
     ` : "";
 
@@ -85,84 +163,120 @@ function render(list){
     `;
     }).join("");
 
-    listEl.innerHTML = html || `<div style="opacity:.7;padding:10px">No messages yet.</div>`;
-    listEl.scrollTop = listEl.scrollHeight;
+    $msgList.innerHTML = html || `<div style="opacity:.7;padding:12px;font-weight:900;">No messages yet.</div>`;
+    $msgList.scrollTop = $msgList.scrollHeight;
 }
 
-async function loadMe(){
-    const me = await account.get();
-    meId = me?.$id || null;
-    if (!meId) throw new Error("Not logged in");
-}
-
-async function getConversation(){
+async function getConversation(to){
     const j = await apiGet(`/.netlify/functions/dm_get_or_create?to=${encodeURIComponent(to)}`);
-    conversationId = j?.conversation_id;
-    if (!conversationId) throw new Error("Missing conversation_id");
+    const cid = j?.conversation_id;
+    if (!cid) throw new Error("Missing conversation_id");
+    return cid;
 }
 
 async function loadMessages(){
-    const j = await apiGet(
-        `/.netlify/functions/dm_list?conversation_id=${encodeURIComponent(conversationId)}&limit=120`
-    );
-    const list = j?.list || [];
-    render(list);
+    if (!activeConversationId) return;
+    const j = await apiGet(`/.netlify/functions/dm_list?conversation_id=${encodeURIComponent(activeConversationId)}&limit=120`);
+    renderMessages(j?.list || []);
+    await apiPost("/.netlify/functions/dm_mark_read", { conversation_id: activeConversationId }).catch(()=>{});
+}
 
-    // ✅ mark incoming as read (batch)
-    await apiPost("/.netlify/functions/dm_mark_read", { conversation_id: conversationId }).catch(()=>{});
+async function openChat(to, knownCid, pushUrl){
+    activeTo = to;
+
+    // mobile: show chat pane
+    $app?.classList.add("showChat");
+
+    // header info from inbox cache if possible
+    const row = inboxCache.find(x => x.other_id === to);
+    $peerName.textContent = row?.other_name || "Chat";
+    $peerSub.textContent = "Direct messages";
+    $peerAva.innerHTML = row?.other_avatar_url ? `<img src="${esc(row.other_avatar_url)}" alt="">` : "";
+
+    try{
+        $msgHint.textContent = "Loading...";
+        activeConversationId = knownCid || await getConversation(to);
+        $msgHint.textContent = "";
+        if (pushUrl) {
+            const u = new URL(location.href);
+            u.searchParams.set("to", to);
+            history.pushState({}, "", u.toString());
+        }
+        renderInbox(inboxCache); // active highlight
+        await loadMessages();
+    }catch(e){
+        console.error(e);
+        $msgHint.textContent = "❌ " + (e?.message || e);
+    }
 }
 
 async function sendMessage(text){
-    await apiPost("/.netlify/functions/dm_send", { conversation_id: conversationId, body: text });
+    if (!activeConversationId) throw new Error("No chat selected");
+    await apiPost("/.netlify/functions/dm_send", { conversation_id: activeConversationId, body: text });
     await loadMessages();
 }
 
-async function boot(){
+/* ---------- Boot ---------- */
+(async function boot(){
     try{
-        if (!to) throw new Error("Missing ?to=USER_ID");
+        const me = await account.get();
+        meId = me?.$id;
+        if (!meId) { location.href = "/auth/login.html"; return; }
 
-        hint.textContent = "Loading...";
-        await loadMe();
-        await getConversation();
-        await loadMessages();
-        hint.textContent = "";
+        // inbox always loads (so /messages/ never errors)
+        await loadInbox();
+
+        // if ?to exists, open it
+        const to = (qs().get("to") || "").trim();
+        if (to) {
+            const row = inboxCache.find(x => x.other_id === to);
+            await openChat(to, row?.conversation_id || null, false);
+        } else {
+            renderEmptyChat();
+        }
+
+        // search
+        $search?.addEventListener("input", applySearch);
+
     }catch(e){
         console.error(e);
-        hint.textContent = "❌ " + (e?.message || e);
+        $msgHint.textContent = "❌ " + (e?.message || e);
     }
-}
+})();
 
-// ✅ back button (no more page not found)
-backBtn?.addEventListener("click", () => {
-    if (history.length > 1) history.back();
-    else location.href = "/feed/";
-});
-
-form?.addEventListener("submit", async (e) => {
+/* events */
+$msgForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const text = (input.value || "").trim();
+    const text = ($msgInput.value || "").trim();
     if (!text) return;
-
-    input.value = "";
+    $msgInput.value = "";
     try{
         await sendMessage(text);
-        hint.textContent = "";
+        $msgHint.textContent = "";
     }catch(err){
         console.error(err);
-        hint.textContent = "❌ " + (err?.message || err);
+        $msgHint.textContent = "❌ " + (err?.message || err);
     }
 });
 
-// ✅ polling
+// polling
 setInterval(() => {
-    if (conversationId) loadMessages().catch(()=>{});
-}, 2500);
+    if (activeConversationId) loadMessages().catch(()=>{});
+    loadInbox().catch(()=>{});
+}, 3500);
 
-// ✅ refresh on tab focus
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && conversationId) {
-        loadMessages().catch(()=>{});
-    }
+// mobile back to list
+$chatBackBtn?.addEventListener("click", () => {
+    $app?.classList.remove("showChat");
 });
 
-boot();
+// back to feed
+$backFeedBtn?.addEventListener("click", () => {
+    if (history.length > 1) history.back();
+    else location.href = "/feed/feed.html";
+});
+
+window.addEventListener("popstate", () => {
+    const to = (qs().get("to") || "").trim();
+    if (!to) renderEmptyChat();
+});

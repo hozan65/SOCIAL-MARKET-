@@ -16,61 +16,56 @@
 <div id="headerMount"></div>
 
 <main class="container msgShell">
-  <section class="msgCard">
+  <section class="msgApp">
 
-    <header class="msgTop">
-      <button class="msgBackBtn" id="msgBackBtn" type="button">← Back</button>
-      <div class="msgTitleWrap">
-        <div class="msgTitle" id="msgTitle">Chat</div>
-        <div class="msgSub" id="msgSub">Direct messages</div>
+    <!-- LEFT: inbox -->
+    <aside class="msgLeft" id="msgLeft">
+      <div class="leftTop">
+        <div class="leftTitle">Messages</div>
+        <input class="leftSearch" id="leftSearch" placeholder="Search..." autocomplete="off">
       </div>
-      <div class="msgTopRight"></div>
-    </header>
 
-    <div class="msgViewport">
-      <div class="msgBody" id="msgList"></div>
+      <div class="leftList" id="inboxList"></div>
+      <div class="leftHint" id="inboxHint"></div>
+    </aside>
 
-      <form class="msgComposer" id="msgForm">
-        <input id="msgInput" class="msgInput" placeholder="Type a message..." autocomplete="off" />
+    <!-- RIGHT: chat -->
+    <section class="msgRight" id="msgRight">
+      <header class="chatTop">
+        <button class="chatBack" id="chatBackBtn" type="button">←</button>
 
-        <button class="msgSend" type="submit" aria-label="Send">
-          <!-- Telegram tarzı paper plane -->
-          <svg class="sendIcon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M3.4 20.4l17.9-8.2c.9-.4.9-1.6 0-2L3.4 2c-.9-.4-1.8.4-1.5 1.3l2.1 6.2c.1.3.4.5.7.5l9 .4-9 .4c-.3 0-.6.2-.7.5l-2.1 6.2c-.3.9.6 1.7 1.5 1.3z"/>
-          </svg>
-        </button>
-      </form>
-    </div>
+        <div class="chatPeer">
+          <div class="peerAva" id="peerAva"></div>
+          <div class="peerMeta">
+            <div class="peerName" id="peerName">Select a chat</div>
+            <div class="peerSub" id="peerSub">Direct messages</div>
+          </div>
+        </div>
 
-    <div class="msgHint" id="msgHint"></div>
+        <button class="topBackFeed" id="backFeedBtn" type="button">Back</button>
+      </header>
+
+      <div class="chatViewport">
+        <div class="msgBody" id="msgList"></div>
+
+        <form class="msgComposer" id="msgForm">
+          <input id="msgInput" class="msgInput" placeholder="Type a message..." autocomplete="off" />
+          <button class="msgSend" type="submit" aria-label="Send">
+            <svg class="sendIcon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M3.4 20.4l17.9-8.2c.9-.4.9-1.6 0-2L3.4 2c-.9-.4-1.8.4-1.5 1.3l2.1 6.2c.1.3.4.5.7.5l9 .4-9 .4c-.3 0-.6.2-.7.5l-2.1 6.2c-.3.9.6 1.7 1.5 1.3z"/>
+            </svg>
+          </button>
+        </form>
+      </div>
+
+      <div class="msgHint" id="msgHint"></div>
+    </section>
 
   </section>
 </main>
 
 <script src="/assets1/header.js"></script>
 <script type="module" src="/messages/messages.js"></script>
-
-<script>
-  const backBtn = document.getElementById("msgBackBtn");
-
-  backBtn?.addEventListener("click", () => {
-    // Eğer gerçekten önceki sayfa varsa
-    if (window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-
-    // Fallback sırası (hangisi varsa)
-    if (document.referrer) {
-      window.location.href = document.referrer;
-      return;
-    }
-
-    // Son çare: feed
-    window.location.href = "/feed/";
-  });
-
-</script>
 
 </body>
 </html>
