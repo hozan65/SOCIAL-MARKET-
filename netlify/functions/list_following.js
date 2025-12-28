@@ -6,40 +6,27 @@ const sb = createClient(
 );
 
 export const handler = async (event) => {
-    try {
-        const uid = event.queryStringParameters?.id;
-        if (!uid) return json(400, { error: "Missing id" });
+    const uid = event.queryStringParameters?.id;
+    if (!uid) return json(400, { error: "Missing id" });
 
-        // follows.follower_id = uid
-        // target_id -> profiles.appwrite_user_id ile join
-        const { data, error } = await sb
-            .from("follows")
-            .select("target_id, profiles:target_id(appwrite_user_id, name, avatar_url)")
-            .eq("follower_id", uid)
-            .order("created_at", { ascending: false })
-            .limit(200);
+    const { data, error } = await sb
+        .from("follows")
+        .select("target_id, profiles:target_id(appwrite_user_id,name,avatar_url)")
+        .eq("follower_id", uid);
 
-        if (error) return json(500, { error: error.message });
+    if (error) return json(500, { error: error.message });
 
-        const list = (data || [])
-            .map((x) => x.profiles)
-            .filter(Boolean)
-            .map((p) => ({
-                id: p.appwrite_user_id,
-                name: p.name,
-                avatar_url: p.avatar_url
-            }));
-
-        return json(200, { list });
-    } catch (e) {
-        return json(500, { error: String(e?.message || e) });
-    }
+    return json(200, {
+        list: (data || []).map(x => ({
+            id: x.profiles.appwrite_user_id,
+            name: x.profiles.name,
+            avatar_url: x.profiles.avatar_url
+        }))
+    });
 };
 
-function json(statusCode, body) {
-    return {
-        statusCode,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-        body: JSON.stringify(body),
-    };
-}
+const json = (s,b)=>({
+    statusCode:s,
+    headers:{ "Content-Type":"application/json","Access-Control-Allow-Origin":"*" },
+    body:JSON.stringify(b)
+});
