@@ -1,99 +1,81 @@
-// /assets1/cookie-consent.js
 console.log("✅ cookie-consent.js loaded");
 
-(function () {
-    const consent = document.getElementById("smConsent");
+(() => {
+    const banner = document.getElementById("smConsent");
     const prefs = document.getElementById("smPrefs");
 
-    const btnAccept = document.getElementById("smConsentAccept");
-    const btnReject = document.getElementById("smConsentReject");
-    const btnManage = document.getElementById("smConsentManage");
+    const acceptBtn = document.getElementById("smConsentAccept");
+    const rejectBtn = document.getElementById("smConsentReject");
+    const manageBtn = document.getElementById("smConsentManage");
 
     const prefAnalytics = document.getElementById("smPrefAnalytics");
     const prefMarketing = document.getElementById("smPrefMarketing");
 
-    const prefsClose = document.getElementById("smPrefsClose");
     const prefsSave = document.getElementById("smPrefsSave");
     const prefsReject = document.getElementById("smPrefsReject");
 
-    if (!consent || !btnAccept || !btnReject || !btnManage) {
-        console.warn("❌ Cookie DOM missing. Check IDs or HTML placement.");
+    const KEY = "sm_cookie_consent_v1";
+
+    if (!banner || !acceptBtn || !rejectBtn || !manageBtn) {
+        console.warn("❌ cookie DOM missing (check IDs / placement in body)");
         return;
     }
 
-    const KEY = "sm_cookie_consent_v1";
+    const load = () => {
+        try { return JSON.parse(localStorage.getItem(KEY) || "null"); }
+        catch { return null; }
+    };
 
-    function showBanner() {
-        consent.hidden = false;
-        // küçük animasyon için class
-        requestAnimationFrame(() => consent.classList.add("show"));
-    }
+    const save = (obj) => localStorage.setItem(KEY, JSON.stringify(obj));
 
-    function hideBanner() {
-        consent.classList.remove("show");
-        consent.hidden = true;
-    }
+    const showBanner = () => {
+        banner.hidden = false;
+        requestAnimationFrame(() => banner.classList.add("show"));
+    };
 
-    function openPrefs() {
-        if (!prefs) return;
-        prefs.hidden = false;
-    }
+    const hideBanner = () => {
+        banner.classList.remove("show");
+        banner.hidden = true;
+    };
 
-    function closePrefs() {
-        if (!prefs) return;
-        prefs.hidden = true;
-    }
+    const openPrefs = () => { if (prefs) prefs.hidden = false; };
+    const closePrefs = () => { if (prefs) prefs.hidden = true; };
 
-    function save(value) {
-        localStorage.setItem(KEY, JSON.stringify(value));
-    }
-
-    function load() {
-        try {
-            return JSON.parse(localStorage.getItem(KEY) || "null");
-        } catch {
-            return null;
-        }
-    }
-
-    function acceptAll() {
-        save({ necessary: true, analytics: true, marketing: true, ts: Date.now() });
+    const acceptAll = () => {
+        save({ necessary:true, analytics:true, marketing:true, ts:Date.now() });
         hideBanner();
         closePrefs();
-    }
+    };
 
-    function rejectAll() {
-        save({ necessary: true, analytics: false, marketing: false, ts: Date.now() });
+    const rejectAll = () => {
+        save({ necessary:true, analytics:false, marketing:false, ts:Date.now() });
         hideBanner();
         closePrefs();
-    }
+    };
 
-    function savePrefs() {
+    const savePrefs = () => {
         save({
-            necessary: true,
+            necessary:true,
             analytics: !!prefAnalytics?.checked,
             marketing: !!prefMarketing?.checked,
-            ts: Date.now(),
+            ts: Date.now()
         });
         hideBanner();
         closePrefs();
-    }
+    };
 
-    // events
-    btnAccept.addEventListener("click", acceptAll);
-    btnReject.addEventListener("click", rejectAll);
-    btnManage.addEventListener("click", openPrefs);
-
-    prefsClose?.addEventListener("click", closePrefs);
+    acceptBtn.addEventListener("click", acceptAll);
+    rejectBtn.addEventListener("click", rejectAll);
+    manageBtn.addEventListener("click", openPrefs);
     prefsSave?.addEventListener("click", savePrefs);
     prefsReject?.addEventListener("click", rejectAll);
 
-    // first load
+    // modal dışına tıklayınca kapansın (x yok dedin)
+    prefs?.addEventListener("click", (e) => {
+        if (e.target === prefs) closePrefs();
+    });
+
+    // first run
     const existing = load();
-    if (!existing) {
-        showBanner();
-    } else {
-        // zaten seçim yapılmış => gösterme
-        hideBanner();
-    }
+    if (!existing) showBanner();
 })();
