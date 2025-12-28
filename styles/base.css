@@ -15,3 +15,226 @@ body{
 html[data-theme="dark"] body{
     background: #0b1220;
 }
+
+
+/* =========================
+   Social Market Cookie CMP
+========================= */
+
+.smConsent{
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 9999;
+    background: rgba(10,14,26,.92);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255,255,255,.12);
+}
+
+.smConsentInner{
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px 18px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.smConsentLeft{ max-width: 780px; }
+
+.smConsentTitle{
+    margin: 0 0 6px;
+    font-size: 16px;
+    font-weight: 1000;
+    color: #e9eefc;
+}
+
+.smConsentText{
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: rgba(233,238,252,.88);
+}
+
+.smConsentSmall{
+    margin-top: 8px;
+    font-size: 12.5px;
+    color: rgba(233,238,252,.65);
+}
+
+.smConsentRight{
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* Buttons */
+.smBtn{
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.06);
+    color: #e9eefc;
+    font-weight: 950;
+    cursor: pointer;
+    transition: transform .12s ease, filter .12s ease, background .12s ease, border-color .12s ease;
+}
+.smBtn:hover{ transform: translateY(-1px); filter: brightness(1.03); }
+.smBtn:active{ transform: translateY(0); }
+
+.smBtnPrimary{
+    background: #2a64ff;
+    border-color: rgba(42,100,255,.45);
+    color: #fff;
+}
+.smBtnPrimary:hover{ background: #1f54e6; }
+
+.smBtnGhost{
+    background: rgba(255,255,255,.03);
+}
+
+.smBtnSoft{
+    background: rgba(255,255,255,.10);
+}
+
+/* Preferences modal overlay */
+.smPrefs{
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0,0,0,.55);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 18px;
+}
+
+.smPrefsCard{
+    width: min(820px, 100%);
+    background: rgba(18,26,43,.96);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 18px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.45);
+    overflow: hidden;
+}
+
+.smPrefsHead{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+.smPrefsHead h3{
+    margin: 0;
+    font-size: 16px;
+    font-weight: 1000;
+    color: #e9eefc;
+}
+
+.smPrefsClose{
+    height: 36px;
+    width: 36px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.14);
+    background: rgba(255,255,255,.06);
+    color: #e9eefc;
+    cursor: pointer;
+}
+
+.smPrefsBody{
+    padding: 14px 16px 16px;
+}
+
+.smPrefRow{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.smPrefName{
+    font-weight: 1000;
+    color: #e9eefc;
+}
+
+.smPrefDesc{
+    margin-top: 4px;
+    font-size: 12.8px;
+    color: rgba(233,238,252,.68);
+    line-height: 1.5;
+}
+
+.smPrefsActions{
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 14px;
+    flex-wrap: wrap;
+}
+
+.smPrefsNote{
+    margin: 12px 0 0;
+    font-size: 12.5px;
+    color: rgba(233,238,252,.62);
+    line-height: 1.6;
+}
+
+/* Switch */
+.smSwitch{
+    position: relative;
+    width: 46px;
+    height: 28px;
+    display: inline-block;
+}
+.smSwitch input{ display:none; }
+.smSlider{
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: rgba(255,255,255,.18);
+    border: 1px solid rgba(255,255,255,.12);
+    transition: .2s;
+}
+.smSlider::after{
+    content:"";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.85);
+    transition: .2s;
+}
+.smSwitch input:checked + .smSlider{
+    background: rgba(42,100,255,.65);
+    border-color: rgba(42,100,255,.55);
+}
+.smSwitch input:checked + .smSlider::after{
+    transform: translateX(18px);
+    background: #fff;
+}
+
+/* Mobile layout */
+@media (max-width: 680px){
+    .smConsentInner{
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .smConsentRight{
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .smPrefs{
+        align-items: flex-end;
+    }
+}

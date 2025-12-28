@@ -11,6 +11,85 @@
     <link rel="stylesheet" href="/feed/feed.css">
     <link rel="stylesheet" href="/textnews/textnews.css">
 </head>
+<!-- =========================
+  COOKIE CONSENT (CMP)
+  Place before </body>
+========================= -->
+<div id="smConsent" class="smConsent" hidden>
+    <div class="smConsentInner">
+        <div class="smConsentLeft">
+            <h3 class="smConsentTitle">Cookies & Tracking</h3>
+            <p class="smConsentText">
+                We use cookies to operate the platform securely, improve performance, and (if you allow)
+                measure usage to enhance the experience. You can accept all cookies, reject non-essential cookies,
+                or manage your preferences.
+            </p>
+            <p class="smConsentText smConsentSmall">
+                You can change your choices anytime in Settings.
+            </p>
+        </div>
+
+        <div class="smConsentRight">
+            <button id="smConsentAccept" class="smBtn smBtnPrimary" type="button">I Accept</button>
+            <button id="smConsentReject" class="smBtn smBtnGhost" type="button">Reject All</button>
+            <button id="smConsentManage" class="smBtn smBtnSoft" type="button">Manage Preferences</button>
+        </div>
+    </div>
+</div>
+
+<!-- Preferences Modal -->
+<div id="smPrefs" class="smPrefs" hidden>
+    <div class="smPrefsCard" role="dialog" aria-modal="true" aria-labelledby="smPrefsTitle">
+        <div class="smPrefsHead">
+            <h3 id="smPrefsTitle">Cookie Preferences</h3>
+            <button id="smPrefsClose" class="smPrefsClose" type="button">✕</button>
+        </div>
+
+        <div class="smPrefsBody">
+            <div class="smPrefRow">
+                <div>
+                    <div class="smPrefName">Necessary</div>
+                    <div class="smPrefDesc">Required for login, security, and core site features.</div>
+                </div>
+                <label class="smSwitch">
+                    <input type="checkbox" checked disabled>
+                    <span class="smSlider"></span>
+                </label>
+            </div>
+
+            <div class="smPrefRow">
+                <div>
+                    <div class="smPrefName">Analytics</div>
+                    <div class="smPrefDesc">Helps us understand usage to improve performance and UX.</div>
+                </div>
+                <label class="smSwitch">
+                    <input id="smPrefAnalytics" type="checkbox">
+                    <span class="smSlider"></span>
+                </label>
+            </div>
+
+            <div class="smPrefRow">
+                <div>
+                    <div class="smPrefName">Marketing</div>
+                    <div class="smPrefDesc">Used for personalized content/ads (only if enabled).</div>
+                </div>
+                <label class="smSwitch">
+                    <input id="smPrefMarketing" type="checkbox">
+                    <span class="smSlider"></span>
+                </label>
+            </div>
+
+            <div class="smPrefsActions">
+                <button id="smPrefsSave" class="smBtn smBtnPrimary" type="button">Save Preferences</button>
+                <button id="smPrefsReject" class="smBtn smBtnGhost" type="button">Reject All</button>
+            </div>
+
+            <p class="smPrefsNote">
+                By continuing, you agree to our use of cookies as described in our Privacy Policy.
+            </p>
+        </div>
+    </div>
+</div>
 
 <body>
 <div id="headerMount"></div>
@@ -144,6 +223,8 @@
 <script src="/feed/feed.js"></script>
 <script src="/assets1/crypto-tabs.js"></script>
 <script src="/assets1/heatmap.js"></script>
+<script src="/assets1/cookie-consent.js"></script>
+
 
 <!-- ✅ Text News Feed (Matriks-style) -->
 <script src="/textnews/textnews-feed.js"></script>
