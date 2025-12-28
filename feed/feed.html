@@ -11,89 +11,9 @@
     <link rel="stylesheet" href="/feed/feed.css">
     <link rel="stylesheet" href="/textnews/textnews.css">
 </head>
+
 <body>
 <div id="headerMount"></div>
-
-<!-- =========================
-  COOKIE CONSENT (CMP)
-  Place before </body>
-========================= -->
-<div id="smConsent" class="smConsent" hidden>
-    <div class="smConsentInner">
-        <div class="smConsentLeft">
-            <h3 class="smConsentTitle">Cookies & Tracking</h3>
-            <p class="smConsentText">
-                We use cookies to operate the platform securely, improve performance, and (if you allow)
-                measure usage to enhance the experience. You can accept all cookies, reject non-essential cookies,
-                or manage your preferences.
-            </p>
-            <p class="smConsentText smConsentSmall">
-                You can change your choices anytime in Settings.
-            </p>
-        </div>
-
-        <div class="smConsentRight">
-            <button id="smConsentAccept" class="smBtn smBtnPrimary" type="button">I Accept</button>
-            <button id="smConsentReject" class="smBtn smBtnGhost" type="button">Reject All</button>
-            <button id="smConsentManage" class="smBtn smBtnSoft" type="button">Manage Preferences</button>
-        </div>
-    </div>
-</div>
-
-<!-- Preferences Modal -->
-<div id="smPrefs" class="smPrefs" hidden>
-    <div class="smPrefsCard" role="dialog" aria-modal="true" aria-labelledby="smPrefsTitle">
-        <div class="smPrefsHead">
-            <h3 id="smPrefsTitle">Cookie Preferences</h3>
-            <button id="smPrefsClose" class="smPrefsClose" type="button">✕</button>
-        </div>
-
-        <div class="smPrefsBody">
-            <div class="smPrefRow">
-                <div>
-                    <div class="smPrefName">Necessary</div>
-                    <div class="smPrefDesc">Required for login, security, and core site features.</div>
-                </div>
-                <label class="smSwitch">
-                    <input type="checkbox" checked disabled>
-                    <span class="smSlider"></span>
-                </label>
-            </div>
-
-            <div class="smPrefRow">
-                <div>
-                    <div class="smPrefName">Analytics</div>
-                    <div class="smPrefDesc">Helps us understand usage to improve performance and UX.</div>
-                </div>
-                <label class="smSwitch">
-                    <input id="smPrefAnalytics" type="checkbox">
-                    <span class="smSlider"></span>
-                </label>
-            </div>
-
-            <div class="smPrefRow">
-                <div>
-                    <div class="smPrefName">Marketing</div>
-                    <div class="smPrefDesc">Used for personalized content/ads (only if enabled).</div>
-                </div>
-                <label class="smSwitch">
-                    <input id="smPrefMarketing" type="checkbox">
-                    <span class="smSlider"></span>
-                </label>
-            </div>
-
-            <div class="smPrefsActions">
-                <button id="smPrefsSave" class="smBtn smBtnPrimary" type="button">Save Preferences</button>
-                <button id="smPrefsReject" class="smBtn smBtnGhost" type="button">Reject All</button>
-            </div>
-
-            <p class="smPrefsNote">
-                By continuing, you agree to our use of cookies as described in our Privacy Policy.
-            </p>
-        </div>
-    </div>
-</div>
-
 
 <main class="container">
 
@@ -138,7 +58,7 @@
     <section class="posts" id="postsGrid"></section>
     <p class="feedMsg" id="feedMsg"></p>
 
-    <!-- ================= HEAT MAP (POSTLARIN ALTINDA) ================= -->
+    <!-- ================= HEAT MAP ================= -->
     <section class="dashBox dashNoBox heatmapBox fullRow">
         <div class="dashHead heatmapHead">
             <h3>Heat Map</h3>
@@ -153,7 +73,6 @@
                     <option value="top_volume">Top by Volume</option>
                     <option value="top_mcap_like">Top “Majors”</option>
                 </select>
-
             </div>
         </div>
 
@@ -163,9 +82,7 @@
         </div>
     </section>
 
-
     <!-- ===== TEXT NEWS (MANUAL CSV) ===== -->
-
     <section class="dashBox dashNoBox fullRow">
         <div class="dashHead">
             <h3>News</h3>
@@ -176,10 +93,6 @@
             <div id="textNewsGrid" class="textNewsGrid"></div>
         </div>
     </section>
-
-
-
-
 
     <!-- ================= ECON CALENDAR ================= -->
     <section class="dashBox dashNoBox fullRow econWrap">
@@ -212,6 +125,33 @@
 
 </main>
 
+<!-- ================= SKYSPORTS-LIKE COOKIE BAR (NO MODAL) ================= -->
+<div id="smCookieOverlay" class="smCookieOverlay" hidden></div>
+
+<section id="smCookieBar" class="smCookieBar" hidden aria-label="Cookie consent">
+    <div class="smCookieWrap">
+        <div class="smCookieLeft">
+            <div class="smCookieBrand">
+                <span class="smCookieLogo">Social Market</span>
+            </div>
+
+            <h3 class="smCookieTitle">Accept cookies to improve your experience</h3>
+
+            <p class="smCookieText">
+                We use cookies to operate the platform securely, remember your session, and improve performance.
+                Optional cookies help us understand usage and deliver more relevant content.
+                You can choose essential cookies only, reject optional cookies, or accept all.
+            </p>
+        </div>
+
+        <div class="smCookieRight">
+            <button id="smCookieNecessary" class="smCBtn smCBtnGhost" type="button">Necessary only</button>
+            <button id="smCookieReject" class="smCBtn smCBtnSoft" type="button">Reject all</button>
+            <button id="smCookieAccept" class="smCBtn smCBtnPrimary" type="button">Accept all</button>
+        </div>
+    </div>
+</section>
+
 <!-- ================= SCRIPTS ================= -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -224,12 +164,11 @@
 <script src="/feed/feed.js"></script>
 <script src="/assets1/crypto-tabs.js"></script>
 <script src="/assets1/heatmap.js"></script>
-<script src="/assets1/cookie-consent.js"></script>
 
+<!-- ✅ Cookie bar (cache kırmak için v ekledim) -->
+<script src="/assets1/cookie-consent.js?v=9"></script>
 
-<!-- ✅ Text News Feed (Matriks-style) -->
+<!-- ✅ Text News Feed -->
 <script src="/textnews/textnews-feed.js"></script>
-
-
 </body>
 </html>

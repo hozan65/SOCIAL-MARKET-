@@ -1,23 +1,17 @@
-console.log("✅ cookie-consent.js loaded");
+console.log("✅ cookie-consent.js loaded (SkySports-like)");
 
 (() => {
-    const banner = document.getElementById("smConsent");
-    const prefs = document.getElementById("smPrefs");
+    const KEY = "sm_cookie_consent_v2";
 
-    const acceptBtn = document.getElementById("smConsentAccept");
-    const rejectBtn = document.getElementById("smConsentReject");
-    const manageBtn = document.getElementById("smConsentManage");
+    const overlay = document.getElementById("smCookieOverlay");
+    const bar = document.getElementById("smCookieBar");
 
-    const prefAnalytics = document.getElementById("smPrefAnalytics");
-    const prefMarketing = document.getElementById("smPrefMarketing");
+    const btnAccept = document.getElementById("smCookieAccept");
+    const btnReject = document.getElementById("smCookieReject");
+    const btnNecessary = document.getElementById("smCookieNecessary");
 
-    const prefsSave = document.getElementById("smPrefsSave");
-    const prefsReject = document.getElementById("smPrefsReject");
-
-    const KEY = "sm_cookie_consent_v1";
-
-    if (!banner || !acceptBtn || !rejectBtn || !manageBtn) {
-        console.warn("❌ cookie DOM missing (check IDs / placement in body)");
+    if (!overlay || !bar || !btnAccept || !btnReject || !btnNecessary) {
+        console.warn("❌ Cookie bar DOM missing. Check IDs + placement inside <body>.");
         return;
     }
 
@@ -26,56 +20,41 @@ console.log("✅ cookie-consent.js loaded");
         catch { return null; }
     };
 
-    const save = (obj) => localStorage.setItem(KEY, JSON.stringify(obj));
-
-    const showBanner = () => {
-        banner.hidden = false;
-        requestAnimationFrame(() => banner.classList.add("show"));
+    const save = (obj) => {
+        localStorage.setItem(KEY, JSON.stringify({ ...obj, ts: Date.now() }));
     };
 
-    const hideBanner = () => {
-        banner.classList.remove("show");
-        banner.hidden = true;
-    };
+    const show = () => {
+        overlay.hidden = false;
+        bar.hidden = false;
 
-    const openPrefs = () => { if (prefs) prefs.hidden = false; };
-    const closePrefs = () => { if (prefs) prefs.hidden = true; };
-
-    const acceptAll = () => {
-        save({ necessary:true, analytics:true, marketing:true, ts:Date.now() });
-        hideBanner();
-        closePrefs();
-    };
-
-    const rejectAll = () => {
-        save({ necessary:true, analytics:false, marketing:false, ts:Date.now() });
-        hideBanner();
-        closePrefs();
-    };
-
-    const savePrefs = () => {
-        save({
-            necessary:true,
-            analytics: !!prefAnalytics?.checked,
-            marketing: !!prefMarketing?.checked,
-            ts: Date.now()
+        requestAnimationFrame(() => {
+            overlay.style.opacity = "1";
+            bar.classList.add("show");
         });
-        hideBanner();
-        closePrefs();
     };
 
-    acceptBtn.addEventListener("click", acceptAll);
-    rejectBtn.addEventListener("click", rejectAll);
-    manageBtn.addEventListener("click", openPrefs);
-    prefsSave?.addEventListener("click", savePrefs);
-    prefsReject?.addEventListener("click", rejectAll);
+    const hide = () => {
+        bar.classList.remove("show");
+        overlay.hidden = true;
+        bar.hidden = true;
+    };
 
-    // modal dışına tıklayınca kapansın (x yok dedin)
-    prefs?.addEventListener("click", (e) => {
-        if (e.target === prefs) closePrefs();
+    // Already decided?
+    if (!load()) show();
+
+    btnAccept.addEventListener("click", () => {
+        save({ necessary: true, analytics: true, marketing: true });
+        hide();
     });
 
-    // first run
-    const existing = load();
-    if (!existing) showBanner();
+    btnReject.addEventListener("click", () => {
+        save({ necessary: true, analytics: false, marketing: false });
+        hide();
+    });
+
+    btnNecessary.addEventListener("click", () => {
+        save({ necessary: true, analytics: false, marketing: false });
+        hide();
+    });
 })();
