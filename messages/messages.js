@@ -1,3 +1,4 @@
+// /messages/messages.js
 import { account } from "/assets/appwrite.js";
 
 console.log("✅ messages.js loaded (inbox + chat)");
@@ -21,8 +22,9 @@ const fmtTime = (iso) => {
     }
 };
 
-const qs = () => new URLSearchParams(location.search);
+const qs = (k) => new URLSearchParams(location.search).get(k);
 
+// ---- elements ----
 const $app = document.querySelector(".msgApp");
 const $inboxList = document.getElementById("inboxList");
 const $inboxHint = document.getElementById("inboxHint");
@@ -40,12 +42,17 @@ const $peerAva = document.getElementById("peerAva");
 const $chatBackBtn = document.getElementById("chatBackBtn");
 const $backFeedBtn = document.getElementById("backFeedBtn");
 
+// ---- state ----
 let meId = null;
 let activeTo = null;
 let activeConversationId = null;
 let inboxCache = [];
 let pollTimer = null;
 
+// ✅ chat değişti mi anlamak için (loading spam yok)
+let lastMsgFingerprint = "";
+
+// ---- JWT helpers ----
 async function getJwtHeaders() {
     const jwtObj = await account.createJWT();
     const jwt = jwtObj?.jwt;
@@ -79,6 +86,7 @@ async function apiPost(url, body) {
     return j;
 }
 
+// ---- UI: Inbox ----
 function renderInbox(list) {
     if (!$inboxList) return;
 
@@ -89,7 +97,7 @@ function renderInbox(list) {
 
     $inboxList.innerHTML = list
         .map((c) => {
-            const active = c.other_id === activeTo ? "active" : "";
+            const isActive = c.other_id === activeTo ? "active" : "";
             const ava = c.other_avatar_url
                 ? `<img src="${esc(c.other_avatar_url)}" alt="">`
                 : "";
@@ -98,7 +106,7 @@ function renderInbox(list) {
             const badge = c.unread ? `<div class="badge">${c.unread}</div>` : "";
 
             return `
-      <div class="chatItem ${active}" data-to="${esc(c.other_id)}" data-cid="${esc(
+      <div class="chatItem ${isActive}" data-to="${esc(c.other_id)}" data-cid="${esc(
                 c.conversation_id
             )}">
         <div class="chatAva">${ava}</div>
@@ -132,14 +140,16 @@ function applySearch() {
     renderInbox(filtered);
 }
 
-async function loadInbox() {
-    if ($inboxHint) $inboxHint.textContent = "Loading...";
+// ilk yüklemede loading göster, polling’de gösterme
+async function loadInbox(showLoading = false) {
+    if (showLoading && $inboxHint) $inboxHint.textContent = "Loading...";
     const j = await apiGet("/.netlify/functions/dm_inbox?limit=60");
     inboxCache = j?.list || [];
-    if ($inboxHint) $inboxHint.textContent = "";
+    if (showLoading && $inboxHint) $inboxHint.textContent = "";
     applySearch();
 }
 
+// ---- UI: Chat ----
 function renderEmptyChat() {
     if ($peerName) $peerName.textContent = "Select a chat";
     if ($peerSub) $peerSub.textContent = "Direct messages";
@@ -149,6 +159,7 @@ function renderEmptyChat() {
     if ($msgHint) $msgHint.textContent = "";
     activeTo = null;
     activeConversationId = null;
+    lastMsgFingerprint = "";
 }
 
 function renderMessages(list) {
@@ -158,6 +169,7 @@ function renderMessages(list) {
         .map((m) => {
             const mine = m.sender_id === meId;
             const t = m.created_at ? fmtTime(m.created_at) : "";
+
             const tick = mine
                 ? `<span class="tick ${m.read_at ? "read" : ""}"><span>✓</span><span>✓</span></span>`
                 : "";
@@ -170,55 +182,86 @@ function renderMessages(list) {
           ${tick}
         </div>
       </div>
-    `;
+    `
+                .trim();
         })
         .join("");
 
     $msgList.innerHTML =
         html || `<div style="opacity:.7;padding:12px;font-weight:900;">No messages yet.</div>`;
+
+    // ✅ her render sonrası aşağı kay
     $msgList.scrollTop = $msgList.scrollHeight;
 }
 
 async function getConversation(to) {
-    const j = await apiGet(
-        `/.netlify/functions/dm_get_or_create?to=${encodeURIComponent(to)}`
-    );
+    const j = await apiGet(`/.netlify/functions/dm_get_or_create?to=${encodeURIComponent(to)}`);
     const cid = j?.conversation_id;
     if (!cid) throw new Error("Missing conversation_id");
     return cid;
 }
 
-async function loadMessages() {
-    if (!activeConversationId) return;
+/**
+ * ✅ IMPORTANT:
+ * showLoading=false => polling'de sessiz
+ * showLoading=true  => sadece chat ilk açılırken
+ * return true => değişiklik var (yeni mesaj vs)
+ */
+async function loadMessages(showLoading = false) {
+    if (!activeConversationId) return false;
+
+    if (showLoading && $msgHint) $msgHint.textContent = "Loading...";
+
     const j = await apiGet(
-        `/.netlify/functions/dm_list?conversation_id=${encodeURIComponent(
-            activeConversationId
-        )}&limit=120`
+        `/.netlify/functions/dm_list?conversation_id=${encodeURIComponent(activeConversationId)}&limit=120`
     );
-    renderMessages(j?.list || []);
+
+    const list = j?.list || [];
+
+    // ✅ fingerprint (değişim kontrolü)
+    // dm_list id döndürmüyorsa created_at ile de idare eder
+    const last = list.length ? list[list.length - 1] : null;
+    const fp = `${list.length}|${last?.id || last?.created_at || ""}`;
+
+    // ✅ değişmediyse UI dokunma (loading spam yok)
+    if (fp === lastMsgFingerprint) {
+        if (showLoading && $msgHint) $msgHint.textContent = "";
+        return false;
+    }
+
+    lastMsgFingerprint = fp;
+
+    // ✅ sadece değişince render
+    renderMessages(list);
+
+    // ✅ sadece değişince read işaretle
     await apiPost("/.netlify/functions/dm_mark_read", {
         conversation_id: activeConversationId,
     }).catch(() => {});
+
+    if (showLoading && $msgHint) $msgHint.textContent = "";
+    return true;
 }
 
 async function openChat(to, knownCid, pushUrl) {
     if (!to) return;
     activeTo = to;
 
+    // mobilde chat ekranına geç
     $app?.classList.add("showChat");
 
+    // header info
     const row = inboxCache.find((x) => x.other_id === to);
     if ($peerName) $peerName.textContent = row?.other_name || "Chat";
     if ($peerSub) $peerSub.textContent = "Direct messages";
     if ($peerAva)
-        $peerAva.innerHTML = row?.other_avatar_url
-            ? `<img src="${esc(row.other_avatar_url)}" alt="">`
-            : "";
+        $peerAva.innerHTML = row?.other_avatar_url ? `<img src="${esc(row.other_avatar_url)}" alt="">` : "";
 
     try {
-        if ($msgHint) $msgHint.textContent = "Loading...";
+        // ✅ chat açılırken fingerprint reset
+        lastMsgFingerprint = "";
+
         activeConversationId = knownCid || (await getConversation(to));
-        if ($msgHint) $msgHint.textContent = "";
 
         if (pushUrl) {
             const u = new URL(location.href);
@@ -227,7 +270,11 @@ async function openChat(to, knownCid, pushUrl) {
         }
 
         applySearch();
-        await loadMessages();
+
+        // ✅ sadece ilk açılışta loading göster
+        await loadMessages(true);
+
+        if ($msgHint) $msgHint.textContent = "";
     } catch (e) {
         console.error(e);
         if ($msgHint) $msgHint.textContent = "❌ " + (e?.message || e);
@@ -240,9 +287,15 @@ async function sendMessage(text) {
         conversation_id: activeConversationId,
         body: text,
     });
-    await loadMessages();
+
+    // ✅ gönderince hemen güncelle (loading yok)
+    await loadMessages(false);
+
+    // ✅ inbox'u da güncelle ki last mesaj/saati gelsin
+    await loadInbox(false);
 }
 
+// ---- BOOT ----
 (async function boot() {
     try {
         const me = await account.get();
@@ -252,9 +305,10 @@ async function sendMessage(text) {
             return;
         }
 
-        await loadInbox();
+        // ✅ inbox ilk yüklemede loading göster
+        await loadInbox(true);
 
-        const to = (qs().get("to") || "").trim();
+        const to = (qs("to") || "").trim();
         if (to) {
             const row = inboxCache.find((x) => x.other_id === to);
             await openChat(to, row?.conversation_id || null, false);
@@ -264,23 +318,25 @@ async function sendMessage(text) {
 
         $search?.addEventListener("input", applySearch);
 
+        // ✅ polling: UI sadece değişince güncellenir (loading yok)
         pollTimer = setInterval(async () => {
             try {
-                await loadInbox();
-                if (activeConversationId) await loadMessages();
+                await loadInbox(false);
+                if (activeConversationId) await loadMessages(false);
             } catch {
                 // sessiz
             }
-        }, 3500);
+        }, 5000); // istersen 8000-12000 yap (supabase daha az yorulur)
     } catch (e) {
         console.error(e);
         if ($msgHint) $msgHint.textContent = "❌ " + (e?.message || e);
     }
 })();
 
+// ---- Events ----
 $msgForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const text = ($msgInput.value || "").trim();
+    const text = ($msgInput?.value || "").trim();
     if (!text) return;
     $msgInput.value = "";
     try {
@@ -293,7 +349,13 @@ $msgForm?.addEventListener("submit", async (e) => {
 });
 
 $chatBackBtn?.addEventListener("click", () => {
+    // mobilde inbox’a dön
     $app?.classList.remove("showChat");
+
+    // URL'den to kaldır
+    const u = new URL(location.href);
+    u.searchParams.delete("to");
+    history.pushState({}, "", u.toString());
 });
 
 $backFeedBtn?.addEventListener("click", () => {
@@ -302,6 +364,6 @@ $backFeedBtn?.addEventListener("click", () => {
 });
 
 window.addEventListener("popstate", () => {
-    const to = (qs().get("to") || "").trim();
+    const to = (qs("to") || "").trim();
     if (!to) renderEmptyChat();
 });
