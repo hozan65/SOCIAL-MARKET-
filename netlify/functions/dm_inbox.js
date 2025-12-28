@@ -12,55 +12,10 @@ const json = (status, body) => ({
         "Content-Type": "application/json",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT, x-jwt",
-        "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
 });
-
-// ✅ profiles primary-key auto-detect: tries user_id -> uid -> id
-async function fetchProfilesByOtherIds(otherIds) {
-    // 1) user_id
-    {
-        const { data, error } = await supabase
-            .from("profiles")
-            .select("user_id,name,avatar_url")
-            .in("user_id", otherIds);
-
-        if (!error) {
-            const map = new Map((data || []).map((p) => [p.user_id, p]));
-            return { key: "user_id", map };
-        }
-    }
-
-    // 2) uid
-    {
-        const { data, error } = await supabase
-            .from("profiles")
-            .select("uid,name,avatar_url")
-            .in("uid", otherIds);
-
-        if (!error) {
-            const map = new Map((data || []).map((p) => [p.uid, p]));
-            return { key: "uid", map };
-        }
-    }
-
-    // 3) id (fallback)
-    {
-        const { data, error } = await supabase
-            .from("profiles")
-            .select("id,name,avatar_url")
-            .in("id", otherIds);
-
-        if (!error) {
-            const map = new Map((data || []).map((p) => [p.id, p]));
-            return { key: "id", map };
-        }
-
-        // none worked
-        throw new Error(error?.message || "profiles key column not found (user_id/uid/id)");
-    }
-}
 
 export const handler = async (event) => {
     try {
@@ -74,7 +29,7 @@ export const handler = async (event) => {
         const q = event.queryStringParameters || {};
         const limit = Math.min(parseInt(q.limit || "60", 10), 100);
 
-        // ✅ conversations where I'm user1_id OR user2_id
+        // ✅ conversations: user1_id / user2_id
         const { data: convs, error: e1 } = await supabase
             .from("conversations")
             .select("id,user1_id,user2_id,created_at,updated_at")
@@ -89,14 +44,14 @@ export const handler = async (event) => {
         const convIds = convList.map((c) => c.id);
         const otherIds = convList.map((c) => (c.user1_id === me ? c.user2_id : c.user1_id));
 
-        // ✅ profiles (auto-detect key column)
-        let profMap;
-        try {
-            const out = await fetchProfilesByOtherIds(otherIds);
-            profMap = out.map;
-        } catch (e) {
-            return json(500, { error: String(e?.message || e) });
-        }
+        // ✅ profiles: PRIMARY KEY = appwrite_user_id (SENDE BU VAR)
+        const { data: profs, error: e2 } = await supabase
+            .from("profiles")
+            .select("appwrite_user_id,name,avatar_url")
+            .in("appwrite_user_id", otherIds);
+
+        if (e2) return json(500, { error: e2.message });
+        const profMap = new Map((profs || []).map((p) => [p.appwrite_user_id, p]));
 
         // ✅ last message per conversation
         const { data: msgs, error: e3 } = await supabase
@@ -109,7 +64,7 @@ export const handler = async (event) => {
         if (e3) return json(500, { error: e3.message });
 
         const lastMap = new Map();
-        for (const m of (msgs || [])) {
+        for (const m of msgs || []) {
             if (!lastMap.has(m.conversation_id)) lastMap.set(m.conversation_id, m);
         }
 
@@ -120,29 +75,29 @@ export const handler = async (event) => {
             .in("conversation_id", convIds)
             .is("read_at", null)
             .neq("sender_id", me)
-            .limit(2000);
+            .limit(4000);
 
         if (e4) return json(500, { error: e4.message });
 
         const unreadMap = new Map();
-        for (const r of (unreadRows || [])) {
+        for (const r of unreadRows || []) {
             unreadMap.set(r.conversation_id, (unreadMap.get(r.conversation_id) || 0) + 1);
         }
 
-        // ✅ build list
+        // ✅ output
         const list = convList.map((c) => {
-            const other_id = c.user1_id === me ? c.user2_id : c.user1_id;
-            const p = profMap.get(other_id) || {};
+            const otherId = c.user1_id === me ? c.user2_id : c.user1_id;
+            const p = profMap.get(otherId) || {};
             const last = lastMap.get(c.id) || null;
 
             return {
                 conversation_id: c.id,
-                other_id,
+                other_id: otherId,
                 other_name: p.name || "User",
                 other_avatar_url: p.avatar_url || "",
                 last_body: last?.body || "",
                 last_at: last?.created_at || c.updated_at || c.created_at || null,
-                unread: unreadMap.get(c.id) || 0
+                unread: unreadMap.get(c.id) || 0,
             };
         });
 
