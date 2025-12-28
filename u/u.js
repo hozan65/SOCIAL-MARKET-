@@ -11,6 +11,9 @@ const FN_LIST_FOLLOWING = "/.netlify/functions/list_following";
 // sayfa linki (/u/index.html)
 const PROFILE_PAGE = "/u/index.html";
 
+// ✅ messages page (DM)
+const MESSAGES_PAGE = "/messages/"; // /messages/index.html
+
 const qs = (k) => new URLSearchParams(location.search).get(k);
 const $ = (id) => document.getElementById(id);
 
@@ -27,6 +30,10 @@ const $msg = $("uMsg");
 
 const $followersBtn = $("uFollowersBtn");
 const $followingBtn = $("uFollowingBtn");
+
+// ✅ action buttons
+const $followBtn = $("uFollowBtn");
+const $msgBtn = $("uMsgBtn");
 
 // ---- drawer elements ----
 const $drawer = $("uDrawer");
@@ -51,6 +58,26 @@ function safeHost(url) {
 
 function setMsg(t) {
     if ($msg) $msg.textContent = t || "";
+}
+
+// ✅ Message button control
+function setMessageButton(isMe, profileUserId) {
+    if (!$msgBtn) return;
+
+    if (isMe) {
+        $msgBtn.hidden = true;
+        $msgBtn.href = "#";
+        return;
+    }
+
+    $msgBtn.hidden = false;
+    $msgBtn.href = `${MESSAGES_PAGE}?to=${encodeURIComponent(profileUserId)}`;
+}
+
+// ✅ Follow button control (if your follow system uses hidden attr)
+function setFollowButton(isMe) {
+    if (!$followBtn) return;
+    $followBtn.hidden = !!isMe;
 }
 
 // ---- drawer control ----
@@ -225,6 +252,22 @@ async function loadList(url) {
         setMsg("❌ Missing user id");
         return;
     }
+
+    // ✅ Determine "isMe" (viewer == profile owner)
+    let viewerId = localStorage.getItem("sm_uid") || "";
+    if (!viewerId) {
+        try {
+            const me = await account.get();
+            viewerId = me?.$id || "";
+            if (viewerId) localStorage.setItem("sm_uid", viewerId);
+        } catch {}
+    }
+
+    const isMe = !!viewerId && viewerId === uid;
+
+    // ✅ show/hide buttons
+    setFollowButton(isMe);
+    setMessageButton(isMe, uid);
 
     // ✅ cache-first (instant)
     const cacheKey = "profile_cache_" + uid;
