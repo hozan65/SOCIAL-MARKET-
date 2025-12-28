@@ -1,14 +1,14 @@
 // /u/u.js
 import { account } from "/assets/appwrite.js";
 
-console.log("✅ u.js loaded (profile + followers/following modal)");
+console.log("✅ u.js loaded (profile + followers/following drawer)");
 
 const FN_GET = "/.netlify/functions/get_profile";
 const FN_ENSURE = "/.netlify/functions/ensure_profile";
 const FN_LIST_FOLLOWERS = "/.netlify/functions/list_followers";
 const FN_LIST_FOLLOWING = "/.netlify/functions/list_following";
 
-// sayfa linki (sende screenshot /u/index.html görünüyor)
+// sayfa linki (/u/index.html)
 const PROFILE_PAGE = "/u/index.html";
 
 const qs = (k) => new URLSearchParams(location.search).get(k);
@@ -28,11 +28,12 @@ const $msg = $("uMsg");
 const $followersBtn = $("uFollowersBtn");
 const $followingBtn = $("uFollowingBtn");
 
-// ---- modal elements ----
-const $modal = $("uModal");
-const $modalTitle = $("uModalTitle");
-const $modalBody = $("uModalBody");
-const $modalClose = $("uModalClose");
+// ---- drawer elements ----
+const $drawer = $("uDrawer");
+const $drawerTitle = $("uDrawerTitle");
+const $drawerBody = $("uDrawerBody");
+const $drawerClose = $("uDrawerClose");
+const $drawerBackdrop = $("uDrawerBackdrop");
 
 // ---- helpers ----
 function esc(s) {
@@ -52,38 +53,51 @@ function setMsg(t) {
     if ($msg) $msg.textContent = t || "";
 }
 
-function openModal(title) {
-    $modalTitle.textContent = title || "—";
-    $modal.hidden = false;
-    $modalBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Loading...</div>`;
+// ---- drawer control ----
+function openDrawer(title) {
+    $drawerTitle.textContent = title || "—";
+    $drawerBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Loading...</div>`;
+
+    $drawerBackdrop.hidden = false;
+    $drawer.classList.add("open");
+    $drawer.setAttribute("aria-hidden", "false");
+
+    document.body.classList.add("uDrawerOpen");
+    document.documentElement.style.overflow = "hidden";
 }
 
-function closeModal() {
-    $modal.hidden = true;
-    $modalBody.innerHTML = "";
+function closeDrawer() {
+    $drawer.classList.remove("open");
+    $drawer.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("uDrawerOpen");
+    document.documentElement.style.overflow = "";
+
+    setTimeout(() => {
+        if (!$drawer.classList.contains("open")) $drawerBackdrop.hidden = true;
+    }, 180);
+
+    $drawerBody.innerHTML = "";
 }
 
 function renderUserList(list) {
     if (!list?.length) {
-        $modalBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Empty</div>`;
+        $drawerBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Empty</div>`;
         return;
     }
 
-    $modalBody.innerHTML = list.map((u) => {
+    $drawerBody.innerHTML = list.map((u) => {
         const name = esc(u?.name || "User");
         const av = u?.avatar_url ? esc(u.avatar_url) : "";
         const id = u?.id || "";
         return `
-      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08);">
+      <div class="uUserRow">
         ${
             av
-                ? `<img src="${av}" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">`
-                : `<div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);"></div>`
+                ? `<img class="uUserAva" src="${av}" alt="">`
+                : `<div class="uUserAva"></div>`
         }
-        <div style="flex:1;">
-          <div style="font-weight:600;">${name}</div>
-        </div>
-        <a href="${PROFILE_PAGE}?id=${encodeURIComponent(id)}" style="text-decoration:none;opacity:.9;">View</a>
+        <div class="uUserName">${name}</div>
+        <a class="uUserGo" href="${PROFILE_PAGE}?id=${encodeURIComponent(id)}">View</a>
       </div>
     `;
     }).join("");
@@ -227,7 +241,6 @@ async function loadList(url) {
         setMsg("");
     } catch (e) {
         console.warn("get_profile failed:", e?.message || e);
-        // ilk login row yoksa ensure + retry
         await ensureProfile();
         try {
             const data2 = await fetchProfile(uid);
@@ -240,30 +253,32 @@ async function loadList(url) {
         }
     }
 
-    // ✅ EVENTS: Followers / Following
+    // ✅ EVENTS: Followers / Following -> Drawer
     $followersBtn?.addEventListener("click", async () => {
         try {
-            openModal("Followers");
+            openDrawer("Followers");
             const list = await loadList(`${FN_LIST_FOLLOWERS}?id=${encodeURIComponent(uid)}`);
             renderUserList(list);
         } catch (e) {
-            $modalBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
+            $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
         }
     });
 
     $followingBtn?.addEventListener("click", async () => {
         try {
-            openModal("Following");
+            openDrawer("Following");
             const list = await loadList(`${FN_LIST_FOLLOWING}?id=${encodeURIComponent(uid)}`);
             renderUserList(list);
         } catch (e) {
-            $modalBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
+            $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
         }
     });
 
-    // ✅ modal close
-    $modalClose?.addEventListener("click", closeModal);
-    $modal?.addEventListener("click", (e) => {
-        if (e.target === $modal) closeModal();
+    // ✅ Drawer close handlers
+    $drawerClose?.addEventListener("click", closeDrawer);
+    $drawerBackdrop?.addEventListener("click", closeDrawer);
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && $drawer.classList.contains("open")) closeDrawer();
     });
 })();

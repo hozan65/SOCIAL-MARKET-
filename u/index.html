@@ -1,3 +1,4 @@
+<!-- /u/index.html -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -26,7 +27,7 @@
             <div class="uRow1">
                 <h1 id="uName" class="uName">—</h1>
 
-                <!-- ✅ Follow button (only on other users) -->
+                <!-- Follow button (only on other users) -->
                 <button id="uFollowBtn" class="uFollowBtn" hidden>Follow</button>
             </div>
 
@@ -60,16 +61,16 @@
 
 </main>
 
-<!-- ✅ Modal (followers/following list) -->
-<div id="uModal" class="uModal" hidden>
-    <div class="uModalCard">
-        <div class="uModalHead">
-            <h3 id="uModalTitle">—</h3>
-            <button id="uModalClose" class="uModalClose" type="button">✕</button>
-        </div>
-        <div id="uModalBody" class="uModalBody"></div>
+<!-- ✅ Right Drawer (Followers/Following list) -->
+<div id="uDrawerBackdrop" class="uDrawerBackdrop" hidden></div>
+
+<aside id="uDrawer" class="uDrawer" aria-hidden="true">
+    <div class="uDrawerHead">
+        <h3 id="uDrawerTitle" class="uDrawerTitle">—</h3>
+        <button id="uDrawerClose" class="uDrawerClose" type="button" aria-label="Close">✕</button>
     </div>
-</div>
+    <div id="uDrawerBody" class="uDrawerBody"></div>
+</aside>
 
 <script src="/assets1/header.js"></script>
 <script type="module" src="/u/u.js"></script>

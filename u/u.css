@@ -1,3 +1,4 @@
+/* /u/u.css */
 .uPage{ padding-top:18px; }
 
 .uTop{ display:flex; gap:16px; align-items:flex-start; }
@@ -46,37 +47,82 @@
 .uPost img{ width:100%; height:160px; object-fit:cover; display:block; }
 .uPostCap{ padding:10px; font-weight:900; opacity:.85; white-space:pre-wrap; }
 
-/* Modal */
-.uModal{
-    position:fixed; inset:0;
-    background:rgba(0,0,0,.35);
-    display:flex; align-items:center; justify-content:center;
-    padding:16px; z-index:999;
+/* =========================
+   Right Drawer (Followers/Following)
+========================= */
+.uDrawerBackdrop{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease;
+    z-index: 900;
 }
-.uModal[hidden]{ display:none !important; }
 
-.uModalCard{
-    width:min(520px,100%);
-    border-radius:18px;
-    background:#fff;
-    overflow:hidden;
-    border:1px solid rgba(0,0,0,.08);
-}
-.uModalHead{
-    display:flex; align-items:center; justify-content:space-between;
-    padding:12px 14px;
-    border-bottom:1px solid rgba(0,0,0,.08);
-}
-.uModalClose{ border:none; background:transparent; font-size:18px; cursor:pointer; }
-.uModalBody{ max-height:60vh; overflow:auto; padding:12px 14px; }
+.uDrawer{
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: min(420px, 92vw);
+    background: #fff;
+    border-left: 1px solid rgba(0,0,0,.08);
+    box-shadow: -12px 0 30px rgba(0,0,0,.12);
+    transform: translateX(105%);
+    transition: transform .18s ease;
+    z-index: 910;
 
+    display: flex;
+    flex-direction: column;
+}
+
+.uDrawer.open{
+    transform: translateX(0);
+}
+
+body.uDrawerOpen .uDrawerBackdrop{
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.uDrawerHead{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 14px 14px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+}
+
+.uDrawerTitle{
+    margin: 0;
+    font-weight: 1100;
+}
+
+.uDrawerClose{
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.uDrawerBody{
+    padding: 12px 14px;
+    overflow: auto;
+    max-height: calc(100vh - 56px);
+}
+
+/* list row */
 .uUserRow{
     display:flex; align-items:center; gap:10px;
     padding:10px 0;
     border-bottom:1px solid rgba(0,0,0,.06);
 }
 .uUserRow:last-child{ border-bottom:none; }
-.uUserAva{ width:40px;height:40px;border-radius:999px; object-fit:cover; background:rgba(0,0,0,.06); }
+.uUserAva{
+    width:40px;height:40px;border-radius:999px;
+    object-fit:cover;background:rgba(0,0,0,.06);
+}
 .uUserName{ font-weight:1100; }
 .uUserGo{
     margin-left:auto;
@@ -84,6 +130,8 @@
     border:1px solid rgba(0,0,0,.10);
     background:rgba(255,255,255,.9);
     font-weight:1000; cursor:pointer;
+    text-decoration:none;
+    color:inherit;
 }
 
 @media (max-width:720px){

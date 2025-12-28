@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!mount) return;
 
     try {
-        // 1) HEADER HTML YÜKLE (robust path)
+        // 1) HEADER HTML load
         const candidates = [
             "/components/header.html",
             "./components/header.html",
@@ -28,10 +28,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
 
         if (!html) throw lastErr || new Error("header.html load failed");
-
         mount.innerHTML = html;
 
-        // 2) AKTİF MENÜ
+        // 2) active menu
         const path = location.pathname.replace(/\/+$/, "");
         let page = path.split("/")[1] || "";
         if (page.endsWith(".html")) page = page.replace(".html", "");
@@ -41,7 +40,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             if ((a.dataset.page || "").trim() === page) a.classList.add("active");
         });
 
-        // 3) HAMBURGER / MOBILE MENU
+        // 3) hamburger / mobile menu
         const btn = document.getElementById("hamburgerBtn");
         const menu = document.getElementById("mobileMenu");
         const backdrop = document.getElementById("menuBackdrop");
@@ -52,6 +51,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                 backdrop.classList.add("open");
                 btn.setAttribute("aria-expanded", "true");
                 menu.setAttribute("aria-hidden", "false");
+
+                // ✅ scroll kilidi (istersen)
+                document.documentElement.style.overflow = "hidden";
             };
 
             const close = () => {
@@ -59,19 +61,41 @@ document.addEventListener("DOMContentLoaded", async () => {
                 backdrop.classList.remove("open");
                 btn.setAttribute("aria-expanded", "false");
                 menu.setAttribute("aria-hidden", "true");
+
+                document.documentElement.style.overflow = "";
             };
 
+            const isOpen = () => menu.classList.contains("open");
+
             btn.addEventListener("click", (e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                menu.classList.contains("open") ? close() : open();
+                isOpen() ? close() : open();
             });
 
-            backdrop.addEventListener("click", () => menu.classList.contains("open") && menu.classList.remove("open") && backdrop.classList.remove("open"));
-            document.addEventListener("keydown", (e) => e.key === "Escape" && menu.classList.contains("open") && (menu.classList.remove("open"), backdrop.classList.remove("open")));
+            // ✅ backdrop tıklayınca kesin kapat
+            backdrop.addEventListener("click", () => close());
+
+            // ✅ menü linkine tıklayınca kapat
+            menu.querySelectorAll("a").forEach((a) => {
+                a.addEventListener("click", () => close());
+            });
+
+            // ✅ ESC ile kapat
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape" && isOpen()) close();
+            });
+
+            // ✅ dışarı tıklayınca kapat
+            document.addEventListener("click", (e) => {
+                if (!isOpen()) return;
+                const t = e.target;
+                if (menu.contains(t) || btn.contains(t)) return;
+                close();
+            });
         }
 
         console.log("✅ Header fully initialized (clean)");
-
     } catch (err) {
         console.error("❌ HEADER ERROR:", err);
     }

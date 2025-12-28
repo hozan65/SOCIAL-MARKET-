@@ -179,3 +179,11 @@
         pointer-events: auto;
     }
 }
+
+.backdrop{
+    /* zaten var */
+    pointer-events: none;
+}
+.backdrop.open{
+    pointer-events: auto;
+}
