@@ -1,22 +1,22 @@
 // /assets1/cookie-consent.js
 (() => {
-    const KEY = "sm_consent_v1";
+    const KEY = "sm_consent_v2"; // versioned key
 
-    const $consent = document.getElementById("smConsent");
-    const $prefs = document.getElementById("smPrefs");
+    const banner = document.getElementById("smCookieBanner");
+    const prefs = document.getElementById("smCookiePrefs");
 
-    const $accept = document.getElementById("smConsentAccept");
-    const $reject = document.getElementById("smConsentReject");
-    const $manage = document.getElementById("smConsentManage");
+    const btnAccept = document.getElementById("smCookieAccept");
+    const btnReject = document.getElementById("smCookieReject");
+    const btnManage = document.getElementById("smCookieManage");
 
-    const $prefsClose = document.getElementById("smPrefsClose");
-    const $prefsSave = document.getElementById("smPrefsSave");
-    const $prefsReject = document.getElementById("smPrefsReject");
+    const swAnalytics = document.getElementById("smPrefAnalytics");
+    const swMarketing = document.getElementById("smPrefMarketing");
 
-    const $analytics = document.getElementById("smPrefAnalytics");
-    const $marketing = document.getElementById("smPrefMarketing");
+    const btnSave = document.getElementById("smPrefsSave");
+    const btnPrefsReject = document.getElementById("smPrefsReject");
+    const btnBack = document.getElementById("smPrefsBack");
 
-    if (!$consent) return;
+    if (!banner) return;
 
     function read() {
         try {
@@ -27,95 +27,105 @@
         }
     }
 
-    function write(obj) {
+    function write(consent) {
         localStorage.setItem(KEY, JSON.stringify({
-            ...obj,
+            necessary: true,
+            analytics: !!consent.analytics,
+            marketing: !!consent.marketing,
             ts: Date.now()
         }));
     }
 
-    function hideConsent() {
-        $consent.hidden = true;
+    function showBanner() {
+        banner.hidden = false;
+        // allow CSS to apply before anim
+        requestAnimationFrame(() => banner.classList.add("is-show"));
     }
 
-    function showConsent() {
-        $consent.hidden = false;
+    function hideBanner() {
+        banner.classList.remove("is-show");
+        setTimeout(() => { banner.hidden = true; }, 220);
     }
 
-    function openPrefs() {
-        // load current values
-        const cur = read();
-        $analytics.checked = !!cur?.analytics;
-        $marketing.checked = !!cur?.marketing;
-
-        $prefs.hidden = false;
+    function showPrefs() {
+        prefs.hidden = false;
+        requestAnimationFrame(() => prefs.classList.add("is-show"));
     }
 
-    function closePrefs() {
-        $prefs.hidden = true;
+    function hidePrefs() {
+        prefs.classList.remove("is-show");
+        setTimeout(() => { prefs.hidden = true; }, 220);
     }
 
-    // ✅ Script gating (buraya GA / Pixel eklersin)
+    // ✅ Here is where you would conditionally load scripts (GA/Pixel) later.
     function apply(consent) {
-        // örnek: sadece analytics true ise analytics script yükle
-        // if (consent?.analytics) loadGoogleAnalytics();
-        // if (consent?.marketing) loadPixel();
-        // reject => hiçbirini yükleme
+        // Example:
+        // if (consent.analytics) loadGoogleAnalytics();
+        // if (consent.marketing) loadMetaPixel();
     }
 
-    // Init
+    // INIT
     const existing = read();
     if (!existing) {
-        showConsent();
+        showBanner();
     } else {
-        hideConsent();
         apply(existing);
     }
 
     // Accept All
-    $accept?.addEventListener("click", () => {
-        const c = { necessary: true, analytics: true, marketing: true };
+    btnAccept?.addEventListener("click", () => {
+        const c = { analytics: true, marketing: true };
         write(c);
-        hideConsent();
-        apply(c);
+        apply({ necessary: true, ...c });
+        hideBanner();
+        hidePrefs();
     });
 
-    // Reject All
-    $reject?.addEventListener("click", () => {
-        const c = { necessary: true, analytics: false, marketing: false };
+    // Reject All (banner)
+    btnReject?.addEventListener("click", () => {
+        const c = { analytics: false, marketing: false };
         write(c);
-        hideConsent();
-        apply(c);
+        apply({ necessary: true, ...c });
+        hideBanner();
+        hidePrefs();
     });
 
-    // Manage Preferences
-    $manage?.addEventListener("click", () => openPrefs());
-
-    // Prefs close
-    $prefsClose?.addEventListener("click", closePrefs);
-    $prefs?.addEventListener("click", (e) => {
-        if (e.target === $prefs) closePrefs();
+    // Manage -> open prefs with current values
+    btnManage?.addEventListener("click", () => {
+        const cur = read();
+        if (swAnalytics) swAnalytics.checked = !!cur?.analytics;
+        if (swMarketing) swMarketing.checked = !!cur?.marketing;
+        showPrefs();
     });
 
-    // Prefs save
-    $prefsSave?.addEventListener("click", () => {
+    // Save prefs
+    btnSave?.addEventListener("click", () => {
         const c = {
-            necessary: true,
-            analytics: !!$analytics.checked,
-            marketing: !!$marketing.checked
+            analytics: !!swAnalytics?.checked,
+            marketing: !!swMarketing?.checked
         };
         write(c);
-        hideConsent();
-        closePrefs();
-        apply(c);
+        apply({ necessary: true, ...c });
+        hidePrefs();
+        hideBanner(); // karar verdi -> banner kapanır
     });
 
-    // Prefs reject
-    $prefsReject?.addEventListener("click", () => {
-        const c = { necessary: true, analytics: false, marketing: false };
+    // Reject in prefs
+    btnPrefsReject?.addEventListener("click", () => {
+        const c = { analytics: false, marketing: false };
         write(c);
-        hideConsent();
-        closePrefs();
-        apply(c);
+        apply({ necessary: true, ...c });
+        hidePrefs();
+        hideBanner();
     });
+
+    // Back (prefs -> banner)
+    btnBack?.addEventListener("click", () => {
+        hidePrefs();
+        // banner açık kalsın (kullanıcı karar vermedi)
+        if (!read()) showBanner();
+    });
+
+    // click outside to close prefs? SoundCloud genelde kapatmıyor.
+    // Biz kapatmıyoruz. Sadece Back/Save/Reject ile kapanır.
 })();

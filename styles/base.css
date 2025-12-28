@@ -18,138 +18,161 @@ html[data-theme="dark"] body{
 
 
 /* =========================
-   Social Market Cookie CMP
+  Social Market - Cookie Consent (SoundCloud style)
 ========================= */
 
-.smConsent{
+/* Banner container */
+.smCookieBanner{
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 0; right: 0; bottom: 0;
     z-index: 9999;
-    background: rgba(10,14,26,.92);
-    backdrop-filter: blur(10px);
-    border-top: 1px solid rgba(255,255,255,.12);
+    padding: 14px 14px 18px;
+    pointer-events: none; /* inner will enable */
 }
 
-.smConsentInner{
-    max-width: 1200px;
+.smCookieWrap{
+    max-width: 1180px;
     margin: 0 auto;
+    pointer-events: auto;
+    background: rgba(255,255,255,.98);
+    border: 1px solid rgba(0,0,0,.10);
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.20);
+    overflow: hidden;
+
+    /* slide-up */
+    transform: translateY(120%);
+    opacity: 0;
+    transition: transform .45s ease, opacity .35s ease;
+}
+
+.smCookieBanner.is-show .smCookieWrap{
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.smCookieGrid{
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 18px;
     padding: 16px 18px;
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    justify-content: space-between;
 }
 
-.smConsentLeft{ max-width: 780px; }
+.smCookieColRight{
+    border-left: 1px solid rgba(0,0,0,.08);
+    padding-left: 18px;
+}
 
-.smConsentTitle{
-    margin: 0 0 6px;
+.smCookieH{
     font-size: 16px;
-    font-weight: 1000;
-    color: #e9eefc;
+    font-weight: 900;
+    margin: 0 0 8px;
+    color: #0f172a;
 }
 
-.smConsentText{
+.smCookieP{
     margin: 0;
     font-size: 13.5px;
     line-height: 1.65;
-    color: rgba(233,238,252,.88);
+    color: rgba(15,23,42,.82);
 }
 
-.smConsentSmall{
-    margin-top: 8px;
-    font-size: 12.5px;
-    color: rgba(233,238,252,.65);
+.smCookieMiniH{
+    margin: 0 0 6px;
+    font-size: 13px;
+    font-weight: 900;
+    color: rgba(15,23,42,.88);
 }
 
-.smConsentRight{
+.smCookieMiniP{
+    margin: 0 0 12px;
+    font-size: 12.8px;
+    line-height: 1.55;
+    color: rgba(15,23,42,.72);
+}
+
+.smCookieLink{
+    display: inline-block;
+    margin-top: 10px;
+    font-weight: 900;
+    font-size: 12.8px;
+    color: #2563eb;
+    text-decoration: none;
+}
+.smCookieLink:hover{ text-decoration: underline; }
+
+.smCookieBtns{
     display: flex;
+    flex-direction: column;
     gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: flex-end;
 }
 
 /* Buttons */
-.smBtn{
-    height: 40px;
-    padding: 0 14px;
+.smCBtn{
+    height: 42px;
     border-radius: 12px;
-    border: 1px solid rgba(255,255,255,.14);
-    background: rgba(255,255,255,.06);
-    color: #e9eefc;
-    font-weight: 950;
+    border: 1px solid rgba(0,0,0,.12);
+    background: rgba(0,0,0,.04);
+    color: #0f172a;
+    font-weight: 900;
     cursor: pointer;
-    transition: transform .12s ease, filter .12s ease, background .12s ease, border-color .12s ease;
+    transition: transform .12s ease, filter .12s ease, background .12s ease;
 }
-.smBtn:hover{ transform: translateY(-1px); filter: brightness(1.03); }
-.smBtn:active{ transform: translateY(0); }
+.smCBtn:hover{ transform: translateY(-1px); filter: brightness(1.02); }
+.smCBtn:active{ transform: translateY(0); }
 
-.smBtnPrimary{
-    background: #2a64ff;
-    border-color: rgba(42,100,255,.45);
+.smCBtnPrimary{
+    background: #111827;
+    border-color: rgba(17,24,39,.28);
     color: #fff;
 }
-.smBtnPrimary:hover{ background: #1f54e6; }
+.smCBtnPrimary:hover{ background: #0b1220; }
 
-.smBtnGhost{
-    background: rgba(255,255,255,.03);
+.smCBtnGhost{
+    background: #fff;
+}
+.smCBtnSoft{
+    background: rgba(0,0,0,.06);
 }
 
-.smBtnSoft{
-    background: rgba(255,255,255,.10);
-}
-
-/* Preferences modal overlay */
-.smPrefs{
+/* Preferences overlay (dark background) */
+.smCookiePrefs{
     position: fixed;
     inset: 0;
     z-index: 10000;
-    background: rgba(0,0,0,.55);
+    background: rgba(2,6,23,.55);
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    padding: 18px;
+    padding: 14px;
 }
 
-.smPrefsCard{
-    width: min(820px, 100%);
-    background: rgba(18,26,43,.96);
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 18px;
-    box-shadow: 0 18px 60px rgba(0,0,0,.45);
+/* Slide-up card */
+.smCookiePrefsCard{
+    width: min(980px, 100%);
+    background: rgba(255,255,255,.98);
+    border: 1px solid rgba(0,0,0,.10);
+    border-radius: 14px;
+    box-shadow: 0 18px 60px rgba(0,0,0,.35);
     overflow: hidden;
+
+    transform: translateY(120%);
+    opacity: 0;
+    transition: transform .45s ease, opacity .35s ease;
 }
 
-.smPrefsHead{
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid rgba(255,255,255,.10);
+.smCookiePrefs.is-show .smCookiePrefsCard{
+    transform: translateY(0);
+    opacity: 1;
 }
 
-.smPrefsHead h3{
-    margin: 0;
-    font-size: 16px;
-    font-weight: 1000;
-    color: #e9eefc;
+.smPrefsTop{
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(0,0,0,.08);
 }
 
-.smPrefsClose{
-    height: 36px;
-    width: 36px;
-    border-radius: 12px;
-    border: 1px solid rgba(255,255,255,.14);
-    background: rgba(255,255,255,.06);
-    color: #e9eefc;
-    cursor: pointer;
-}
-
-.smPrefsBody{
-    padding: 14px 16px 16px;
+.smPrefsRows{
+    padding: 6px 18px 12px;
 }
 
 .smPrefRow{
@@ -157,35 +180,36 @@ html[data-theme="dark"] body{
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    padding: 12px 0;
-    border-bottom: 1px solid rgba(255,255,255,.08);
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(0,0,0,.06);
 }
 
 .smPrefName{
-    font-weight: 1000;
-    color: #e9eefc;
+    font-weight: 950;
+    color: #0f172a;
 }
 
 .smPrefDesc{
     margin-top: 4px;
     font-size: 12.8px;
-    color: rgba(233,238,252,.68);
+    color: rgba(15,23,42,.70);
     line-height: 1.5;
 }
 
-.smPrefsActions{
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-    margin-top: 14px;
-    flex-wrap: wrap;
+/* “Always on” pill */
+.smPill{
+    padding: 7px 10px;
+    border-radius: 999px;
+    font-weight: 900;
+    font-size: 12px;
+    border: 1px solid rgba(0,0,0,.12);
+    background: rgba(0,0,0,.05);
+    color: rgba(15,23,42,.85);
 }
-
-.smPrefsNote{
-    margin: 12px 0 0;
-    font-size: 12.5px;
-    color: rgba(233,238,252,.62);
-    line-height: 1.6;
+.smPillOn{
+    background: rgba(34,197,94,.12);
+    border-color: rgba(34,197,94,.30);
+    color: rgba(15,23,42,.92);
 }
 
 /* Switch */
@@ -200,8 +224,8 @@ html[data-theme="dark"] body{
     position: absolute;
     inset: 0;
     border-radius: 999px;
-    background: rgba(255,255,255,.18);
-    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(0,0,0,.18);
+    border: 1px solid rgba(0,0,0,.12);
     transition: .2s;
 }
 .smSlider::after{
@@ -212,29 +236,52 @@ html[data-theme="dark"] body{
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: rgba(255,255,255,.85);
+    background: rgba(255,255,255,.95);
+    box-shadow: 0 6px 16px rgba(0,0,0,.18);
     transition: .2s;
 }
 .smSwitch input:checked + .smSlider{
-    background: rgba(42,100,255,.65);
-    border-color: rgba(42,100,255,.55);
+    background: rgba(17,24,39,.85);
+    border-color: rgba(17,24,39,.30);
 }
 .smSwitch input:checked + .smSlider::after{
     transform: translateX(18px);
-    background: #fff;
 }
 
-/* Mobile layout */
-@media (max-width: 680px){
-    .smConsentInner{
-        flex-direction: column;
-        align-items: flex-start;
+/* Pref buttons */
+.smPrefsActions{
+    display: flex;
+    gap: 10px;
+    padding: 14px 18px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    border-top: 1px solid rgba(0,0,0,.08);
+}
+
+.smPrefsFine{
+    padding: 0 18px 14px;
+    font-size: 12.5px;
+    color: rgba(15,23,42,.65);
+}
+
+/* Mobile */
+@media (max-width: 860px){
+    .smCookieGrid{
+        grid-template-columns: 1fr;
     }
-    .smConsentRight{
-        width: 100%;
-        justify-content: flex-end;
+    .smCookieColRight{
+        border-left: none;
+        padding-left: 0;
+        border-top: 1px solid rgba(0,0,0,.08);
+        padding-top: 12px;
     }
-    .smPrefs{
-        align-items: flex-end;
+    .smCookieBtns{
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+    .smCookieBtns .smCBtn{
+        flex: 1;
+        min-width: 150px;
     }
 }
+
