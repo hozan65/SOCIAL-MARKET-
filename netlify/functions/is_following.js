@@ -1,4 +1,4 @@
-﻿// netlify/functions/toggle_follow.js
+﻿// netlify/functions/is_following.js
 import { createClient } from "@supabase/supabase-js";
 import { getAppwriteUser } from "./_appwrite_user.js";
 

@@ -1,43 +1,38 @@
 // netlify/functions/_auth_user.js
-import { getAppwriteUser } from "./_appwrite_user.js";
+// CommonJS helper: verifies Appwrite JWT and returns { uid, email }
 
-export async function handler(event) {
-    try {
-        if (event.httpMethod === "OPTIONS") return json(204, null);
+const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "").trim();     // e.g. https://cloud.appwrite.io/v1
+const APPWRITE_PROJECT_ID = (process.env.APPWRITE_PROJECT_ID || "").trim(); // Appwrite Project ID
 
-        if (event.httpMethod !== "GET") {
-            return json(405, { error: "Method not allowed" });
-        }
+async function authUser(jwt) {
+    if (!jwt) throw new Error("Missing JWT");
 
-        const { user } = await getAppwriteUser(event);
-
-        return json(200, {
-            ok: true,
-            user: {
-                $id: user.$id,
-                name: user.name || "",
-                email: user.email || "",
-            },
-            uid: user.$id,
-            user_id: user.$id,
-        });
-    } catch (e) {
-        const msg = String(e?.message || e);
-        const low = msg.toLowerCase();
-        const status = low.includes("jwt") || low.includes("authorization") ? 401 : 500;
-        return json(status, { error: msg });
+    if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID) {
+        throw new Error("Missing APPWRITE_ENDPOINT / APPWRITE_PROJECT_ID in Netlify env");
     }
-}
 
-function json(status, body) {
-    return new Response(body == null ? "" : JSON.stringify(body), {
-        status,
+    const url = `${APPWRITE_ENDPOINT.replace(/\/$/, "")}/account`;
+
+    const r = await fetch(url, {
+        method: "GET",
         headers: {
-            "Content-Type": "application/json; charset=utf-8",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+            "X-Appwrite-JWT": jwt,
         },
     });
+
+    const j = await r.json().catch(() => null);
+
+    if (!r.ok) {
+        const msg = j?.message || `Appwrite auth failed (${r.status})`;
+        throw new Error(msg);
+    }
+
+    const uid = j?.$id || j?.id || null;
+    const email = j?.email || null;
+
+    if (!uid) throw new Error("Appwrite user id not found");
+    return { uid, email };
 }
+
+module.exports = { authUser };
