@@ -6,27 +6,44 @@ const sb = createClient(
 );
 
 export const handler = async (event) => {
-    const uid = event.queryStringParameters?.id;
-    if (!uid) return json(400, { error: "Missing id" });
+    try {
+        const uid = event.queryStringParameters?.id;
+        if (!uid) return json(400, { error: "Missing id" });
 
-    const { data, error } = await sb
-        .from("follows")
-        .select("target_id, profiles:target_id(appwrite_user_id,name,avatar_url)")
-        .eq("follower_id", uid);
+        // follower_uid = uid  => ben kimi takip ediyorum?
+        const { data, error } = await sb
+            .from("follows")
+            .select(
+                "following_uid, p:profiles!follows_following_uid_fk(appwrite_user_id,name,avatar_url)"
+            )
+            .eq("follower_uid", uid)
+            .order("created_at", { ascending: false })
+            .limit(200);
 
-    if (error) return json(500, { error: error.message });
+        if (error) return json(500, { error: error.message });
 
-    return json(200, {
-        list: (data || []).map(x => ({
-            id: x.profiles.appwrite_user_id,
-            name: x.profiles.name,
-            avatar_url: x.profiles.avatar_url
-        }))
-    });
+        const list = (data || [])
+            .map((x) => x.p)
+            .filter(Boolean)
+            .map((p) => ({
+                id: p.appwrite_user_id,
+                name: p.name,
+                avatar_url: p.avatar_url
+            }));
+
+        return json(200, { list });
+    } catch (e) {
+        return json(500, { error: String(e?.message || e) });
+    }
 };
 
-const json = (s,b)=>({
-    statusCode:s,
-    headers:{ "Content-Type":"application/json","Access-Control-Allow-Origin":"*" },
-    body:JSON.stringify(b)
-});
+function json(statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+        },
+        body: JSON.stringify(body)
+    };
+}
