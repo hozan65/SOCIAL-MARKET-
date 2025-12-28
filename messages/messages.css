@@ -174,12 +174,35 @@
 /* =========================
    CHAT BODY
 ========================= */
+/* =========================
+   CHAT BACKGROUND (SOFT BLUE-WHITE)
+========================= */
 .chatViewport{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    min-height:0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+
+
+    background:
+            radial-gradient(
+                    900px 500px at 15% 20%,
+                    rgba(120,170,255,.22),
+                    transparent 60%
+            ),
+            radial-gradient(
+                    800px 500px at 85% 30%,
+                    rgba(120,170,255,.18),
+                    transparent 60%
+            ),
+            linear-gradient(
+                    180deg,
+                    #f3f8ff 0%,
+                    #f9fbff 60%,
+                    #ffffff 100%
+            );
 }
+
 
 /* SCROLL */
 .msgBody{
