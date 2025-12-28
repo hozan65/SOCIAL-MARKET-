@@ -1,4 +1,7 @@
 // /assets1/crypto-tabs.js  (BINANCE: REST seed + WS realtime, SILENT UI)
+// ✅ ALL coins show + try to show logo for all
+// ✅ ICON map optional, fallback to dynamic logo URL
+// ✅ onerror -> placeholder (no broken images)
 
 (() => {
     const grid = document.getElementById("cryptoGrid");
@@ -11,8 +14,7 @@
     const DEFAULT_LIST = ["BTCUSDT","ETHUSDT","SOLUSDT","XRPUSDT","BNBUSDT","DOGEUSDT","ADAUSDT","AVAXUSDT","LINKUSDT","MATICUSDT"];
     const REST_24H = "https://api.binance.com/api/v3/ticker/24hr";
 
-    // İkonlar: en stabil çözüm = bunları LOCAL dosyaya almak (aşağıdaki gibi dış linkte kalırsa bazen geç gelebilir)
-    // Örn: /assets/icons/btc.png gibi yapıp burayı değiştir.
+    // ✅ Opsiyonel: bazılarını sabitlemek istersen burada dursun (hızlı/garanti)
     const ICON = {
         BTCUSDT: "https://assets.coingecko.com/coins/images/1/large/bitcoin.png",
         ETHUSDT: "https://assets.coingecko.com/coins/images/279/large/ethereum.png",
@@ -24,6 +26,32 @@
         AVAXUSDT:"https://assets.coingecko.com/coins/images/12559/large/Avalanche_Circle_RedWhite_Trans.png",
         LINKUSDT:"https://assets.coingecko.com/coins/images/877/large/chainlink-new-logo.png",
         MATICUSDT:"https://assets.coingecko.com/coins/images/4713/large/polygon.png",
+    };
+
+    // ✅ geniş logo kaynağı (çok coin kapsar)
+    const ICON_BASE =
+        "https://raw.githubusercontent.com/spothq/cryptocurrency-icons/master/128/color/";
+
+    // bazı Binance sembolleri ikon repo isimleriyle farklı olabiliyor
+    const ALIAS = {
+        // örnekler:
+        // "MATIC": "matic-network",
+        // "BCH": "bitcoin-cash",
+        // "ETC": "ethereum-classic",
+        // "FTM": "fantom",
+        // Stablecoin’ler genelde var:
+        "USDT": "tether",
+        "USDC": "usd-coin",
+        "DAI": "dai",
+        // bazı coinler:
+        "BNB": "binance-coin",
+        "AVAX": "avalanche",
+        "DOGE": "dogecoin",
+        "XRP": "xrp",
+        "SOL": "solana",
+        "ETH": "ethereum",
+        "BTC": "bitcoin",
+        "LINK": "chainlink",
     };
 
     // ===== helpers =====
@@ -47,6 +75,28 @@
         if (msg) msg.textContent = "";
     }
 
+    // Binance symbol -> base coin (ör: "1000SHIBUSDT" => "SHIB")
+    function baseFromSymbol(sym) {
+        let base = String(sym || "").replace("USDT","");
+        // Binance özel prefiksleri: 1000SHIB, 1000PEPE gibi
+        base = base.replace(/^1000/, "");
+        base = base.replace(/^10000/, "");
+        return base;
+    }
+
+    // base coin -> icon url
+    // 1) ICON map (sym bazlı)
+    // 2) ICON_BASE + alias/lowcase + ".png"
+    function getIconUrl(sym) {
+        if (ICON[sym]) return ICON[sym];
+
+        const base = baseFromSymbol(sym);
+        const key = ALIAS[base] || base.toLowerCase();
+        // repo formatı genelde: btc.png, ethereum.png vs.
+        // alias’ı "ethereum" gibi verirsen olur.
+        return `${ICON_BASE}${key}.png`;
+    }
+
     // ===== state =====
     let activeTab = (document.querySelector(".gTab[data-tab].active")?.dataset.tab) || "trending";
     let activeSymbols = [...DEFAULT_LIST];
@@ -62,8 +112,9 @@
             .filter(sym => !q || sym.includes(q))
             .map(sym => {
                 const d = state.get(sym) || {};
-                const base = sym.replace("USDT","");
-                const img = ICON[sym] || "";
+                const base = baseFromSymbol(sym);
+
+                const img = getIconUrl(sym);
 
                 const price = d.price != null ? fmtUsd(d.price) : "-";
                 const chgNum = Number(d.chg24);
@@ -73,11 +124,13 @@
                 return `
           <div class="coinCard">
             <div class="coinLeft">
-              ${
-                    img
-                        ? `<img class="coinIcon" src="${esc(img)}" alt="${esc(base)}" loading="eager" decoding="async" fetchpriority="high">`
-                        : `<div class="coinIcon"></div>`
-                }
+              <img class="coinIcon"
+                   src="${esc(img)}"
+                   alt="${esc(base)}"
+                   loading="eager"
+                   decoding="async"
+                   fetchpriority="high"
+                   onerror="this.onerror=null; this.outerHTML='<div class=\\'coinIcon\\'></div>';">
               <div class="coinSymbol">${esc(base)}</div>
             </div>
 

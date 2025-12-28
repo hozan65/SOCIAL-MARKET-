@@ -1,12 +1,20 @@
+// /news/news.js  (FIXED for your Supabase schema)
+// ✅ Uses: news.summary (not body)
+// ✅ Reads from table: public.news
+// ✅ Chunk render + single listener + modal
+
 import { supabase } from "../services/supabase.js";
 
 /* =========================
-   NEWS.JS (OPTIMIZED)
+   NEWS.JS (OPTIMIZED - FIXED)
    - Lazy images
    - Chunked render (no freeze)
    - Event delegation (1 listener)
    - ID->item map (fast modal open)
+   - ✅ summary column (your table) instead of body
 ========================= */
+
+console.log("✅ RUNNING: /news/news.js");
 
 const DEFAULT_IMAGES = {
     crypto: "/img/news-default.jpg",
@@ -18,15 +26,15 @@ const DEFAULT_IMAGES = {
     all: "/img/news-default.jpg",
 };
 
-const VALID_CATS = new Set(["all","crypto","forex","indices","commodities","stocks","macro"]);
+const VALID_CATS = new Set(["all", "crypto", "forex", "indices", "commodities", "stocks", "macro"]);
 
 let ALL_NEWS = [];
 let ACTIVE_CAT = "all";
 let ITEM_BY_ID = new Map();
 
 // Render tuning
-const CHUNK_SIZE = 12;       // 12-12 bas
-const CHUNK_DELAY = 0;       // 0 = requestAnimationFrame
+const CHUNK_SIZE = 12; // 12-12 bas
+const CHUNK_DELAY = 0; // 0 = requestAnimationFrame
 let lastRenderToken = 0;
 
 function escapeHtml(str) {
@@ -39,8 +47,11 @@ function escapeHtml(str) {
 }
 
 function formatDate(ts) {
-    try { return new Date(ts).toLocaleString("tr-TR",{dateStyle:"short",timeStyle:"short"}); }
-    catch { return ""; }
+    try {
+        return new Date(ts).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+    } catch {
+        return "";
+    }
 }
 
 function normalizeCat(cat) {
@@ -68,6 +79,8 @@ function openModal(item) {
     const textEl = document.getElementById("modal-text");
     const metaEl = document.getElementById("modal-meta");
 
+    if (!modal || !imgEl || !titleEl || !textEl || !metaEl) return;
+
     const catKey = String(item.category ?? "").toLowerCase();
     const img = item.image_url || DEFAULT_IMAGES[catKey] || "/img/news-default.jpg";
 
@@ -77,7 +90,8 @@ function openModal(item) {
     imgEl.src = img;
 
     titleEl.textContent = item.title ?? "";
-    textEl.textContent = item.body ?? "";
+    // ✅ your column is summary
+    textEl.textContent = item.summary ?? "";
     metaEl.textContent = `${item.category ?? ""} • ${formatDate(item.created_at)}`;
 
     modal.classList.add("open");
@@ -87,6 +101,7 @@ function openModal(item) {
 
 function closeModal() {
     const modal = document.getElementById("news-modal");
+    if (!modal) return;
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
     document.body.style.overflow = "";
@@ -97,7 +112,6 @@ function cardHtml(n) {
     const img = n.image_url || DEFAULT_IMAGES[catKey] || "/img/news-default.jpg";
 
     // ✅ loading="lazy" + decoding="async"
-    // ✅ width/height eklemek (CSS ile de olur) layout shift azaltır
     return `
     <article class="news-card" tabindex="0" data-id="${escapeHtml(n.id)}">
       <div class="news-thumb">
@@ -107,7 +121,7 @@ function cardHtml(n) {
       </div>
       <div class="news-content">
         <div class="news-title">${escapeHtml(n.title)}</div>
-        <div class="news-body">${escapeHtml(n.body)}</div>
+        <div class="news-body">${escapeHtml(n.summary)}</div>
         <div class="news-meta">
           <span class="news-cat">${escapeHtml(n.category)}</span>
           <span class="news-dot">•</span>
@@ -197,7 +211,8 @@ async function loadNews() {
 
     const { data, error } = await supabase
         .from("news")
-        .select("id,title,body,category,image_url,created_at")
+        // ✅ your table has summary not body
+        .select("id,title,summary,category,image_url,created_at")
         .order("created_at", { ascending: false })
         .limit(80);
 
@@ -242,7 +257,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     initTabs();
     bindGridEvents();
-
     loadNews();
 
     // modal close
