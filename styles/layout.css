@@ -46,7 +46,7 @@
 }
 
 .logo-img{
-    height: 44px;          /* ✅ PC büyük logo */
+    height: 80px;          /* ✅ PC büyük logo */
     width: auto;
     object-fit: contain;
     display: block;
@@ -132,7 +132,7 @@
     .topbar .menu{ display: none; }
 
     .logo-img{
-        height: 34px;      /* ✅ mobil logo */
+        height: 70px;      /* ✅ mobil logo */
     }
 
     .hamburger{
