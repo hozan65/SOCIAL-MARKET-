@@ -69,7 +69,7 @@ function renderLoggedIn(slot, user) {
     slot.innerHTML = `
     <div class="tvAuth">
       <button class="tvProfileBtn" id="tvProfileBtn" type="button">
-        <span class="tvAvatar">👤</span>
+        <span class="tvAvatar"></span>
         <span class="tvName">${name}</span>
       </button>
 
