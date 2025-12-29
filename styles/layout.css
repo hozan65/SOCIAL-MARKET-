@@ -1,62 +1,54 @@
-/* =========================
-   GLOBAL HEADER (SAFE + LOGO)
-========================= */
+.container{
+    max-width: 1240px;       /* ✅ PC eski genişlik */
+    margin: 0 auto;
+    padding: 0 24px 44px;
+}
 
-/* Desktop */
+@media (max-width: 980px){
+    .container{ padding: 0 14px 44px; }
+}
+@media (max-width: 420px){
+    .container{ padding: 0 12px 44px; }
+}
+
+/* =========================
+   GLOBAL HEADER
+========================= */
 .topbar{
     position: sticky;
     top: 16px;
     z-index: 100;
 
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: 18px;
+
     max-width: 1240px;
     width: calc(100% - 48px);
     margin: 16px auto 0;
-
-    /* 🔒 bar sabit: logo büyüse de header büyümez */
-    height: 64px;
-    min-height: 64px;
-    padding: 0 22px;
+    padding: 14px 22px;
 
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 18px;
     backdrop-filter: blur(12px);
     box-shadow: var(--softShadow);
-
-    display: grid;
-    grid-template-columns: auto 1fr auto; /* logo | menu | auth/hamb */
-    align-items: center;
-    column-gap: 18px;
-
-    overflow: visible;
 }
 
-/* LOGO */
-.logo-wrap{
+.topbar .logo{
     justify-self: start;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    text-decoration: none;
-    flex: 0 0 auto;
+    font-weight: 900;
+    font-size: 16px;
+    white-space: nowrap;
 }
 
-.logo-img{
-    max-height: 54px;   /* 🔥 sadece logo büyür */
-    width: auto;
-    object-fit: contain;
-    display: block;
-}
-
-/* MENU (center) */
 .topbar .menu{
     justify-self: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 18px;
+    display:flex;
+    align-items:center;
+    gap:18px;
     flex-wrap: nowrap;
-    min-width: 0;
 }
 
 .topbar .menu a{
@@ -76,73 +68,60 @@
     border: 1px solid rgba(37,99,235,.22);
 }
 
-/* AUTH SLOT (profile area) */
+/* AUTH SLOT */
 #authSlot{
     justify-self: end;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 10px;
-
-    /* ✅ profile click asla kaybolmasın */
-    position: relative;
-    z-index: 300;
-
-    /* ❌ sağa iten min-width iptal */
-    min-width: 0;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:10px;
+    min-width: 180px;
 }
 
-/* hamburger desktop'ta gizli */
+/* hamburger hidden on desktop */
 .hamburger{
-    display: none;
+    display:none;
     border: 1px solid var(--border);
     background: var(--card);
     color: var(--text);
     border-radius: 12px;
 }
 
-/* Desktop: mobile drawer görünmez */
-.mobileMenu{ display: none; }
-.backdrop{ display: none; }
+/* drawer hidden by default */
+.mobileMenu{ display:none; }
+.backdrop{ display:none; }
 
-/* =========================
-   MOBILE
-========================= */
+/* Mobile header */
 @media (max-width: 980px){
     .topbar{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:10px;
+
         top: 0;
         width: 100%;
         max-width: none;
         margin: 0;
         border-radius: 0 0 18px 18px;
-
-        height: 56px;
-        min-height: 56px;
-        padding: 0 12px;
-
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
+        padding: 10px 12px;
     }
 
-    .topbar .menu{ display: none; }
-
-    .logo-img{ max-height: 40px; }
+    .topbar .menu{ display:none; }
 
     .hamburger{
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 42px;
-        height: 42px;
-        font-size: 20px;
-        cursor: pointer;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        width:42px;
+        height:42px;
+        font-size:20px;
+        cursor:pointer;
         box-shadow: var(--softShadow);
     }
 
     .mobileMenu{
-        display: block;
+        display:block;
         position: fixed;
         top: 66px;
         left: 12px;
@@ -158,7 +137,7 @@
         opacity: 0;
         pointer-events: none;
         transition: opacity .18s ease, transform .18s ease;
-        z-index: 200; /* ✅ authSlot (300) üstte kalır */
+        z-index: 130;
     }
 
     .mobileMenu.open{
@@ -168,10 +147,11 @@
     }
 
     .mobileMenu a{
-        display: block;
+        display:block;
         padding: 12px 12px;
         border-radius: 12px;
         font-weight: 900;
+
         background: var(--card);
         border: 1px solid var(--border);
         margin-bottom: 8px;
@@ -185,27 +165,25 @@
     }
 
     .backdrop{
-        display: block;
+        display:block;
         position: fixed;
         inset: 0;
         background: rgba(15,23,42,.30);
         opacity: 0;
         pointer-events: none;
         transition: opacity .18s ease;
-        z-index: 150;
+        z-index: 125;
     }
-
     .backdrop.open{
         opacity: 1;
         pointer-events: auto;
     }
 }
 
-/* =========================
-   CLICK SAFETY (CRITICAL)
-   Menü kapalıyken asla click çalmasın
-========================= */
-.backdrop{ pointer-events: none; }
-.mobileMenu{ pointer-events: none; }
-.backdrop.open{ pointer-events: auto; }
-.mobileMenu.open{ pointer-events: auto; }
+.backdrop{
+    /* zaten var */
+    pointer-events: none;
+}
+.backdrop.open{
+    pointer-events: auto;
+}
