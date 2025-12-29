@@ -187,3 +187,71 @@
 .backdrop.open{
     pointer-events: auto;
 }
+
+
+/* ==================================================
+   HEADER (SABİT YÜKSEKLİK – LOGO BÜYÜSE DEĞİŞMEZ)
+================================================== */
+
+.topbar{
+    height: 64px;              /* 🔒 header kilitli */
+    min-height: 64px;
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 18px;
+    overflow: hidden;          /* logo taşarsa kes */
+}
+
+/* ==================================================
+   LOGO
+================================================== */
+
+.logo-wrap{
+    height: 100%;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    flex-shrink: 0;            /* logo sıkışmaz */
+}
+
+.logo-img{
+    max-height: 120px;          /* 🔥 10 tık büyük logo */
+    width: auto;
+    object-fit: contain;
+    display: block;
+    transition: transform .15s ease;
+}
+
+/* hover çok hafif */
+.logo-img:hover{
+    transform: scale(1.04);
+}
+
+/* ==================================================
+   MENU (koruma amaçlı)
+================================================== */
+
+.menu{
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
+/* ==================================================
+   MOBILE
+================================================== */
+
+@media (max-width: 768px){
+    .topbar{
+        height: 56px;
+        min-height: 56px;
+        padding: 0 14px;
+    }
+
+    .logo-img{
+        max-height: 40px;
+    }
+}
+
+
