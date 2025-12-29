@@ -1,14 +1,13 @@
 <header class="topbar">
-    <!-- LOGO -->
     <a href="/feed/" class="logo-wrap">
-        <img
-                src="/assets/social-market-logo.png"
-                alt="Social Market Logo"
-                class="logo-img"
-        />
+        <img src="/assets/social-market-logo.png" alt="Social Market" class="logo-img">
     </a>
 
-    <!-- MENU (ORTADA KALIR) -->
+    <link rel="stylesheet" href="/styles/variables.css">
+    <link rel="stylesheet" href="/styles/base.css">
+    <link rel="stylesheet" href="/styles/layout.css">
+
+
     <nav class="menu">
         <a data-page="feed" href="/feed/feed.html">FEED</a>
         <a data-page="post" href="/post/post.html">POST</a>
@@ -17,22 +16,12 @@
         <a data-page="tools" href="/tools/tools.html">TOOLS</a>
     </nav>
 
-    <!-- PROFIL / AUTH -->
-    <div id="authSlot"></div>
-
-    <!-- HAMBURGER -->
-    <button
-            class="hamburger"
-            id="hamburgerBtn"
-            type="button"
-            aria-label="Menu"
-            aria-expanded="false"
-    >
-        ☰
-    </button>
+    <div class="rightArea">
+        <div id="authSlot"></div>
+        <button class="hamburger" id="hamburgerBtn" type="button" aria-label="Menu" aria-expanded="false">☰</button>
+    </div>
 </header>
 
-<!-- MOBILE MENU -->
 <div class="mobileMenu" id="mobileMenu" aria-hidden="true">
     <a data-page="feed" href="/feed/feed.html">Feed</a>
     <a data-page="post" href="/post/post.html">Post</a>

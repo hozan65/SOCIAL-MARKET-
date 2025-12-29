@@ -1,5 +1,5 @@
 .container{
-    max-width: 1240px;       /* ✅ PC eski genişlik */
+    max-width: 1240px;
     margin: 0 auto;
     padding: 0 24px 44px;
 }
@@ -12,37 +12,55 @@
 }
 
 /* =========================
-   HEADER LOGO (IMAGE)
+   GLOBAL HEADER (DESKTOP)
 ========================= */
+.topbar{
+    position: sticky;
+    top: 16px;
+    z-index: 100;
 
+    max-width: 1240px;
+    width: calc(100% - 48px);
+    margin: 16px auto 0;
+    padding: 14px 22px;
+
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    backdrop-filter: blur(12px);
+    box-shadow: var(--softShadow);
+
+    display: grid;
+    grid-template-columns: auto 1fr auto; /* logo | menu | right */
+    align-items: center;
+    column-gap: 18px;
+}
+
+/* ===== LOGO (IMAGE) ===== */
 .logo-wrap{
-    justify-self: start;      /* grid sol */
+    justify-self: start;
     display: flex;
     align-items: center;
     text-decoration: none;
+    flex: 0 0 auto;
 }
 
 .logo-img{
-    height: 40px;             /* desktop logo boyu */
+    height: 44px;          /* ✅ PC büyük logo */
     width: auto;
     object-fit: contain;
     display: block;
 }
 
-@media (max-width: 980px){
-    .logo-img{
-        height: 32px;
-    }
-}
-
-
-
+/* ===== MENU (CENTER) ===== */
 .topbar .menu{
     justify-self: center;
-    display:flex;
-    align-items:center;
-    gap:18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
     flex-wrap: nowrap;
+    min-width: 0;
 }
 
 .topbar .menu a{
@@ -62,36 +80,46 @@
     border: 1px solid rgba(37,99,235,.22);
 }
 
+/* ===== RIGHT AREA (AUTH + HAMBURGER) ===== */
+.rightArea{
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
 /* AUTH SLOT */
 #authSlot{
-    justify-self: end;
-    display:flex;
-    align-items:center;
-    justify-content:flex-end;
-    gap:10px;
-    min-width: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-width: 0;          /* ✅ 180px itmesini kaldırdık */
 }
 
 /* hamburger hidden on desktop */
 .hamburger{
-    display:none;
+    display: none;
     border: 1px solid var(--border);
     background: var(--card);
     color: var(--text);
     border-radius: 12px;
 }
 
-/* drawer hidden by default */
-.mobileMenu{ display:none; }
-.backdrop{ display:none; }
+/* drawer hidden by default (desktop) */
+.mobileMenu{ display: none; }
+.backdrop{ display: none; }
 
-/* Mobile header */
+/* =========================
+   MOBILE HEADER
+========================= */
 @media (max-width: 980px){
     .topbar{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
 
         top: 0;
         width: 100%;
@@ -101,21 +129,25 @@
         padding: 10px 12px;
     }
 
-    .topbar .menu{ display:none; }
+    .topbar .menu{ display: none; }
+
+    .logo-img{
+        height: 34px;      /* ✅ mobil logo */
+    }
 
     .hamburger{
-        display:inline-flex;
-        align-items:center;
-        justify-content:center;
-        width:42px;
-        height:42px;
-        font-size:20px;
-        cursor:pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        font-size: 20px;
+        cursor: pointer;
         box-shadow: var(--softShadow);
     }
 
     .mobileMenu{
-        display:block;
+        display: block;
         position: fixed;
         top: 66px;
         left: 12px;
@@ -141,7 +173,7 @@
     }
 
     .mobileMenu a{
-        display:block;
+        display: block;
         padding: 12px 12px;
         border-radius: 12px;
         font-weight: 900;
@@ -159,7 +191,7 @@
     }
 
     .backdrop{
-        display:block;
+        display: block;
         position: fixed;
         inset: 0;
         background: rgba(15,23,42,.30);
@@ -174,10 +206,6 @@
     }
 }
 
-.backdrop{
-    /* zaten var */
-    pointer-events: none;
-}
-.backdrop.open{
-    pointer-events: auto;
-}
+/* Desktop'ta backdrop click çalmasın */
+.backdrop{ pointer-events: none; }
+.backdrop.open{ pointer-events: auto; }
