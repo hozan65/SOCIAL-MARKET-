@@ -47,7 +47,7 @@
 
 /* 🔥 Buradan logo büyüklüğünü ayarla */
 .logo-img{
-    max-height: 54px;             /* ✅ sadece logo büyür (bar büyümez) */
+    max-height: 80px;             /* ✅ sadece logo büyür (bar büyümez) */
     width: auto;
     object-fit: contain;
     display: block;
@@ -138,7 +138,7 @@
     .logo-wrap{ height:100%; }
 
     .logo-img{
-        max-height: 40px;           /* mobil logo boyu */
+        max-height: 60px;           /* mobil logo boyu */
     }
 
     .hamburger{
