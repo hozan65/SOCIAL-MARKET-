@@ -36,13 +36,50 @@ function checkSecret(req, res) {
 }
 
 io.on("connection", (socket) => {
+    // Kullanıcı odası (DM vs için)
     socket.on("auth_user", (uid) => {
         const id = String(uid || "").trim();
         if (!id) return;
         socket.join(`user:${id}`);
     });
+
+    // ✅ Post odası (like update sadece o post’u izleyenlere gitsin)
+    socket.on("join:post", (postId) => {
+        const pid = String(postId || "").trim();
+        if (!pid) return;
+        socket.join(`post:${pid}`);
+    });
+
+    socket.on("leave:post", (postId) => {
+        const pid = String(postId || "").trim();
+        if (!pid) return;
+        socket.leave(`post:${pid}`);
+    });
+
+    // ✅ FEED.JS -> like:toggle
+    // payload: { postId, userId(optional), likeCount }
+    socket.on("like:toggle", (p) => {
+        const postId = String(p?.postId || "").trim();
+        if (!postId) return;
+
+        const likeCount = Number(p?.likeCount ?? 0);
+        const userId = String(p?.userId || "").trim();
+
+        // O post odasına yayın
+        io.to(`post:${postId}`).emit("post:like:update", {
+            postId,
+            likeCount,
+            userId,
+            ts: Date.now(),
+        });
+    });
+
+    // (İstersen sonra follow realtime da ekleriz: follow:toggle -> user:follow:update)
 });
 
+// -------------------------
+// Eski HTTP emit endpointleri (istersen sonra kaldır)
+// -------------------------
 app.post("/emit/like", (req, res) => {
     if (!checkSecret(req, res)) return;
     io.emit("like_update", req.body);

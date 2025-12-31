@@ -7,11 +7,6 @@ const sb = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// VPS socket server endpoint
-// ör: https://socket.domain.com/emit/follow
-const SOCKET_FOLLOW_EMIT_URL = process.env.SOCKET_FOLLOW_EMIT_URL || "";
-const SOCKET_SECRET = process.env.SOCKET_SECRET || "";
-
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
@@ -24,13 +19,12 @@ export const handler = async (event) => {
         let body = {};
         try { body = JSON.parse(event.body || "{}"); } catch {}
 
-        // hem following_uid hem following_id kabul (eski front uyumu)
+        // hem following_uid hem following_id kabul (geri uyum)
         const following_uid = String(body.following_uid || body.following_id || "").trim();
         if (!following_uid) return json(400, { error: "Missing following_uid" });
-
         if (following_uid === myUid) return json(400, { error: "Cannot follow yourself" });
 
-        // 🔎 existing?
+        // 🔎 mevcut ilişki var mı?
         const { data: existing, error: e1 } = await sb
             .from("follows")
             .select("id")
@@ -41,24 +35,18 @@ export const handler = async (event) => {
         if (e1) return json(500, { error: e1.message });
 
         let following = false;
-        let action = "";
 
         // 🔁 toggle
         if (existing?.id) {
             const { error: delErr } = await sb.from("follows").delete().eq("id", existing.id);
             if (delErr) return json(500, { error: delErr.message });
-
             following = false;
-            action = "unfollow";
         } else {
             const { error: insErr } = await sb
                 .from("follows")
                 .insert([{ follower_uid: myUid, following_uid }]);
-
             if (insErr) return json(500, { error: insErr.message });
-
             following = true;
-            action = "follow";
         }
 
         // ✅ counts
@@ -67,20 +55,12 @@ export const handler = async (event) => {
             sb.from("follows").select("*", { count: "exact", head: true }).eq("follower_uid", myUid),
         ]);
 
-        const followers_count = Number(followersCount || 0);
-        const following_count = Number(followingCount || 0);
-
-        // 🔥 notify socket server (fail olsa bile işlem başarılı kalsın)
-        emitFollowUpdateSafe({
-            target_user_id: following_uid, // takip edilen kişi
-            actor_user_id: myUid,          // takip eden kişi (ben)
+        return json(200, {
+            ok: true,
             following,
-            action,
-            followers_count,
-            following_count,
+            followers_count: Number(followersCount || 0),
+            following_count: Number(followingCount || 0),
         });
-
-        return json(200, { ok: true, following, followers_count, following_count });
     } catch (e) {
         const msg = String(e?.message || e);
         const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
@@ -100,25 +80,4 @@ function json(statusCode, body) {
         },
         body: JSON.stringify(body),
     };
-}
-
-async function emitFollowUpdateSafe(payload) {
-    try {
-        if (!SOCKET_FOLLOW_EMIT_URL) return;
-
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), 1500);
-
-        await fetch(SOCKET_FOLLOW_EMIT_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-socket-secret": SOCKET_SECRET,
-            },
-            body: JSON.stringify(payload),
-            signal: controller.signal,
-        });
-
-        clearTimeout(t);
-    } catch {}
 }

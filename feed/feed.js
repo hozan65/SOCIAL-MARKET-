@@ -9,9 +9,53 @@
     ✅ Follow state hydrate on refresh:
        - cache first
        - ✅ definitive check via Netlify function is_following (JWT)
+
+  ✅ REALTIME (Socket.IO):
+     - Emits: like:toggle, join:post
+     - Listens: post:like:update
 ========================= */
 
 console.log("✅ feed.js running");
+
+// =========================
+// REALTIME (Socket.IO)
+// =========================
+function getSocket() {
+    // feed.html içine eklediğin: window.rt.socket
+    return window.rt?.socket || null;
+}
+
+function rtEmit(eventName, payload) {
+    try {
+        const s = getSocket();
+        if (!s) return;
+        // connected değilse bile emit’i kuyruğa alabiliyor; yine de güvenli:
+        s.emit(eventName, payload);
+    } catch {}
+}
+
+function rtOn(eventName, handler) {
+    try {
+        const s = getSocket();
+        if (!s) return;
+        s.off?.(eventName); // aynı sayfada hot reload vs olursa çift dinleyici olmasın
+        s.on(eventName, handler);
+    } catch {}
+}
+
+// Like update geldiğinde UI güncelle
+rtOn("post:like:update", ({ postId, likeCount }) => {
+    try {
+        const pid = String(postId || "").trim();
+        if (!pid) return;
+
+        const btns = document.querySelectorAll(`.likeBtn[data-post-id="${CSS.escape(pid)}"]`);
+        btns.forEach((b) => {
+            const span = b.querySelector(".likeCount");
+            if (span) span.textContent = String(likeCount ?? 0);
+        });
+    } catch {}
+});
 
 // =========================
 // SUPABASE (READ ONLY)
@@ -78,7 +122,6 @@ function resolveImageUrl(image_path) {
     if (p.startsWith("http://") || p.startsWith("https://")) return p;
 
     // storage public bucket varsayımı:
-    // analyses image bucket adın farklıysa burayı değiştir
     return `${SUPABASE_URL}/storage/v1/object/public/analysis-images/${p}`;
 }
 
@@ -202,13 +245,13 @@ async function isFollowingUser(targetUserId) {
         const jwt = getJWT();
         const r = await fetch(`${FN_IS_FOLLOWING}?id=${encodeURIComponent(target)}`, {
             headers: { Authorization: `Bearer ${jwt}` },
-            cache: "no-store"
+            cache: "no-store",
         });
 
         const out = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(out?.error || `HTTP ${r.status}`);
         return !!out.is_following;
-    } catch (e) {
+    } catch {
         // 3) fallback cache
         try {
             const myId = await getMyUserId();
@@ -287,14 +330,18 @@ function renderPost(row) {
 async function hydrateNewPosts(justAddedRows) {
     if (!grid) return;
 
-    // like counts
+    // like counts + realtime room join
     for (const r of justAddedRows) {
         try {
             const postId = String(r.id);
             const c = await getLikeCount(postId);
+
             const btn = grid.querySelector(`.likeBtn[data-post-id="${CSS.escape(postId)}"]`);
             const span = btn?.querySelector(".likeCount");
             if (span) span.textContent = String(c);
+
+            // ✅ realtime: bu post için odaya katıl (like update sadece o post’a gelsin)
+            rtEmit("join:post", postId);
         } catch {}
     }
 
@@ -536,10 +583,23 @@ document.addEventListener("click", async (e) => {
     if (likeBtn) {
         const postId = likeBtn.dataset.postId;
         likeBtn.disabled = true;
+
         try {
             await toggleLike(postId);
+
+            // DB -> kesin sayı
             const c = await getLikeCount(postId);
-            likeBtn.querySelector(".likeCount").textContent = String(c);
+
+            // UI update (local)
+            const span = likeBtn.querySelector(".likeCount");
+            if (span) span.textContent = String(c);
+
+            // ✅ REALTIME: herkese yayın (post room)
+            // userId opsiyonel: best-effort
+            let userId = "";
+            try { userId = await getMyUserId(); } catch {}
+            rtEmit("like:toggle", { postId: String(postId), userId, likeCount: c });
+
         } catch (err) {
             alert("❌ " + (err?.message || err));
         } finally {
@@ -571,6 +631,8 @@ document.addEventListener("click", async (e) => {
                     saveFollowingSetToCache(myId, set);
                 }
             } catch {}
+
+            // (Follow realtime'i istersen sonraki dosyada ekleriz. Like ile finalledik.)
         } catch (err) {
             alert("❌ " + (err?.message || err));
         } finally {

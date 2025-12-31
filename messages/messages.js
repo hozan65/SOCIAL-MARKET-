@@ -21,6 +21,26 @@ let activeTo = null;
 let inboxCache = [];
 let lastFp = "";
 
+/* =========================
+   REALTIME (Socket.IO)
+   - uses: window.rt.socket (assets1/realtime.js)
+========================= */
+function getSocket() {
+    return window.rt?.socket || null;
+}
+function rtOn(ev, fn) {
+    const s = getSocket();
+    if (!s) return;
+    // double-bind olmasın
+    s.off?.(ev);
+    s.on(ev, fn);
+}
+function rtEmit(ev, payload) {
+    const s = getSocket();
+    if (!s) return;
+    s.emit(ev, payload);
+}
+
 /* helpers */
 const esc = (s) =>
     String(s ?? "").replace(/[&<>"']/g, (m) =>
@@ -117,6 +137,7 @@ async function loadMessages() {
 
     $msgList.scrollTop = $msgList.scrollHeight;
 
+    // mark read (DB)
     await apiPost("/.netlify/functions/dm_mark_read", {
         conversation_id: activeConversationId,
     });
@@ -144,53 +165,71 @@ async function openChat(to, cid, push) {
 /* events */
 $msgForm.onsubmit = async (e) => {
     e.preventDefault();
-    if (!$msgInput.value.trim()) return;
+    const body = $msgInput.value.trim();
+    if (!body) return;
     if (!activeConversationId) return;
 
+    // 1) DB'ye yaz (source of truth)
     await apiPost("/.netlify/functions/dm_send", {
         conversation_id: activeConversationId,
-        body: $msgInput.value,
+        body,
     });
 
+    // 2) UI local refresh
     $msgInput.value = "";
     lastFp = "";
     await loadMessages();
     await loadInbox();
+
+    // 3) ✅ REALTIME: karşı tarafa anında haber ver
+    // (DB başarılı olduktan sonra emit ediyoruz)
+    rtEmit("dm:send", {
+        conversation_id: String(activeConversationId),
+        to_id: String(activeTo || ""),
+        from_id: String(meId || ""),
+        body,
+        ts: Date.now(),
+    });
 };
 
 $chatBackBtn.onclick = () => {
     $app.classList.remove("showChat");
     activeConversationId = null;
+    activeTo = null;
 };
 
-/* ✅ REALTIME: socket DM geldiğinde anında yenile */
-window.addEventListener("sm:dm_new", async (e) => {
-    try {
-        const p = e.detail || {};
-        const cid = String(p.conversation_id || "").trim();
-        if (!cid) return;
+/* ✅ REALTIME: dm:new gelince anında yenile */
+function bindRealtimeDM() {
+    // Yeni mesaj event'i
+    rtOn("dm:new", async (p) => {
+        try {
+            const cid = String(p?.conversation_id || "").trim();
+            if (!cid) return;
 
-        await loadInbox();
+            // inbox yenile (badge/last message)
+            await loadInbox();
 
-        if (activeConversationId && String(activeConversationId) === cid) {
-            lastFp = ""; // force refresh
-            await loadMessages();
-        }
-    } catch {}
-});
+            // açık chat aynıysa mesajları yenile
+            if (activeConversationId && String(activeConversationId) === cid) {
+                lastFp = "";
+                await loadMessages();
+            }
+        } catch {}
+    });
+}
 
 /* boot */
 (async () => {
     const me = await account.get();
     meId = me.$id;
 
-    // ✅ realtime odasına gir (DM)
-    window.SM_ME_ID = meId;
-    if (window.SM_SOCKET) {
-        try {
-            window.SM_SOCKET.emit("auth_user", meId);
-        } catch {}
-    }
+    // ✅ user room’a gir (server.js’de auth_user var)
+    try {
+        rtEmit("auth_user", meId);
+    } catch {}
+
+    // realtime DM dinle
+    bindRealtimeDM();
 
     await loadInbox();
 
@@ -200,9 +239,9 @@ window.addEventListener("sm:dm_new", async (e) => {
         if (row) openChat(to, row.conversation_id, false);
     }
 
-    // fallback polling (realtime koparsa diye)
+    // ✅ fallback polling (realtime koparsa diye) — daha seyrek
     setInterval(async () => {
         await loadInbox();
         if (activeConversationId) await loadMessages();
-    }, 20000);
+    }, 45000);
 })();
