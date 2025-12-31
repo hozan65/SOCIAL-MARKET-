@@ -1,274 +1,278 @@
 // /messages/messages.js
-console.log("messages.js LOADED ✅", location.href);
+(() => {
+    console.log("messages.js LOADED ✅", location.href);
 
-const $ = (id) => document.getElementById(id);
-const inboxList = $("inboxList");
-const inboxHint = $("inboxHint");
-const peerName  = $("peerName");
-const peerAva   = $("peerAva");
-const msgList   = $("msgList");
-const msgHint   = $("msgHint");
-const msgForm   = $("msgForm");
-const msgInput  = $("msgInput");
-const backBtn   = $("chatBackBtn");
+    // ---------- Helpers ----------
+    const qs = (s, el = document) => el.querySelector(s);
+    const qsa = (s, el = document) => Array.from(el.querySelectorAll(s));
 
-const FN = "/.netlify/functions";
-const qs = (k) => new URLSearchParams(location.search).get(k);
-
-function setHint(el, t){ if (el) el.textContent = t || ""; }
-function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
-
-async function getJWT(){
-    if (window.SM_JWT_READY) await window.SM_JWT_READY;
-    const jwt = window.SM_JWT || localStorage.getItem("sm_jwt");
-    if (!jwt) throw new Error("Missing JWT (login required)");
-    return jwt;
-}
-
-async function apiGET(path){
-    const jwt = await getJWT();
-    const r = await fetch(`${FN}${path}`, {
-        headers:{ Authorization:`Bearer ${jwt}`, "X-Appwrite-JWT": jwt },
-    });
-    const j = await r.json().catch(()=> ({}));
-    if (!r.ok) throw new Error(j?.error || `GET ${path} failed (${r.status})`);
-    return j;
-}
-
-async function apiPOST(path, body){
-    const jwt = await getJWT();
-    const r = await fetch(`${FN}${path}`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json", Authorization:`Bearer ${jwt}`, "X-Appwrite-JWT": jwt },
-        body: JSON.stringify(body||{})
-    });
-    const j = await r.json().catch(()=> ({}));
-    if (!r.ok) throw new Error(j?.error || `POST ${path} failed (${r.status})`);
-    return j;
-}
-
-let ME = null;
-let ACTIVE_CONV = null;
-let ACTIVE_PEER = null;
-
-// realtime state
-let joinedConvId = null;
-let onDmNewBound = null;
-
-function setPeerUI(name, avatar){
-    peerName.textContent = name || "User";
-    peerAva.innerHTML = avatar
-        ? `<img src="${esc(avatar)}" style="width:36px;height:36px;border-radius:999px;object-fit:cover">`
-        : `<div style="width:36px;height:36px;border-radius:999px;background:rgba(0,0,0,.08)"></div>`;
-}
-
-function appendMessage(m){
-    const isMe = m.sender_id === ME;
-    const b = document.createElement("div");
-    b.style.cssText = `
-    max-width:70%; margin:8px 0; padding:10px 12px;
-    border-radius:14px; border:1px solid rgba(0,0,0,.08);
-    background: rgba(255,255,255,.85);
-    ${isMe ? "margin-left:auto" : "margin-right:auto"}
-  `;
-    b.innerHTML = `
-    <div style="font-weight:800">${esc(m.body || "")}</div>
-    <div style="opacity:.6;font-size:11px;margin-top:4px">${esc(m.created_at || "")}</div>
-  `;
-    msgList.appendChild(b);
-    msgList.scrollTop = msgList.scrollHeight;
-}
-
-function renderMessages(arr){
-    msgList.innerHTML = "";
-    for (const m of arr) appendMessage(m);
-    msgList.scrollTop = msgList.scrollHeight;
-}
-
-// ✅ socket join + listener (kritik)
-async function ensureRealtimeJoined(conversation_id){
-    const socket = window.SM_SOCKET;
-    if (!socket) {
-        console.warn("⚠️ SM_SOCKET yok -> realtime kapalı");
-        return;
-    }
-    if (!socket.connected) {
-        // bağlanmayı bekle
-        await new Promise((res) => {
-            const t = setTimeout(res, 1500);
-            socket.once("connect", () => { clearTimeout(t); res(); });
-        });
+    function getConversationId() {
+        const u = new URL(location.href);
+        return u.searchParams.get("conversation_id") || "";
     }
 
-    if (joinedConvId === conversation_id) return;
-
-    // önce eski listener'ı temizle
-    if (onDmNewBound) socket.off("dm:new", onDmNewBound);
-
-    const jwt = await getJWT();
-
-    // server'a auth+join iste
-    socket.emit("dm:join", { conversation_id, jwt });
-
-    // yeni mesaj event'i
-    onDmNewBound = (payload) => {
-        // payload: { conversation_id, message:{...} }
-        if (!payload?.conversation_id || payload.conversation_id !== conversation_id) return;
-        const m = payload.message;
-        if (!m) return;
-
-        // duplicate engel (id varsa)
-        if (m.id && msgList.querySelector?.(`[data-mid="${m.id}"]`)) return;
-
-        // append
-        const wrap = document.createElement("div");
-        wrap.dataset.mid = m.id || "";
-        // wrap içine bubble bas
-        const isMe = m.sender_id === ME;
-        wrap.style.cssText = `
-      max-width:70%; margin:8px 0; padding:10px 12px;
-      border-radius:14px; border:1px solid rgba(0,0,0,.08);
-      background: rgba(255,255,255,.85);
-      ${isMe ? "margin-left:auto" : "margin-right:auto"}
-    `;
-        wrap.innerHTML = `
-      <div style="font-weight:800">${esc(m.body || "")}</div>
-      <div style="opacity:.6;font-size:11px;margin-top:4px">${esc(m.created_at || "")}</div>
-    `;
-        msgList.appendChild(wrap);
-        msgList.scrollTop = msgList.scrollHeight;
-    };
-
-    socket.on("dm:new", onDmNewBound);
-
-    joinedConvId = conversation_id;
-    console.log("✅ joined realtime conv:", conversation_id);
-}
-
-async function loadInbox(){
-    setHint(inboxHint, "Loading…");
-    inboxList.innerHTML = "";
-
-    const j = await apiGET("/dm_inbox");
-    const list = j.list || [];
-
-    if (!list.length){
-        setHint(inboxHint, "No conversations yet.");
-        return;
+    function escapeHtml(str) {
+        return String(str || "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
     }
-    setHint(inboxHint, "");
 
-    for (const it of list){
-        const row = document.createElement("button");
-        row.type = "button";
-        row.style.cssText = "width:100%;border:0;background:transparent;padding:10px;text-align:left;cursor:pointer;border-radius:12px";
-        row.innerHTML = `
-      <div style="display:flex;gap:10px;align-items:center">
-        <div style="width:34px;height:34px;border-radius:999px;background:#eee;overflow:hidden">
-          ${it.other_avatar_url ? `<img src="${esc(it.other_avatar_url)}" style="width:100%;height:100%;object-fit:cover">` : ""}
-        </div>
-        <div style="min-width:0">
-          <div style="font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.other_name)}</div>
-          <div style="font-size:12px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.last_body || "")}</div>
+    // ---------- Appwrite JWT Refresh ----------
+    async function ensureJWT() {
+        // Senin projede account objesi nerede ise buraya düşür.
+        const account =
+            window.account ||
+            window.appwrite?.account ||
+            window.appwriteAccount ||
+            null;
+
+        if (!account?.createJWT) {
+            // createJWT yoksa burası patlar. En azından net hata verelim.
+            throw new Error("Appwrite account client not found (createJWT missing).");
+        }
+
+        const jwtObj = await account.createJWT(); // { jwt: "..." }
+        const jwt = jwtObj?.jwt;
+
+        if (!jwt) throw new Error("JWT not returned from Appwrite.");
+
+        localStorage.setItem("sm_jwt", jwt);
+        return jwt;
+    }
+
+    function getJWT() {
+        return localStorage.getItem("sm_jwt") || "";
+    }
+
+    // ---------- Netlify Functions API ----------
+    async function apiFetch(path, opts = {}) {
+        const url = `/.netlify/functions/${path.replace(/^\/+/, "")}`;
+
+        let jwt = getJWT();
+
+        const doReq = async () => {
+            const headers = new Headers(opts.headers || {});
+            if (jwt) headers.set("Authorization", `Bearer ${jwt}`);
+            headers.set("Accept", "application/json");
+
+            return fetch(url, {
+                ...opts,
+                headers
+            });
+        };
+
+        let r = await doReq();
+
+        // 401 => JWT refresh + 1 retry
+        if (r.status === 401) {
+            try {
+                jwt = await ensureJWT();
+                r = await doReq();
+            } catch (e) {
+                // refresh de olmadıysa
+                throw new Error("Invalid JWT");
+            }
+        }
+
+        if (!r.ok) {
+            const txt = await r.text().catch(() => "");
+            throw new Error(`HTTP ${r.status} ${txt}`.trim());
+        }
+
+        return r.json();
+    }
+
+    async function authUser() {
+        // Bu function sende var: /.netlify/functions/_auth_user
+        const data = await apiFetch("_auth_user", { method: "GET" });
+
+        // Senin _auth_user şu alanları döndürüyordu: user, uid, user_id
+        const uid = data?.uid || data?.user_id || data?.user?.$id || data?.user?.id || "";
+        const name = data?.user?.name || data?.user?.email || "";
+
+        if (!uid) throw new Error("Missing user id from _auth_user");
+
+        // global set (realtime.js join otomatik çalışsın diye)
+        window.APPWRITE_USER_ID = uid;
+        window.user_id = uid;
+        localStorage.setItem("sm_uid", uid);
+
+        return { uid, name, raw: data };
+    }
+
+    // ---------- UI Wiring ----------
+    const convoId = getConversationId();
+
+    // Senin HTML yapın değişik olabilir, ama minimum:
+    // - messages container: #dmList veya .dmList
+    // - input: #dmInput
+    // - send button: #dmSend
+    const listEl =
+        qs("#dmList") ||
+        qs(".dmList") ||
+        qs("#messagesList") ||
+        qs(".messagesList");
+
+    const inputEl =
+        qs("#dmInput") ||
+        qs("input[name='message']") ||
+        qs("textarea[name='message']") ||
+        qs("#messageInput");
+
+    const sendBtn =
+        qs("#dmSend") ||
+        qs("button[data-send]") ||
+        qs("#sendBtn");
+
+    function renderMessageRow(m, selfId) {
+        const mine = m.from_id === selfId;
+        const cls = mine ? "dmRow dmMine" : "dmRow dmTheirs";
+
+        const t = m.created_at ? new Date(m.created_at).toLocaleString() : "";
+        return `
+      <div class="${cls}" data-mid="${escapeHtml(m.id)}">
+        <div class="dmBubble">
+          <div class="dmText">${escapeHtml(m.text)}</div>
+          <div class="dmMeta">${escapeHtml(t)}</div>
         </div>
       </div>
     `;
-        row.onclick = () => {
-            const u = new URL(location.href);
-            u.searchParams.delete("to");
-            u.searchParams.set("conversation_id", it.conversation_id);
-            history.pushState({}, "", u.toString());
-            bootFromURL().catch(e => setHint(msgHint, e?.message || String(e)));
+    }
+
+    function addMessageToUI(m, selfId) {
+        if (!listEl) return;
+        listEl.insertAdjacentHTML("beforeend", renderMessageRow(m, selfId));
+        // scroll bottom
+        listEl.scrollTop = listEl.scrollHeight;
+    }
+
+    // Dedupe: aynı client_id veya id ile iki kez basmasın
+    const seen = new Set();
+    function seenKey(m) {
+        return m.client_id ? `c:${m.client_id}` : `id:${m.id}`;
+    }
+
+    // ---------- Socket Realtime ----------
+    function bindRealtime(selfId) {
+        const socket = window.rt?.socket;
+
+        if (!socket) {
+            console.warn("⚠️ realtime socket not ready (window.rt.socket missing)");
+            return;
+        }
+
+        // listener her zaman bir kere bağlansın
+        if (window.__dm_listener_bound) return;
+        window.__dm_listener_bound = true;
+
+        socket.on("dm:new", (msg) => {
+            try {
+                if (!msg) return;
+
+                // sadece bu conversation’a ait mi? (sende msg.conversation_id varsa kontrol et)
+                // yoksa yine basıyoruz, çünkü sende event formatı farklı olabilir.
+                if (msg.conversation_id && convoId && msg.conversation_id !== convoId) return;
+
+                const key = seenKey(msg);
+                if (seen.has(key)) return;
+                seen.add(key);
+
+                addMessageToUI(msg, selfId);
+            } catch (e) {
+                console.error("dm:new handler error", e);
+            }
+        });
+
+        // connect olduysa join at
+        socket.emit("join", { user_id: selfId });
+    }
+
+    // ---------- Send DM ----------
+    function sendDm(selfId, toId, text) {
+        const socket = window.rt?.socket;
+        if (!socket) throw new Error("Socket not connected");
+
+        const client_id = (crypto?.randomUUID?.() || String(Date.now()));
+        const payload = {
+            from_id: selfId,
+            to_id: toId,
+            text,
+            client_id,
+            conversation_id: convoId || undefined
         };
-        inboxList.appendChild(row);
-    }
-}
 
-async function bootFromURL(){
-    const to = qs("to");
-    ACTIVE_CONV = qs("conversation_id");
+        // UI optimistic
+        const optimistic = {
+            ...payload,
+            id: `tmp-${client_id}`,
+            created_at: new Date().toISOString()
+        };
 
-    // profile -> /messages/?to=...
-    if (to && !ACTIVE_CONV){
-        setHint(msgHint, "Opening chat…");
-        const ensured = await apiGET(`/dm_ensure?to=${encodeURIComponent(to)}`);
+        const k = seenKey(optimistic);
+        if (!seen.has(k)) {
+            seen.add(k);
+            addMessageToUI(optimistic, selfId);
+        }
 
-        const u = new URL(location.href);
-        u.searchParams.delete("to");
-        u.searchParams.set("conversation_id", ensured.conversation_id);
-        history.replaceState({}, "", u.toString());
-
-        ACTIVE_CONV = ensured.conversation_id;
-    }
-
-    if (!ACTIVE_CONV){
-        peerName.textContent = "Select a chat";
-        msgList.innerHTML = "";
-        setHint(msgHint, "Select a chat");
-        return;
-    }
-
-    setHint(msgHint, "Loading…");
-    const j = await apiGET(`/dm_get?conversation_id=${encodeURIComponent(ACTIVE_CONV)}`);
-
-    ACTIVE_PEER = j.peer || null;
-    setPeerUI(j.peer?.name || "User", j.peer?.avatar_url || "");
-    renderMessages(j.list || []);
-    setHint(msgHint, "");
-
-    // mark read
-    apiPOST("/dm_mark_read", { conversation_id: ACTIVE_CONV }).catch(()=>{});
-
-    // ✅ realtime join here
-    await ensureRealtimeJoined(ACTIVE_CONV);
-}
-
-async function sendMessage(text){
-    if (!ACTIVE_CONV) throw new Error("No active conversation");
-
-    // ✅ optimistic UI (anında göster)
-    appendMessage({ sender_id: ME, body: text, created_at: new Date().toISOString() });
-
-    // send
-    await apiPOST("/dm_send", { conversation_id: ACTIVE_CONV, body: text });
-
-    // inbox yenilensin (last message güncellensin)
-    loadInbox().catch(()=>{});
-}
-
-(async function init(){
-    try{
-        const me = await apiGET("/_auth_user");
-        ME = me.uid;
-        console.log("ME ✅", ME);
-
-        await loadInbox();
-        await bootFromURL();
-
-        backBtn?.addEventListener("click", () => {
-            const u = new URL(location.href);
-            u.searchParams.delete("to");
-            u.searchParams.delete("conversation_id");
-            history.pushState({}, "", u.toString());
-            bootFromURL().catch(()=>{});
+        socket.emit("dm:send", payload, (ack) => {
+            if (!ack?.ok) {
+                console.error("❌ dm:send failed", ack);
+                // istersen UI’da hata yazdır
+            } else {
+                // ack.row varsa gerçek id/created_at gelir, ister replace yaparsın
+                // şimdilik seen set ile duplicate engelliyoruz
+            }
         });
-
-        msgForm?.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const t = (msgInput.value || "").trim();
-            if (!t) return;
-            msgInput.value = "";
-            try{ await sendMessage(t); }
-            catch(err){ setHint(msgHint, err?.message || String(err)); }
-        });
-
-        window.addEventListener("popstate", () => {
-            bootFromURL().catch((e)=> setHint(msgHint, e?.message || String(e)));
-        });
-
-    } catch(e){
-        console.error(e);
-        setHint(inboxHint, "Login required");
-        setHint(msgHint, e?.message || String(e));
     }
+
+    // ---------- INIT ----------
+    async function init() {
+        try {
+            // 1) JWT’yi garanti altına al
+            await ensureJWT();
+
+            // 2) user doğrula
+            const me = await authUser();
+
+            // 3) realtime bind
+            bindRealtime(me.uid);
+
+            // 4) send UI
+            if (sendBtn && inputEl) {
+                const toId =
+                    new URL(location.href).searchParams.get("to_id") ||
+                    new URL(location.href).searchParams.get("user_id") ||
+                    ""; // sende alıcı id paramı farklı olabilir
+
+                sendBtn.addEventListener("click", () => {
+                    const text = String(inputEl.value || "").trim();
+                    if (!text) return;
+                    if (!toId) {
+                        console.error("❌ missing to_id in url (add ?to_id=...)");
+                        return;
+                    }
+                    inputEl.value = "";
+                    sendDm(me.uid, toId, text);
+                });
+
+                // Enter ile gönder
+                inputEl.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        sendBtn.click();
+                    }
+                });
+            }
+
+            console.log("✅ messages init ok", { uid: me.uid, convoId });
+        } catch (e) {
+            console.error(e);
+            console.error("init @ messages.js failed:", String(e?.message || e));
+        }
+    }
+
+    init();
 })();

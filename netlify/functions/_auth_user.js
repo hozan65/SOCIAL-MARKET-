@@ -1,3 +1,4 @@
+// netlify/functions/_auth_user.js
 import { getAppwriteUser } from "./_appwrite_user.js";
 
 export const handler = async (event) => {
@@ -19,7 +20,12 @@ export const handler = async (event) => {
         });
     } catch (e) {
         const msg = String(e?.message || e);
-        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
+        const low = msg.toLowerCase();
+        const status =
+            low.includes("jwt") || low.includes("unauthorized") || low.includes("invalid")
+                ? 401
+                : 500;
+
         return json(status, { error: msg });
     }
 };
@@ -30,6 +36,8 @@ function json(statusCode, body) {
         headers: {
             "Content-Type": "application/json",
             "Cache-Control": "no-store",
+
+            // Netlify function çağrısı same-origin olduğu için "*" sorun olmaz
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
