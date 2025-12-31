@@ -1,3 +1,5 @@
+console.log("messages.js LOADED ✅", location.href);
+
 import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
 
 (() => {
