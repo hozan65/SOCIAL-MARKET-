@@ -3,73 +3,73 @@ import { getAppwriteUser } from "./_appwrite_user.js";
 
 const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-const json = (s,b)=>({
-    statusCode:s,
-    headers:{
-        "Content-Type":"application/json",
-        "Cache-Control":"no-store",
-        "Access-Control-Allow-Origin":"*",
-        "Access-Control-Allow-Headers":"Content-Type, Authorization, X-Appwrite-JWT",
-        "Access-Control-Allow-Methods":"GET,OPTIONS"
+const json = (s, b) => ({
+    statusCode: s,
+    headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
+        "Access-Control-Allow-Methods": "GET,OPTIONS",
     },
-    body:JSON.stringify(b)
+    body: JSON.stringify(b),
 });
 
 export const handler = async (event) => {
-    try{
-        if (event.httpMethod === "OPTIONS") return json(200,{ok:true});
-        if (event.httpMethod !== "GET") return json(405,{error:"Method not allowed"});
+    try {
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+        if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
 
         const conversation_id = String(event.queryStringParameters?.conversation_id || "").trim();
-        if (!conversation_id) return json(400,{error:"Missing conversation_id"});
+        if (!conversation_id) return json(400, { error: "Missing conversation_id" });
 
         const { user } = await getAppwriteUser(event);
         const me = user?.$id;
-        if (!me) return json(401,{error:"Unauthorized"});
+        if (!me) return json(401, { error: "Unauthorized" });
 
-        // ✅ must be participant
         const { data: conv, error: e1 } = await sb
             .from("conversations")
             .select("id,user1_id,user2_id")
             .eq("id", conversation_id)
             .maybeSingle();
 
-        if (e1) return json(500,{error:e1.message});
-        if (!conv?.id) return json(404,{error:"Conversation not found"});
-        if (conv.user1_id !== me && conv.user2_id !== me) return json(403,{error:"Forbidden"});
+        if (e1) return json(500, { error: e1.message });
+        if (!conv?.id) return json(404, { error: "Conversation not found" });
+
+        // ✅ participant check
+        if (conv.user1_id !== me && conv.user2_id !== me) return json(403, { error: "Forbidden" });
 
         const otherId = conv.user1_id === me ? conv.user2_id : conv.user1_id;
 
-        const { data: prof, error: e2 } = await sb
+        const { data: peer, error: e2 } = await sb
             .from("profiles")
             .select("appwrite_user_id,name,avatar_url")
             .eq("appwrite_user_id", otherId)
             .maybeSingle();
 
-        if (e2) return json(500,{error:e2.message});
+        if (e2) return json(500, { error: e2.message });
 
         const { data: rows, error: e3 } = await sb
             .from("messages")
-            .select("id,conversation_id,sender_id,body,created_at")
+            .select("id,conversation_id,sender_id,body,created_at,read_at")
             .eq("conversation_id", conversation_id)
-            .order("created_at", { ascending:true })
+            .order("created_at", { ascending: true })
             .limit(500);
 
-        if (e3) return json(500,{error:e3.message});
+        if (e3) return json(500, { error: e3.message });
 
-        return json(200,{
-            ok:true,
+        return json(200, {
+            ok: true,
             peer: {
                 id: otherId,
-                name: prof?.name || "User",
-                avatar_url: prof?.avatar_url || ""
+                name: peer?.name || "User",
+                avatar_url: peer?.avatar_url || "",
             },
-            list: rows || []
+            list: rows || [],
         });
-
-    } catch(e){
+    } catch (e) {
         const msg = String(e?.message || e);
         const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
-        return json(status,{error:msg});
+        return json(status, { error: msg });
     }
 };

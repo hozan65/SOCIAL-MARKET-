@@ -11,11 +11,13 @@ export async function getAppwriteUser(event) {
     const endpoint = process.env.APPWRITE_ENDPOINT;
     const project = process.env.APPWRITE_PROJECT_ID;
 
+    if (!endpoint || !project) throw new Error("Missing APPWRITE env vars");
+
     const res = await fetch(`${endpoint.replace(/\/$/, "")}/account`, {
         headers: {
             "X-Appwrite-Project": project,
-            "X-Appwrite-JWT": jwt
-        }
+            "X-Appwrite-JWT": jwt,
+        },
     });
 
     if (!res.ok) throw new Error("Invalid JWT");

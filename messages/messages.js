@@ -2,7 +2,6 @@
 console.log("messages.js LOADED ✅", location.href);
 
 const $ = (id) => document.getElementById(id);
-
 const inboxList = $("inboxList");
 const inboxHint = $("inboxHint");
 const peerName  = $("peerName");
@@ -14,14 +13,10 @@ const msgInput  = $("msgInput");
 const backBtn   = $("chatBackBtn");
 
 const FN = "/.netlify/functions";
+const qs = (k) => new URLSearchParams(location.search).get(k);
 
-function setHint(el, txt){ if (el) el.textContent = txt || ""; }
-function esc(s){
-    return String(s ?? "").replace(/[&<>"']/g, m =>
-        ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])
-    );
-}
-function qs(name){ return new URLSearchParams(location.search).get(name); }
+function setHint(el, t){ if (el) el.textContent = t || ""; }
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
 
 async function getJWT(){
     if (window.SM_JWT_READY) await window.SM_JWT_READY;
@@ -29,39 +24,28 @@ async function getJWT(){
     if (!jwt) throw new Error("Missing JWT (login required)");
     return jwt;
 }
-
 async function apiGET(path){
     const jwt = await getJWT();
-    const r = await fetch(`${FN}${path}`, {
-        headers: { Authorization: `Bearer ${jwt}`, "X-Appwrite-JWT": jwt }
-    });
+    const r = await fetch(`${FN}${path}`, { headers:{ Authorization:`Bearer ${jwt}`, "X-Appwrite-JWT": jwt } });
     const j = await r.json().catch(()=> ({}));
-    if (!r.ok || j?.error) throw new Error(j?.error || `GET ${path} failed (${r.status})`);
+    if (!r.ok) throw new Error(j?.error || `GET ${path} failed (${r.status})`);
     return j;
 }
-
 async function apiPOST(path, body){
     const jwt = await getJWT();
     const r = await fetch(`${FN}${path}`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-            "X-Appwrite-JWT": jwt
-        },
-        body: JSON.stringify(body || {})
+        method:"POST",
+        headers:{ "Content-Type":"application/json", Authorization:`Bearer ${jwt}`, "X-Appwrite-JWT": jwt },
+        body: JSON.stringify(body||{})
     });
     const j = await r.json().catch(()=> ({}));
-    if (!r.ok || j?.error) throw new Error(j?.error || `POST ${path} failed (${r.status})`);
+    if (!r.ok) throw new Error(j?.error || `POST ${path} failed (${r.status})`);
     return j;
 }
 
-// ---------------- state ----------------
 let ME = null;
-let ACTIVE_CONV = null; // conversation_id
-let ACTIVE_TO = null;   // peer id (when opening from profile)
+let ACTIVE_CONV = null;
 
-// ---------------- UI ----------------
 function setPeerUI(name, avatar){
     peerName.textContent = name || "User";
     peerAva.innerHTML = avatar
@@ -75,41 +59,32 @@ function renderMessages(arr){
         const isMe = m.sender_id === ME;
         const b = document.createElement("div");
         b.style.cssText = `
-      max-width:70%;
-      margin:8px 0;
-      padding:10px 12px;
-      border-radius:14px;
-      background:#fff;
-      border:1px solid rgba(0,0,0,.08);
+      max-width:70%; margin:8px 0; padding:10px 12px;
+      border-radius:14px; border:1px solid rgba(0,0,0,.08);
+      background: rgba(255,255,255,.85);
       ${isMe ? "margin-left:auto" : "margin-right:auto"}
     `;
-        b.innerHTML = `<div style="font-weight:800">${esc(m.body)}</div>`;
+        b.innerHTML = `<div style="font-weight:800">${esc(m.body || "")}</div>
+                   <div style="opacity:.6;font-size:11px;margin-top:4px">${esc(m.created_at || "")}</div>`;
         msgList.appendChild(b);
     }
     msgList.scrollTop = msgList.scrollHeight;
 }
 
-// ---------------- inbox ----------------
 async function loadInbox(){
     setHint(inboxHint, "Loading…");
     inboxList.innerHTML = "";
-
     const j = await apiGET("/dm_inbox");
-    console.log("dm_inbox ✅", j);
-
     const list = j.list || [];
     if (!list.length){
-        setHint(inboxHint, "No conversations");
+        setHint(inboxHint, "No conversations yet.");
         return;
     }
     setHint(inboxHint, "");
-
     for (const it of list){
         const row = document.createElement("button");
         row.type = "button";
-        row.style.cssText =
-            "width:100%;border:0;background:transparent;padding:10px;text-align:left;cursor:pointer;border-radius:12px";
-
+        row.style.cssText = "width:100%;border:0;background:transparent;padding:10px;text-align:left;cursor:pointer;border-radius:12px";
         row.innerHTML = `
       <div style="display:flex;gap:10px;align-items:center">
         <div style="width:34px;height:34px;border-radius:999px;background:#eee;overflow:hidden">
@@ -121,7 +96,6 @@ async function loadInbox(){
         </div>
       </div>
     `;
-
         row.onclick = () => {
             const u = new URL(location.href);
             u.searchParams.delete("to");
@@ -129,37 +103,19 @@ async function loadInbox(){
             history.pushState({}, "", u.toString());
             bootFromURL();
         };
-
         inboxList.appendChild(row);
     }
 }
 
-// ---------------- ensure / open chat ----------------
-async function ensureConversationWith(to){
-    // dm_ensure: creates or returns conversation_id + peer profile
-    const j = await apiGET(`/dm_ensure?to=${encodeURIComponent(to)}`);
-    return j; // { ok:true, conversation_id, peer:{id,name,avatar_url} }
-}
-
-async function loadChatByConversationId(conversation_id){
-    const j = await apiGET(`/dm_get?conversation_id=${encodeURIComponent(conversation_id)}`);
-    // { ok:true, peer:{...}, list:[...] }
-    if (j.peer) setPeerUI(j.peer.name, j.peer.avatar_url);
-    renderMessages(j.list || []);
-    await apiPOST("/dm_mark_read", { conversation_id });
-}
-
 async function bootFromURL(){
-    setHint(msgHint, "");
-    ACTIVE_TO = qs("to");
+    const to = qs("to");
     ACTIVE_CONV = qs("conversation_id");
 
-    // 1) profile -> /messages/?to=...
-    if (ACTIVE_TO && !ACTIVE_CONV){
+    // profile -> /messages/?to=...
+    if (to && !ACTIVE_CONV){
         setHint(msgHint, "Opening chat…");
-        const ensured = await ensureConversationWith(ACTIVE_TO);
+        const ensured = await apiGET(`/dm_ensure?to=${encodeURIComponent(to)}`);
 
-        // URL'yi conversation_id ile sabitle
         const u = new URL(location.href);
         u.searchParams.delete("to");
         u.searchParams.set("conversation_id", ensured.conversation_id);
@@ -169,7 +125,6 @@ async function bootFromURL(){
         setPeerUI(ensured.peer?.name || "User", ensured.peer?.avatar_url || "");
     }
 
-    // 2) inbox click -> /messages/?conversation_id=...
     if (!ACTIVE_CONV){
         peerName.textContent = "Select a chat";
         msgList.innerHTML = "";
@@ -177,23 +132,26 @@ async function bootFromURL(){
         return;
     }
 
-    await loadChatByConversationId(ACTIVE_CONV);
+    setHint(msgHint, "Loading…");
+    const j = await apiGET(`/dm_get?conversation_id=${encodeURIComponent(ACTIVE_CONV)}`);
+    setPeerUI(j.peer?.name || "User", j.peer?.avatar_url || "");
+    renderMessages(j.list || []);
+    setHint(msgHint, "");
+
+    // mark read
+    apiPOST("/dm_mark_read", { conversation_id: ACTIVE_CONV }).catch(()=>{});
 }
 
-// ---------------- send ----------------
 async function sendMessage(text){
     if (!ACTIVE_CONV) throw new Error("No active conversation");
-
     await apiPOST("/dm_send", { conversation_id: ACTIVE_CONV, body: text });
-    await loadChatByConversationId(ACTIVE_CONV);
+    await bootFromURL();
 }
 
-// ---------------- init ----------------
 (async function init(){
     try{
-        // who am i
-        const meResp = await apiGET("/_auth_user");
-        ME = meResp.uid;
+        const me = await apiGET("/_auth_user");
+        ME = me.uid;
         console.log("ME ✅", ME);
 
         await loadInbox();
@@ -201,8 +159,8 @@ async function sendMessage(text){
 
         backBtn?.addEventListener("click", () => {
             const u = new URL(location.href);
-            u.searchParams.delete("conversation_id");
             u.searchParams.delete("to");
+            u.searchParams.delete("conversation_id");
             history.pushState({}, "", u.toString());
             bootFromURL();
         });
@@ -212,11 +170,8 @@ async function sendMessage(text){
             const t = (msgInput.value || "").trim();
             if (!t) return;
             msgInput.value = "";
-            try{
-                await sendMessage(t);
-            } catch(err){
-                setHint(msgHint, err?.message || String(err));
-            }
+            try{ await sendMessage(t); }
+            catch(err){ setHint(msgHint, err?.message || String(err)); }
         });
 
         window.addEventListener("popstate", () => {
