@@ -1,28 +1,52 @@
 /* =========================
-   LAYOUT
+   RESET / SAFETY
+========================= */
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+    margin:0;
+    overflow-x:hidden;          /* ✅ mobilde sağa sola kayma yok */
+}
+
+/* =========================
+   PAGE BACKGROUND (LIGHT SEA BLUE)
 ========================= */
 .msgShell{
     padding-top:14px;
+    min-height:calc(100vh - 90px);
 }
 
+.msgShell,
+.msgApp{
+    background:
+            radial-gradient(1000px 520px at 20% 18%, rgba(70,160,255,.22), transparent 60%),
+            radial-gradient(900px 520px at 82% 26%, rgba(90,200,255,.18), transparent 60%),
+            linear-gradient(180deg, #eaf6ff 0%, #f4fbff 45%, #ffffff 100%);
+}
+
+/* =========================
+   LAYOUT
+========================= */
 .msgApp{
     height:calc(100vh - 90px);
     display:grid;
     grid-template-columns:340px 1fr;
     gap:14px;
+    min-height:0;
 }
 
 /* =========================
-   PANELS
+   PANELS (NO SHADOW, SEMI-TRANSPARENT)
 ========================= */
 .msgLeft,
 .msgRight{
-    background:#ffffff;
+    background: rgba(255,255,255,.72);   /* ✅ şeffaf panel */
     border-radius:16px;
     border:1px solid rgba(0,0,0,.08);
-    box-shadow:0 10px 30px rgba(0,0,0,.06);
+    box-shadow:none;                      /* ✅ shadow yok */
     overflow:hidden;
     min-height:0;
+    backdrop-filter: blur(10px);
 }
 
 /* =========================
@@ -36,23 +60,24 @@
 .leftTop{
     padding:12px;
     border-bottom:1px solid rgba(0,0,0,.06);
+    background: rgba(255,255,255,.55);
 }
 
 .leftTitle{
     font-size:15px;
-    font-weight:1000;
+    font-weight:900;
     margin-bottom:8px;
-    color:#222;
+    color:#111;
 }
 
 .leftSearch{
     width:100%;
     height:38px;
     border-radius:10px;
-    border:1px solid rgba(0,0,0,.12);
+    border:1px solid rgba(0,0,0,.10);
     padding:0 10px;
-    font-weight:900;
-    background:#fff;
+    font-weight:700;
+    background: rgba(255,255,255,.65);
     outline:none;
 }
 
@@ -62,28 +87,32 @@
     padding:10px;
 }
 
-/* inbox item */
+/* inbox item (daha sade) */
 .chatItem{
     display:flex;
     gap:10px;
     padding:10px;
     border-radius:12px;
     cursor:pointer;
-    border:1px solid transparent;
-    background:#f6f7f9;
+    border:1px solid rgba(0,0,0,.06);
+    background: rgba(255,255,255,.55);  /* ✅ şeffaf kutu */
     margin-bottom:8px;
 }
 
+.chatItem:hover{
+    background: rgba(255,255,255,.70);
+}
+
 .chatItem.active{
-    background:#eef1f5;
-    border-color:rgba(0,0,0,.08);
+    background: rgba(255,255,255,.85);
+    border-color: rgba(0,0,0,.10);
 }
 
 .chatAva{
     width:40px;
     height:40px;
     border-radius:999px;
-    background:#ddd;
+    background: rgba(0,0,0,.08);
     overflow:hidden;
 }
 
@@ -93,23 +122,30 @@
     object-fit:cover;
 }
 
-.chatMain{flex:1}
+.chatMain{ flex:1; min-width:0; }
 
 .chatName{
-    font-weight:1000;
+    font-weight:900;
     font-size:14px;
-    color:#222;
+    color:#111;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
 }
 
 .chatLast{
     font-size:12px;
     opacity:.65;
     margin-top:3px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
 }
 
 .chatTime{
     font-size:11px;
-    opacity:.6;
+    opacity:.55;
+    white-space:nowrap;
 }
 
 /* =========================
@@ -127,17 +163,18 @@
     gap:10px;
     padding:10px;
     border-bottom:1px solid rgba(0,0,0,.06);
+    background: rgba(255,255,255,.55);
 }
 
-/* ONLY ONE BACK BUTTON */
+/* back button */
 .chatBack{
     width:38px;
     height:38px;
     border-radius:10px;
-    border:1px solid rgba(0,0,0,.12);
-    background:#fff;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.70);
     font-size:18px;
-    font-weight:1000;
+    font-weight:900;
     cursor:pointer;
 }
 
@@ -145,13 +182,14 @@
     display:flex;
     align-items:center;
     gap:10px;
+    min-width:0;
 }
 
 .peerAva{
     width:36px;
     height:36px;
     border-radius:999px;
-    background:#ddd;
+    background: rgba(0,0,0,.08);
     overflow:hidden;
 }
 
@@ -161,125 +199,133 @@
     object-fit:cover;
 }
 
+.peerMeta{ min-width:0; }
+
 .peerName{
-    font-weight:1000;
+    font-weight:900;
     font-size:14px;
+    color:#111;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
 }
 
 .peerSub{
     font-size:12px;
     opacity:.6;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
 }
 
 /* =========================
-   CHAT BODY
-========================= */
-/* =========================
-   CHAT BACKGROUND (SOFT BLUE-WHITE)
+   CHAT BACKGROUND (LIGHT SEA)
 ========================= */
 .chatViewport{
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
 
     background:
-            radial-gradient(
-                    900px 500px at 15% 20%,
-                    rgba(120,170,255,.22),
-                    transparent 60%
-            ),
-            radial-gradient(
-                    800px 500px at 85% 30%,
-                    rgba(120,170,255,.18),
-                    transparent 60%
-            ),
-            linear-gradient(
-                    180deg,
-                    #f3f8ff 0%,
-                    #f9fbff 60%,
-                    #ffffff 100%
-            );
+            radial-gradient(900px 520px at 18% 22%, rgba(70,160,255,.18), transparent 60%),
+            radial-gradient(800px 520px at 85% 28%, rgba(80,210,255,.14), transparent 60%),
+            linear-gradient(180deg, #edf8ff 0%, #f7fcff 65%, #ffffff 100%);
 }
 
-
-/* SCROLL */
+/* scroll */
 .msgBody{
     flex:1;
     overflow-y:auto;
+    overflow-x:hidden;  /* ✅ yatay kayma yok */
     padding:14px;
 }
 
 /* =========================
-   MESSAGE BUBBLES (DULL)
+   MESSAGE ROWS / BUBBLES (TRANSPARENT, NO SHADOW)
+   Senin JS "msgRow" + "msgBubble mine/theirs" kullanıyor.
 ========================= */
-.bubble{
-    max-width:70%;
+.msgRow{
+    display:flex;
+    margin-bottom:10px;
+}
+
+.msgRow .msgBubble{
+    max-width:72%;
     padding:10px 14px;
     border-radius:14px;
-    margin-bottom:10px;
-    background:#ffffff;
+    background: rgba(255,255,255,.62);     /* ✅ şeffaf */
     border:1px solid rgba(0,0,0,.06);
-    box-shadow:none;
-    font-weight:900;
-    color:#222;
+    box-shadow:none;                        /* ✅ shadow yok */
+    color:#111;
     word-break:break-word;
 }
 
-/* YOUR MESSAGE */
-.bubble.me{
+.msgRow .msgBubble.mine{
     margin-left:auto;
-    background:#e9eef4;        /* DULL GRAY-BLUE */
-    border-color:#d4dbe3;
+    background: rgba(235,242,250,.75);      /* ✅ çok açık mavi-gri */
+    border-color: rgba(0,0,0,.07);
 }
 
-/* META */
-.metaRow{
+.msgRow .msgBubble.theirs{
+    margin-right:auto;
+}
+
+/* text + meta */
+.msgText{
+    font-weight:700;
+    line-height:1.35;
+}
+
+.msgMeta{
     font-size:11px;
     opacity:.55;
-    margin-top:4px;
-    display:flex;
-    justify-content:flex-end;
-    gap:4px;
+    margin-top:6px;
+    text-align:right;
 }
 
-.tick{opacity:.5}
-.tick.read{opacity:.9}
-
 /* =========================
-   COMPOSER
+   COMPOSER (SIMPLE)
 ========================= */
 .msgComposer{
     display:flex;
     gap:10px;
     padding:10px;
     border-top:1px solid rgba(0,0,0,.06);
+    background: rgba(255,255,255,.55);
 }
 
 .msgInput{
     flex:1;
     height:40px;
     border-radius:10px;
-    border:1px solid rgba(0,0,0,.12);
+    border:1px solid rgba(0,0,0,.10);
     padding:0 12px;
-    font-weight:900;
+    font-weight:700;
     outline:none;
+    background: rgba(255,255,255,.70);
 }
 
 .msgSend{
     width:40px;
     height:40px;
     border-radius:10px;
-    border:1px solid rgba(0,0,0,.12);
-    background:#fff;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.70);
     cursor:pointer;
 }
 
 .sendIcon{
     width:18px;
     height:18px;
-    fill:#333;
+    fill:#222;
+}
+
+/* hint */
+.msgHint{
+    font-size:12px;
+    padding:8px 12px;
+    opacity:.75;
 }
 
 /* =========================
@@ -291,15 +337,17 @@
         height:calc(100vh - 70px);
     }
 
-    .msgLeft{height:100%}
-    .msgRight{display:none;height:100%}
+    .msgLeft{ height:100%; }
+    .msgRight{ display:none; height:100%; }
 
-    .msgApp.showChat .msgLeft{display:none}
-    .msgApp.showChat .msgRight{display:flex}
+    .msgApp.showChat .msgLeft{ display:none; }
+    .msgApp.showChat .msgRight{ display:flex; }
 
     .chatBack{
         width:44px;
         height:44px;
         font-size:20px;
     }
+
+    .msgRow .msgBubble{ max-width:86%; }   /* ✅ mobilde daha geniş */
 }
