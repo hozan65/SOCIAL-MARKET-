@@ -21,10 +21,12 @@
         console.error("❌ realtime error:", e.message);
     });
 
-    // expose
+    // expose (🔥 KRİTİK)
     window.rt.socket = socket;
+    window.SM_SOCKET = socket; // 👈 BUNU EKLE
+    console.log("✅ SM_SOCKET exposed");
 
-    // small helpers (optional)
+    // helpers
     window.rt.emit = (ev, payload) => socket.emit(ev, payload);
     window.rt.on = (ev, fn) => socket.on(ev, fn);
 })();
