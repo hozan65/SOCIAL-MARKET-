@@ -20,13 +20,13 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
     }
 
     function authHeaders(extra = {}) {
-        const jwt = getJWT() || ""; // sm_jwt
-        const h = { ...extra };
-        if (jwt) h["X-Appwrite-JWT"] = jwt;
-        // bazı function’lar x-jwt de kabul ediyor, ikisini de basalım:
-        if (jwt) h["x-jwt"] = jwt;
-        return h;
+        const jwt = getJWT() || "";
+        return {
+            ...extra,
+            ...(jwt ? { "X-Appwrite-JWT": jwt, "x-jwt": jwt, "Authorization": `Bearer ${jwt}` } : {})
+        };
     }
+
 
     function renderMessage(m, { optimistic = false } = {}) {
         const row = document.createElement("div");
