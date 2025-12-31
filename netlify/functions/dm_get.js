@@ -1,75 +1,68 @@
-import { createClient } from "@supabase/supabase-js";
+// netlify/functions/dm_get.js
 import { getAppwriteUser } from "./_appwrite_user.js";
+import { createClient } from "@supabase/supabase-js";
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-
-const json = (s, b) => ({
-    statusCode: s,
-    headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
-        "Access-Control-Allow-Methods": "GET,OPTIONS",
-    },
-    body: JSON.stringify(b),
-});
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
 
-        const conversation_id = String(event.queryStringParameters?.conversation_id || "").trim();
+        const { user } = await getAppwriteUser(event);
+        const uid = user.$id;
+
+        const q = event.queryStringParameters || {};
+        const conversation_id = q.conversation_id || "";
         if (!conversation_id) return json(400, { error: "Missing conversation_id" });
 
-        const { user } = await getAppwriteUser(event);
-        const me = user?.$id;
-        if (!me) return json(401, { error: "Unauthorized" });
+        if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+            throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
+        }
 
-        const { data: conv, error: e1 } = await sb
+        const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
+
+        // conversation doğrula
+        const { data: convo, error: e1 } = await sb
             .from("conversations")
-            .select("id,user1_id,user2_id")
+            .select("id,user_a,user_b")
             .eq("id", conversation_id)
-            .maybeSingle();
+            .single();
 
-        if (e1) return json(500, { error: e1.message });
-        if (!conv?.id) return json(404, { error: "Conversation not found" });
+        if (e1) throw new Error(e1.message);
+        if (!(convo.user_a === uid || convo.user_b === uid)) return json(403, { error: "Forbidden" });
 
-        // ✅ participant check
-        if (conv.user1_id !== me && conv.user2_id !== me) return json(403, { error: "Forbidden" });
+        const peer_id = convo.user_a === uid ? convo.user_b : convo.user_a;
 
-        const otherId = conv.user1_id === me ? conv.user2_id : conv.user1_id;
-
-        const { data: peer, error: e2 } = await sb
-            .from("profiles")
-            .select("appwrite_user_id,name,avatar_url")
-            .eq("appwrite_user_id", otherId)
-            .maybeSingle();
-
-        if (e2) return json(500, { error: e2.message });
-
-        const { data: rows, error: e3 } = await sb
+        const { data, error } = await sb
             .from("messages")
-            .select("id,conversation_id,sender_id,body,created_at,read_at")
+            .select("id,conversation_id,from_id,to_id,text,created_at,client_id")
             .eq("conversation_id", conversation_id)
-            .order("created_at", { ascending: true })
-            .limit(500);
+            .order("created_at", { ascending: true });
 
-        if (e3) return json(500, { error: e3.message });
+        if (error) throw new Error(error.message);
 
-        return json(200, {
-            ok: true,
-            peer: {
-                id: otherId,
-                name: peer?.name || "User",
-                avatar_url: peer?.avatar_url || "",
-            },
-            list: rows || [],
-        });
+        return json(200, { ok: true, peer_id, rows: data || [] });
     } catch (e) {
         const msg = String(e?.message || e);
-        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
+        const low = msg.toLowerCase();
+        const status = low.includes("jwt") ? 401 : 500;
         return json(status, { error: msg });
     }
 };
+
+function json(statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+        },
+        body: JSON.stringify(body),
+    };
+}

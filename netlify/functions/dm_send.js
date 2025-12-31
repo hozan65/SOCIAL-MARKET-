@@ -3,7 +3,8 @@ import { getAppwriteUser } from "./_appwrite_user.js";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
+const SUPABASE_SERVICE_ROLE =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 
 export const handler = async (event) => {
     try {
@@ -14,8 +15,9 @@ export const handler = async (event) => {
         const from_id = user.$id;
 
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
-            throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE env");
+            throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
         }
+
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
         const body = JSON.parse(event.body || "{}");
@@ -24,7 +26,7 @@ export const handler = async (event) => {
         if (!to_id) return json(400, { error: "Missing to_id" });
         if (!text || !String(text).trim()) return json(400, { error: "Missing text" });
 
-        // conversation yoksa oluştur
+        // conversation_id yoksa otomatik conversation bul/oluştur
         if (!conversation_id) {
             const a = from_id, b = to_id;
 
@@ -50,7 +52,7 @@ export const handler = async (event) => {
             }
         }
 
-        // insert message (tablo adı sende farklıysa burayı değiştir)
+        // message insert
         const { data: row, error: e3 } = await sb
             .from("messages")
             .insert([{
@@ -65,7 +67,7 @@ export const handler = async (event) => {
 
         if (e3) throw new Error(e3.message);
 
-        // update conversation preview
+        // conversation preview update
         await sb
             .from("conversations")
             .update({ last_message: String(text).slice(0, 140), last_at: new Date().toISOString() })
@@ -74,7 +76,8 @@ export const handler = async (event) => {
         return json(200, { ok: true, conversation_id, row });
     } catch (e) {
         const msg = String(e?.message || e);
-        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
+        const low = msg.toLowerCase();
+        const status = low.includes("jwt") ? 401 : 500;
         return json(status, { error: msg });
     }
 };

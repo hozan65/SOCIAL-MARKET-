@@ -3,7 +3,8 @@ import { getAppwriteUser } from "./_appwrite_user.js";
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
+const SUPABASE_SERVICE_ROLE =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 
 export const handler = async (event) => {
     try {
@@ -16,22 +17,20 @@ export const handler = async (event) => {
         const me = user.$id;
 
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
-            throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE env");
+            throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
         }
+
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
-        // peer_id GET ?peer_id=... veya POST body {peer_id}
         const qs = event.queryStringParameters || {};
         const body = event.httpMethod === "POST" ? JSON.parse(event.body || "{}") : {};
         const peer_id = body.peer_id || qs.peer_id || "";
+
         if (!peer_id) return json(400, { error: "Missing peer_id" });
         if (peer_id === me) return json(400, { error: "peer_id cannot be self" });
 
-        // Sende conversations tablosu yoksa burada uyarlamak gerekir.
-        // Varsayım: conversations(user_a, user_b)
         const a = me, b = peer_id;
 
-        // mevcut convo var mı?
         const { data: existing, error: e1 } = await sb
             .from("conversations")
             .select("id,user_a,user_b")
@@ -44,7 +43,6 @@ export const handler = async (event) => {
             return json(200, { ok: true, conversation_id: existing[0].id, existing: true });
         }
 
-        // yoksa oluştur
         const { data: created, error: e2 } = await sb
             .from("conversations")
             .insert([{ user_a: a, user_b: b, last_message: "", last_at: new Date().toISOString() }])
@@ -56,7 +54,8 @@ export const handler = async (event) => {
         return json(200, { ok: true, conversation_id: created.id, existing: false });
     } catch (e) {
         const msg = String(e?.message || e);
-        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
+        const low = msg.toLowerCase();
+        const status = low.includes("jwt") ? 401 : 500;
         return json(status, { error: msg });
     }
 };
