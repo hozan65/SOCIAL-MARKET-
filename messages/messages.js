@@ -2,25 +2,19 @@
 (() => {
     console.log("messages.js LOADED ✅");
 
-    // -----------------------------
-    // DOM
-    // -----------------------------
     const msgList = document.getElementById("msgList");
     const msgForm = document.getElementById("msgForm");
     const msgInput = document.getElementById("msgInput");
 
-    // -----------------------------
-    // STATE
-    // -----------------------------
-    const params = new URL(location.href).searchParams;
+    const sp = new URL(location.href).searchParams;
+
     const state = {
-        me: localStorage.getItem("sm_uid"),
-        conversation_id: params.get("conversation_id") || "",
+        me: localStorage.getItem("sm_uid") || "",
+        conversation_id: sp.get("conversation_id") || "",
+        // ✅ sen bazen ?to= kullanıyorsun, bazen ?to_id=
+        peer_id: sp.get("to_id") || sp.get("to") || "",
     };
 
-    // -----------------------------
-    // HELPERS
-    // -----------------------------
     function esc(s) {
         return String(s || "")
             .replaceAll("&", "&amp;")
@@ -33,15 +27,12 @@
     function renderMessage(m) {
         const mine = m.from_id === state.me;
         const cls = mine ? "mMine" : "mTheirs";
-        const time = m.created_at
-            ? new Date(m.created_at).toLocaleTimeString()
-            : "";
-
+        const time = m.created_at ? new Date(m.created_at).toLocaleTimeString() : "";
         return `
       <div class="mRow ${cls}">
         <div class="mBubble">
           <div class="mText">${esc(m.text)}</div>
-          <div class="mTime">${time}</div>
+          <div class="mTime">${esc(time)}</div>
         </div>
       </div>
     `;
@@ -52,16 +43,26 @@
         msgList.scrollTop = msgList.scrollHeight;
     }
 
-    // -----------------------------
-    // SOCKET – REALTIME (SERVER dm_new)
-    // -----------------------------
+    // ✅ SOCKET: server emit adı dm_new
     const socket = window.rt?.socket;
     if (socket) {
         socket.on("dm_new", (m) => {
             console.log("📩 dm_new received:", m);
 
-            // sadece açık conversation ise ekrana bas
-            if (m.conversation_id === state.conversation_id) {
+            // conversation_id yoksa ilk mesajla birlikte state’e oturtacağız
+            const cid = m.conversation_id || "";
+            if (!state.conversation_id && cid) {
+                state.conversation_id = cid;
+
+                // URL'ye yaz (refresh olmadan)
+                const u = new URL(location.href);
+                u.searchParams.set("conversation_id", cid);
+                if (state.peer_id) u.searchParams.set("to", state.peer_id);
+                history.replaceState(null, "", u.toString());
+            }
+
+            // sadece aktif conversation ise bas
+            if (!state.conversation_id || m.conversation_id === state.conversation_id) {
                 appendMessage(m);
             }
         });
@@ -69,9 +70,6 @@
         console.warn("⚠️ socket not ready in messages.js");
     }
 
-    // -----------------------------
-    // SEND MESSAGE (JWT İLE)
-    // -----------------------------
     msgForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
 
@@ -80,7 +78,7 @@
 
         msgInput.value = "";
 
-        // optimistic UI (anında göster)
+        // optimistic
         appendMessage({
             from_id: state.me,
             text,
@@ -93,28 +91,43 @@
             return;
         }
 
+        // ✅ payload: conversation_id varsa onu, yoksa peer_id gönder
+        const payload = { text };
+
+        if (state.conversation_id) payload.conversation_id = state.conversation_id;
+        else if (state.peer_id) payload.peer_id = state.peer_id;
+        else {
+            alert("Missing conversation_id and peer_id. Open chat with ?to=<USER_ID> or ?conversation_id=<ID>");
+            return;
+        }
+
         try {
             const r = await fetch("/.netlify/functions/dm_send", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": "Bearer " + jwt, // 🔥 HATANIN ASIL ÇÖZÜMÜ
+                    "Authorization": "Bearer " + jwt,
                 },
-                body: JSON.stringify({
-                    conversation_id: state.conversation_id,
-                    text,
-                }),
+                body: JSON.stringify(payload),
             });
 
             const d = await r.json();
             if (!r.ok) throw new Error(d.error || "send failed");
 
-            // NOT:
-            // Mesaj tekrar basılmıyor çünkü
-            // server zaten socket ile dm_new gönderecek
+            // ✅ yeni conversation oluştuysa state ve URL güncelle
+            if (!state.conversation_id && d.conversation_id) {
+                state.conversation_id = d.conversation_id;
+
+                const u = new URL(location.href);
+                u.searchParams.set("conversation_id", d.conversation_id);
+                if (state.peer_id) u.searchParams.set("to", state.peer_id);
+                history.replaceState(null, "", u.toString());
+            }
+
+            // server zaten dm_new ile push edecek (aynı mesajı ikinci kez basmıyoruz)
         } catch (err) {
             console.error("❌ dm_send error:", err);
-            alert("Mesaj gönderilemedi");
+            alert(String(err?.message || "Mesaj gönderilemedi"));
         }
     });
 })();
