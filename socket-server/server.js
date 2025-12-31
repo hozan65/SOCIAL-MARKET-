@@ -35,7 +35,6 @@ function checkSecret(req, res) {
     return true;
 }
 
-// user rooms (DM)
 io.on("connection", (socket) => {
     socket.on("auth_user", (uid) => {
         const id = String(uid || "").trim();
@@ -44,32 +43,26 @@ io.on("connection", (socket) => {
     });
 });
 
-// LIKE
 app.post("/emit/like", (req, res) => {
     if (!checkSecret(req, res)) return;
     io.emit("like_update", req.body);
     return res.json({ ok: true });
 });
 
-// FOLLOW
 app.post("/emit/follow", (req, res) => {
     if (!checkSecret(req, res)) return;
     io.emit("follow_update", req.body);
     return res.json({ ok: true });
 });
 
-// DM
 app.post("/emit/dm", (req, res) => {
     if (!checkSecret(req, res)) return;
-
     const p = req.body || {};
     if (p.to_id) io.to(`user:${p.to_id}`).emit("dm_new", p);
     if (p.from_id) io.to(`user:${p.from_id}`).emit("dm_new", p);
-
     return res.json({ ok: true });
 });
 
-// COMMENT
 app.post("/emit/comment", (req, res) => {
     if (!checkSecret(req, res)) return;
     io.emit("comment_new", req.body);
