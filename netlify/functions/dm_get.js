@@ -30,14 +30,16 @@ export const handler = async (event) => {
             .single();
         if (e1) throw new Error(e1.message);
 
-        if (!(convo.user1_id === uid || convo.user2_id === uid)) return json(403, { error: "Forbidden" });
+        if (!(convo.user1_id === uid || convo.user2_id === uid)) {
+            return json(403, { error: "Forbidden" });
+        }
 
         const peer_id = convo.user1_id === uid ? convo.user2_id : convo.user1_id;
 
-        // ✅ only columns that exist (NO inserted_at)
+        // ✅ updated_at yok
         const { data: rows, error: e2 } = await sb
             .from("messages")
-            .select("id,conversation_id,sender_id,body,created_at,updated_at,read_at")
+            .select("id,conversation_id,sender_id,body,created_at,read_at")
             .eq("conversation_id", conversation_id)
             .order("created_at", { ascending: true });
 
@@ -48,7 +50,7 @@ export const handler = async (event) => {
             conversation_id: m.conversation_id,
             from_id: m.sender_id,
             text: m.body,
-            created_at: m.created_at || m.updated_at || null,
+            created_at: m.created_at || null,
             raw: m,
         }));
 
