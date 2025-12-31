@@ -1,4 +1,3 @@
-// netlify/functions/ensure_conversation.js
 import { createClient } from "@supabase/supabase-js";
 import { getAppwriteUser } from "./_appwrite_user.js";
 
@@ -14,7 +13,7 @@ const json = (status, body) => ({
         "Cache-Control": "no-store",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT, x-jwt",
-        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+        "Access-Control-Allow-Methods": "GET,OPTIONS",
     },
     body: JSON.stringify(body),
 });
@@ -27,22 +26,31 @@ export const handler = async (event) => {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
 
-        // ?to=OTHER_USER_ID
-        const to = String(event.queryStringParameters?.to || "").trim();
+        const to = (event.queryStringParameters?.to || "").trim();
         if (!to) return json(400, { error: "Missing 'to' param" });
 
-        // 🔐 JWT doğrula
         const { user } = await getAppwriteUser(event);
         const me = user?.$id;
-        if (!me) return json(401, { error: "Missing JWT" });
+        if (!me) return json(401, { error: "Unauthorized" });
+
         if (to === me) return json(400, { error: "Cannot message yourself" });
+
+        // ✅ SENDE profiles primary alanı appwrite_user_id
+        const { data: other, error: pe } = await supabase
+            .from("profiles")
+            .select("appwrite_user_id")
+            .eq("appwrite_user_id", to)
+            .maybeSingle();
+
+        if (pe) return json(500, { error: pe.message });
+        if (!other?.appwrite_user_id) return json(404, { error: "User not found" });
 
         const [user1_id, user2_id] = sortPair(me, to);
 
-        // 1) var mı?
+        // var mı?
         const { data: existing, error: e1 } = await supabase
             .from("conversations")
-            .select("id,user1_id,user2_id,created_at")
+            .select("id,user1_id,user2_id,created_at,updated_at")
             .eq("user1_id", user1_id)
             .eq("user2_id", user2_id)
             .maybeSingle();
@@ -53,7 +61,7 @@ export const handler = async (event) => {
             return json(200, { ok: true, conversation_id: existing.id });
         }
 
-        // 2) yoksa oluştur
+        // yoksa oluştur
         const { data: created, error: e2 } = await supabase
             .from("conversations")
             .insert({ user1_id, user2_id })
@@ -64,7 +72,7 @@ export const handler = async (event) => {
             return json(200, { ok: true, conversation_id: created.id });
         }
 
-        // 3) race condition (aynı anda iki create) -> tekrar çek
+        // race condition → tekrar fetch
         const { data: again, error: e3 } = await supabase
             .from("conversations")
             .select("id")
@@ -73,12 +81,10 @@ export const handler = async (event) => {
             .maybeSingle();
 
         if (e3) return json(500, { error: e3.message });
-        if (!again?.id) return json(500, { error: e2?.message || "ensure_conversation failed" });
+        if (!again?.id) return json(500, { error: e2?.message || "create conversation failed" });
 
         return json(200, { ok: true, conversation_id: again.id });
     } catch (e) {
-        const msg = String(e?.message || e);
-        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
-        return json(status, { error: msg });
+        return json(500, { error: String(e?.message || e) });
     }
 };

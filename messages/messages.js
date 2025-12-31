@@ -11,7 +11,7 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
         return;
     }
 
-    const myUid = getAppwriteUID() || ""; // sm_uid
+    const myUid = getAppwriteUID() || "";
     const seenIds = new Set();
 
     function setHint(t) {
@@ -23,10 +23,18 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
         const jwt = getJWT() || "";
         return {
             ...extra,
-            ...(jwt ? { "X-Appwrite-JWT": jwt, "x-jwt": jwt, "Authorization": `Bearer ${jwt}` } : {})
+            ...(jwt ? { "X-Appwrite-JWT": jwt, "x-jwt": jwt, Authorization: `Bearer ${jwt}` } : {}),
         };
     }
 
+    async function safeJson(res) {
+        const ct = (res.headers.get("content-type") || "").toLowerCase();
+        if (!ct.includes("application/json")) {
+            const txt = await res.text().catch(() => "");
+            throw new Error(`Non-JSON response (${res.status}). ${txt.slice(0, 120)}`);
+        }
+        return res.json();
+    }
 
     function renderMessage(m, { optimistic = false } = {}) {
         const row = document.createElement("div");
@@ -50,28 +58,32 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
     async function ensureConversationId() {
         const params = new URLSearchParams(location.search);
 
-        // 1) önce direkt conversation_id varsa onu kullan
+        // 1) conversation_id varsa onu kullan
         let conversation_id = (params.get("conversation_id") || "").trim();
         if (conversation_id) return conversation_id;
 
-        // 2) yoksa ?to=OTHER_ID varsa ensure_conversation çağır
+        // 2) yoksa ?to=OTHER_ID ile conversation oluştur
         const to = (params.get("to") || "").trim();
         if (!to) return "";
 
         setHint("Opening chat...");
 
-        const res = await fetch(
-            `/.netlify/functions/ensure_conversation?to=${encodeURIComponent(to)}`,
-            { headers: authHeaders() }
-        );
-        const data = await res.json();
+        const res = await fetch(`/.netlify/functions/ensure_conversation?to=${encodeURIComponent(to)}`, {
+            headers: authHeaders(),
+        });
+
+        if (!res.ok) {
+            const txt = await res.text().catch(() => "");
+            throw new Error(`ensure_conversation ${res.status}: ${txt.slice(0, 120)}`);
+        }
+
+        const data = await safeJson(res);
         if (!data?.ok || !data?.conversation_id) {
             throw new Error(data?.error || "ensure_conversation failed");
         }
 
         conversation_id = String(data.conversation_id);
 
-        // URL'yi temiz şekilde güncelle (reload yok)
         params.set("conversation_id", conversation_id);
         params.delete("to");
         history.replaceState(null, "", `${location.pathname}?${params.toString()}`);
@@ -81,11 +93,18 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
 
     async function loadHistory(conversation_id) {
         setHint("");
+
         const res = await fetch(
             `/.netlify/functions/get_messages?conversation_id=${encodeURIComponent(conversation_id)}&limit=200`,
             { headers: authHeaders() }
         );
-        const data = await res.json();
+
+        if (!res.ok) {
+            const txt = await res.text().catch(() => "");
+            throw new Error(`get_messages ${res.status}: ${txt.slice(0, 120)}`);
+        }
+
+        const data = await safeJson(res);
         if (!data?.ok) throw new Error(data?.error || "get_messages failed");
 
         (data.messages || data.list || []).forEach((m) => {
@@ -116,10 +135,9 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
 
                     seenIds.add(id);
                     renderMessage(m);
-                    console.log("✅ ANLIK MESAJ GELDİ", m);
                 }
             )
-            .subscribe((status) => console.log("Realtime:", status));
+            .subscribe();
     }
 
     async function sendMessage(conversation_id, text) {
@@ -141,11 +159,13 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
             body: JSON.stringify({ conversation_id, body: text }),
         });
 
-        const data = await res.json();
-        if (!data?.ok) {
-            alert("Send failed: " + (data?.error || "unknown"));
-            return;
+        if (!res.ok) {
+            const txt = await res.text().catch(() => "");
+            throw new Error(`send_message ${res.status}: ${txt.slice(0, 120)}`);
         }
+
+        const data = await safeJson(res);
+        if (!data?.ok) throw new Error(data?.error || "Send failed");
 
         if (data?.message?.id) seenIds.add(String(data.message.id));
     }
@@ -165,7 +185,14 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
             const text = String(inputEl.value || "").trim();
             if (!text) return;
             inputEl.value = "";
-            await sendMessage(conversation_id, text);
+
+            try {
+                await sendMessage(conversation_id, text);
+            } catch (err) {
+                console.error(err);
+                setHint("Error: " + err.message);
+                alert(err.message);
+            }
         });
 
         setHint("");

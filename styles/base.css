@@ -1,7 +1,13 @@
+/* /styles/base.css */
+
+/* ===== RESET / BASE ===== */
 *{ box-sizing:border-box; }
 html,body{ height:100%; }
 a{ color:inherit; text-decoration:none; }
 button,input,select,textarea{ font:inherit; }
+
+/* ✅ IMPORTANT: hidden attribute must work everywhere */
+[hidden]{ display:none !important; }
 
 html{ scrollbar-gutter: stable; }
 body{
@@ -132,4 +138,3 @@ html[data-theme="dark"] body{
     .smCookieWrap{ grid-template-columns: 1fr; }
     .smCookieRight{ justify-content: flex-start; }
 }
-
