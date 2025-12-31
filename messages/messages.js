@@ -35,19 +35,30 @@
     function params() {
         return new URL(location.href).searchParams;
     }
+
+    // ✅ URL'yi senin formatında tutalım: to=...
     function setURL(conversation_id, peer_id) {
         const u = new URL(location.href);
         if (conversation_id) u.searchParams.set("conversation_id", conversation_id);
         else u.searchParams.delete("conversation_id");
-        if (peer_id) u.searchParams.set("to_id", peer_id);
-        else u.searchParams.delete("to_id");
+
+        if (peer_id) u.searchParams.set("to", peer_id);
+        else u.searchParams.delete("to");
+
+        // geriye dönük uyum: eğer to_id varsa temizle
+        u.searchParams.delete("to_id");
+
         history.replaceState(null, "", u.toString());
     }
+
     function getURLConvoId() {
         return params().get("conversation_id") || "";
     }
+
+    // ✅ hem to_id hem to destek
     function getURLPeerId() {
-        return params().get("to_id") || "";
+        const p = params();
+        return p.get("to_id") || p.get("to") || "";
     }
 
     // ---------- JWT ----------
@@ -97,7 +108,7 @@
         return uid;
     }
 
-    // ---------- UI helpers ----------
+    // ---------- UI ----------
     function renderInboxItem(item, active) {
         const t = item.last_at ? new Date(item.last_at).toLocaleString() : "";
         const peer = item.peer_id || "User";
@@ -140,7 +151,7 @@
 
     function setChatHeader(peer_id) {
         peerName.textContent = peer_id ? peer_id : "Select a chat";
-        peerSub.textContent = peer_id ? "Direct messages" : "Direct messages";
+        peerSub.textContent = "Direct messages";
     }
 
     function showHint(where, text) {
@@ -148,7 +159,7 @@
         where.textContent = text || "";
     }
 
-    // ---------- Load inbox ----------
+    // ---------- inbox ----------
     async function loadInbox() {
         showHint(inboxHint, "Loading...");
         inboxList.innerHTML = "";
@@ -162,14 +173,11 @@
             showHint(inboxHint, "No chats yet.");
             return;
         }
-
         showHint(inboxHint, "");
 
         const activeCid = state.activeConvoId || getURLConvoId();
 
-        inboxList.innerHTML = list
-            .map((x) => renderInboxItem(x, x.conversation_id === activeCid))
-            .join("");
+        inboxList.innerHTML = list.map((x) => renderInboxItem(x, x.conversation_id === activeCid)).join("");
 
         inboxList.querySelectorAll(".inboxRow").forEach((btn) => {
             btn.addEventListener("click", () => {
@@ -185,14 +193,15 @@
         const base = state.inbox || [];
         const filtered = !q
             ? base
-            : base.filter((x) => String(x.peer_id || "").toLowerCase().includes(q) ||
-                String(x.last_message || "").toLowerCase().includes(q));
+            : base.filter(
+                (x) =>
+                    String(x.peer_id || "").toLowerCase().includes(q) ||
+                    String(x.last_message || "").toLowerCase().includes(q)
+            );
 
         const activeCid = state.activeConvoId;
 
-        inboxList.innerHTML = filtered
-            .map((x) => renderInboxItem(x, x.conversation_id === activeCid))
-            .join("");
+        inboxList.innerHTML = filtered.map((x) => renderInboxItem(x, x.conversation_id === activeCid)).join("");
 
         inboxList.querySelectorAll(".inboxRow").forEach((btn) => {
             btn.addEventListener("click", () => {
@@ -203,7 +212,7 @@
         });
     }
 
-    // ---------- Load chat ----------
+    // ---------- chat ----------
     async function loadChat() {
         const cid = state.activeConvoId;
         const peer = state.activePeerId;
@@ -222,7 +231,6 @@
         const d = await apiFetch(`dm_get?conversation_id=${encodeURIComponent(cid)}`, { method: "GET" });
         const rows = d.rows || [];
 
-        // peer_id function'dan geliyorsa güncelle
         state.activePeerId = peer || d.peer_id || "";
         setChatHeader(state.activePeerId);
 
@@ -237,7 +245,6 @@
 
         setURL(state.activeConvoId, state.activePeerId);
 
-        // highlight active
         inboxList.querySelectorAll(".inboxRow").forEach((b) => {
             const cid = b.getAttribute("data-cid");
             b.classList.toggle("isActive", cid === state.activeConvoId);
@@ -249,7 +256,7 @@
         });
     }
 
-    // ---------- Send ----------
+    // ---------- send ----------
     async function sendMessage() {
         const text = String(msgInput.value || "").trim();
         if (!text) return;
@@ -264,7 +271,7 @@
 
         msgInput.value = "";
 
-        // optimistic UI bubble
+        // optimistic
         const temp = {
             id: "tmp_" + Date.now(),
             from_id: state.me,
@@ -274,43 +281,36 @@
         msgList.insertAdjacentHTML("beforeend", renderMessageBubble(temp));
         scrollBottom();
 
-        // IMPORTANT: Your dm_send expects:
-        // { conversation_id?, peer_id?, text }
         const payload = {
             conversation_id: cid || null,
             peer_id: peer || null,
             text,
         };
 
-        const res = await apiFetch("dm_send", {
-            method: "POST",
-            body: JSON.stringify(payload),
-        });
-
+        const res = await apiFetch("dm_send", { method: "POST", body: JSON.stringify(payload) });
         if (!res?.ok || !res?.row) throw new Error(res?.error || "Send failed");
 
-        const saved = res.row;
-
-        // conversation newly created?
+        // if new convo created
         if (!cid && res.conversation_id) {
             state.activeConvoId = res.conversation_id;
             state.activePeerId = res.peer_id || peer || "";
             setURL(state.activeConvoId, state.activePeerId);
-            await loadInbox(); // show new convo on left
+            await loadInbox();
         }
 
-        // replace temp bubble (simple: append real one + remove temp by id)
+        // replace tmp
         const tmpEl = msgList.querySelector(`[data-mid="${temp.id}"]`);
         if (tmpEl) tmpEl.remove();
-        msgList.insertAdjacentHTML("beforeend", renderMessageBubble(saved));
+
+        msgList.insertAdjacentHTML("beforeend", renderMessageBubble(res.row));
         scrollBottom();
 
         // socket emit optional
         const socket = window.rt?.socket;
-        if (socket) socket.emit("dm:send", saved);
+        if (socket) socket.emit("dm:send", res.row);
     }
 
-    // ---------- Socket realtime (optional) ----------
+    // ---------- socket realtime optional ----------
     function bindRealtime() {
         const socket = window.rt?.socket;
         if (!socket) return;
@@ -322,13 +322,11 @@
 
         socket.on("dm:new", (m) => {
             try {
-                // If message belongs to current convo, append
                 const currentCid = state.activeConvoId || getURLConvoId();
                 if (!currentCid) return;
 
                 const cid = m?.conversation_id || m?.raw?.conversation_id;
                 if (cid && cid !== currentCid) {
-                    // başka konuşma: inbox refresh (preview güncellensin)
                     loadInbox().catch(() => {});
                     return;
                 }
@@ -347,7 +345,6 @@
         try {
             await authUser();
 
-            // pick convo from URL if present
             state.activeConvoId = getURLConvoId();
             state.activePeerId = getURLPeerId();
 
@@ -357,14 +354,12 @@
 
             if (state.activeConvoId) await loadChat();
             else {
-                setChatHeader("");
-                showHint(msgHint, "Choose a conversation from the left.");
+                setChatHeader(state.activePeerId || "");
+                showHint(msgHint, state.activePeerId ? "Start messaging…" : "Choose a conversation from the left.");
             }
 
-            // search
             leftSearch?.addEventListener("input", (e) => filterInbox(e.target.value));
 
-            // send
             msgForm?.addEventListener("submit", async (e) => {
                 e.preventDefault();
                 try {
@@ -375,7 +370,6 @@
                 }
             });
 
-            // back button (mobile)
             chatBackBtn?.addEventListener("click", () => {
                 state.activeConvoId = "";
                 state.activePeerId = "";
@@ -386,7 +380,11 @@
                 inboxList.querySelectorAll(".inboxRow").forEach((b) => b.classList.remove("isActive"));
             });
 
-            console.log("✅ messages init ok", { uid: state.me, convoId: state.activeConvoId, peer: state.activePeerId });
+            console.log("✅ messages init ok", {
+                uid: state.me,
+                convoId: state.activeConvoId,
+                peer: state.activePeerId,
+            });
         } catch (e) {
             console.error("init @ messages.js failed:", e);
             alert(String(e?.message || e));
