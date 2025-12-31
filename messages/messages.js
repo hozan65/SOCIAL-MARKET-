@@ -1,206 +1,233 @@
+// /messages/messages.js
 console.log("messages.js LOADED ✅", location.href);
 
-import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
+const $ = (id) => document.getElementById(id);
 
-(() => {
-    const listEl = document.getElementById("msgList");
-    const inputEl = document.getElementById("msgInput");
-    const formEl = document.getElementById("msgForm");
-    const hintEl = document.getElementById("msgHint");
+const inboxList = $("inboxList");
+const inboxHint = $("inboxHint");
+const peerName  = $("peerName");
+const peerAva   = $("peerAva");
+const msgList   = $("msgList");
+const msgHint   = $("msgHint");
+const msgForm   = $("msgForm");
+const msgInput  = $("msgInput");
+const backBtn   = $("chatBackBtn");
+const leftSearch = $("leftSearch");
 
-    if (!listEl || !inputEl || !formEl) {
-        console.error("Missing #msgList / #msgInput / #msgForm in HTML");
+// ---- helpers
+function setHint(el, txt) { if (el) el.textContent = txt || ""; }
+function esc(s){ return String(s||"").replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m])); }
+function qs(name){ return new URLSearchParams(location.search).get(name); }
+
+// ---- API base (Netlify functions)
+const FN = "/.netlify/functions";
+
+// ---- auth (kendi sistemin için _auth_user kullanıyoruz)
+async function getMe(){
+    const r = await fetch(`${FN}/_auth_user`, { credentials:"include" });
+    const j = await r.json().catch(()=> ({}));
+    if (!r.ok || !j?.ok) throw new Error(j?.error || `auth failed (${r.status})`);
+    // uyumluluk: uid / user_id / user.$id
+    return j.uid || j.user_id || j?.user?.$id;
+}
+
+// ---- active state
+let ME = null;
+let ACTIVE_TO = null;          // peer user id
+let ACTIVE_CONV = null;        // optional conversation id
+
+function setActivePeerUI(name, avatarUrl){
+    peerName.textContent = name || "Unknown";
+    peerAva.innerHTML = avatarUrl
+        ? `<img src="${esc(avatarUrl)}" alt="" style="width:36px;height:36px;border-radius:999px;object-fit:cover;">`
+        : `<div style="width:36px;height:36px;border-radius:999px;background:rgba(0,0,0,.08)"></div>`;
+}
+
+// ---- load left list
+async function loadInbox(){
+    setHint(inboxHint, "Loading…");
+    inboxList.innerHTML = "";
+
+    const r = await fetch(`${FN}/dm_list`, { credentials:"include" });
+    const j = await r.json().catch(()=> ({}));
+
+    console.log("dm_list status:", r.status, j);
+
+    if (!r.ok || !j?.ok){
+        setHint(inboxHint, j?.error || `dm_list failed (${r.status})`);
         return;
     }
 
-    const myUid = getAppwriteUID() || "";
-    const seenIds = new Set();
-
-    function setHint(t) {
-        if (!hintEl) return;
-        hintEl.textContent = t || "";
+    const items = j.items || [];
+    if (!items.length){
+        setHint(inboxHint, "No conversations yet.");
+        return;
     }
 
-    function authHeaders(extra = {}) {
-        const jwt = getJWT() || "";
-        return {
-            ...extra,
-            ...(jwt ? { "X-Appwrite-JWT": jwt, "x-jwt": jwt, Authorization: `Bearer ${jwt}` } : {}),
-        };
-    }
+    setHint(inboxHint, "");
+    for (const it of items){
+        // it: { peer_id, peer_name, peer_avatar, last_text, last_ts, conversation_id }
+        const peerId = it.peer_id;
+        const name = it.peer_name || "Unknown";
+        const last = it.last_text || "";
+        const conv = it.conversation_id || "";
 
-    async function safeJson(res) {
-        const ct = (res.headers.get("content-type") || "").toLowerCase();
-        if (!ct.includes("application/json")) {
-            const txt = await res.text().catch(() => "");
-            throw new Error(`Non-JSON response (${res.status}). ${txt.slice(0, 120)}`);
-        }
-        return res.json();
-    }
-
-    function renderMessage(m, { optimistic = false } = {}) {
-        const row = document.createElement("div");
-        row.className = "msgRow" + (optimistic ? " optimistic" : "");
-        row.dataset.id = m.id || "";
-
-        const mine = myUid && String(m.sender_id) === String(myUid);
-
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "inboxRow"; // css’in yoksa bile sorun değil
+        row.style.cssText = "width:100%;text-align:left;border:0;background:transparent;padding:10px 8px;border-radius:12px;cursor:pointer;";
         row.innerHTML = `
-      <div class="msgBubble ${mine ? "mine" : "theirs"}">
-        <div class="msgText"></div>
-        <div class="msgMeta">${new Date(m.created_at || Date.now()).toLocaleString()}</div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <div style="width:34px;height:34px;border-radius:999px;background:rgba(0,0,0,.08);overflow:hidden;">
+          ${it.peer_avatar ? `<img src="${esc(it.peer_avatar)}" style="width:100%;height:100%;object-fit:cover;">` : ""}
+        </div>
+        <div style="min-width:0;flex:1">
+          <div style="font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(name)}</div>
+          <div style="opacity:.7;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(last)}</div>
+        </div>
       </div>
     `;
-        row.querySelector(".msgText").textContent = m.body || "";
-
-        listEl.appendChild(row);
-        listEl.scrollTop = listEl.scrollHeight;
-    }
-
-    async function ensureConversationId() {
-        const params = new URLSearchParams(location.search);
-
-        // 1) conversation_id varsa onu kullan
-        let conversation_id = (params.get("conversation_id") || "").trim();
-        if (conversation_id) return conversation_id;
-
-        // 2) yoksa ?to=OTHER_ID ile conversation oluştur
-        const to = (params.get("to") || "").trim();
-        if (!to) return "";
-
-        setHint("Opening chat...");
-
-        const res = await fetch(`/.netlify/functions/ensure_conversation?to=${encodeURIComponent(to)}`, {
-            headers: authHeaders(),
+        row.addEventListener("click", () => {
+            // URL güncelle
+            const u = new URL(location.href);
+            u.searchParams.set("to", peerId);
+            if (conv) u.searchParams.set("conversation_id", conv);
+            history.pushState({}, "", u.toString());
+            bootActiveFromURL(); // yeniden yükle
         });
 
-        if (!res.ok) {
-            const txt = await res.text().catch(() => "");
-            throw new Error(`ensure_conversation ${res.status}: ${txt.slice(0, 120)}`);
-        }
+        inboxList.appendChild(row);
+    }
+}
 
-        const data = await safeJson(res);
-        if (!data?.ok || !data?.conversation_id) {
-            throw new Error(data?.error || "ensure_conversation failed");
-        }
-
-        conversation_id = String(data.conversation_id);
-
-        params.set("conversation_id", conversation_id);
-        params.delete("to");
-        history.replaceState(null, "", `${location.pathname}?${params.toString()}`);
-
-        return conversation_id;
+// ---- load peer + messages
+async function loadActiveChat(){
+    if (!ACTIVE_TO && !ACTIVE_CONV){
+        peerName.textContent = "Select a chat";
+        setHint(msgHint, "Select a chat");
+        msgList.innerHTML = "";
+        return;
     }
 
-    async function loadHistory(conversation_id) {
-        setHint("");
+    setHint(msgHint, "Loading…");
+    msgList.innerHTML = "";
 
-        const res = await fetch(
-            `/.netlify/functions/get_messages?conversation_id=${encodeURIComponent(conversation_id)}&limit=200`,
-            { headers: authHeaders() }
-        );
+    // 1) peer info + (opsiyonel) conversation resolve
+    const q = new URLSearchParams();
+    if (ACTIVE_TO) q.set("to", ACTIVE_TO);
+    if (ACTIVE_CONV) q.set("conversation_id", ACTIVE_CONV);
 
-        if (!res.ok) {
-            const txt = await res.text().catch(() => "");
-            throw new Error(`get_messages ${res.status}: ${txt.slice(0, 120)}`);
-        }
+    const r = await fetch(`${FN}/dm_get?` + q.toString(), { credentials:"include" });
+    const j = await r.json().catch(()=> ({}));
 
-        const data = await safeJson(res);
-        if (!data?.ok) throw new Error(data?.error || "get_messages failed");
+    console.log("dm_get status:", r.status, j);
 
-        (data.messages || data.list || []).forEach((m) => {
-            const id = String(m.id || "");
-            if (!id || seenIds.has(id)) return;
-            seenIds.add(id);
-            renderMessage(m);
-        });
+    if (!r.ok || !j?.ok){
+        setHint(msgHint, j?.error || `dm_get failed (${r.status})`);
+        peerName.textContent = "Select a chat";
+        return;
     }
 
-    function subscribeRealtime(conversation_id) {
-        supabase
-            .channel("msg-" + conversation_id)
-            .on(
-                "postgres_changes",
-                {
-                    event: "INSERT",
-                    schema: "public",
-                    table: "messages",
-                    filter: `conversation_id=eq.${conversation_id}`,
-                },
-                (payload) => {
-                    const m = payload?.new;
-                    if (!m?.id) return;
+    // dm_get response beklenen:
+    // { ok:true, peer:{id,name,avatar}, conversation_id:"...", messages:[...] }
+    ACTIVE_TO = j.peer?.id || ACTIVE_TO;
+    ACTIVE_CONV = j.conversation_id || ACTIVE_CONV;
 
-                    const id = String(m.id);
-                    if (seenIds.has(id)) return;
+    setActivePeerUI(j.peer?.name || "Unknown", j.peer?.avatar || "");
 
-                    seenIds.add(id);
-                    renderMessage(m);
-                }
-            )
-            .subscribe();
+    renderMessages(j.messages || []);
+    setHint(msgHint, "");
+}
+
+function renderMessages(arr){
+    msgList.innerHTML = "";
+    if (!arr.length) return;
+
+    for (const m of arr){
+        const isMe = (m.sender_id === ME);
+        const bubble = document.createElement("div");
+        bubble.style.cssText = `
+      max-width: 70%;
+      margin: 8px 0;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(0,0,0,.08);
+      background: rgba(255,255,255,.75);
+      ${isMe ? "margin-left:auto;" : "margin-right:auto;"}
+    `;
+        bubble.innerHTML = `<div style="font-weight:700">${esc(m.text || "")}</div>
+      <div style="opacity:.65;font-size:11px;margin-top:4px">${esc(m.created_at || "")}</div>`;
+        msgList.appendChild(bubble);
     }
 
-    async function sendMessage(conversation_id, text) {
-        // optimistic UI
-        renderMessage(
-            {
-                id: "temp-" + Date.now(),
-                conversation_id,
-                sender_id: myUid,
-                body: text,
-                created_at: new Date().toISOString(),
-            },
-            { optimistic: true }
-        );
+    // scroll bottom
+    msgList.scrollTop = msgList.scrollHeight;
+}
 
-        const res = await fetch("/.netlify/functions/send_message", {
-            method: "POST",
-            headers: authHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({ conversation_id, body: text }),
-        });
+// ---- send
+async function sendMessage(text){
+    if (!ACTIVE_TO && !ACTIVE_CONV) throw new Error("No active chat");
 
-        if (!res.ok) {
-            const txt = await res.text().catch(() => "");
-            throw new Error(`send_message ${res.status}: ${txt.slice(0, 120)}`);
-        }
+    const payload = { to: ACTIVE_TO, conversation_id: ACTIVE_CONV, text };
 
-        const data = await safeJson(res);
-        if (!data?.ok) throw new Error(data?.error || "Send failed");
-
-        if (data?.message?.id) seenIds.add(String(data.message.id));
-    }
-
-    (async () => {
-        const conversation_id = await ensureConversationId();
-        if (!conversation_id) {
-            setHint("Select a chat");
-            return;
-        }
-
-        await loadHistory(conversation_id);
-        subscribeRealtime(conversation_id);
-
-        formEl.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const text = String(inputEl.value || "").trim();
-            if (!text) return;
-            inputEl.value = "";
-
-            try {
-                await sendMessage(conversation_id, text);
-            } catch (err) {
-                console.error(err);
-                setHint("Error: " + err.message);
-                alert(err.message);
-            }
-        });
-
-        setHint("");
-    })().catch((err) => {
-        console.error(err);
-        setHint("Error: " + err.message);
-        alert("Messages init error: " + err.message);
+    const r = await fetch(`${FN}/dm_send`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type":"application/json" },
+        body: JSON.stringify(payload),
     });
+    const j = await r.json().catch(()=> ({}));
+    console.log("dm_send status:", r.status, j);
+
+    if (!r.ok || !j?.ok) throw new Error(j?.error || `dm_send failed (${r.status})`);
+
+    // refresh
+    await loadActiveChat();
+}
+
+// ---- boot
+function bootActiveFromURL(){
+    ACTIVE_TO = qs("to") || null;
+    ACTIVE_CONV = qs("conversation_id") || null;
+
+    console.log("ACTIVE_TO:", ACTIVE_TO, "ACTIVE_CONV:", ACTIVE_CONV);
+
+    loadActiveChat();
+}
+
+(async function init(){
+    try{
+        ME = await getMe();
+        console.log("ME:", ME);
+
+        await loadInbox();
+        bootActiveFromURL();
+
+        // back button (mobil)
+        backBtn?.addEventListener("click", () => {
+            // mobilde sağ panelden sola dönmek için: aktif chati temizle
+            const u = new URL(location.href);
+            u.searchParams.delete("to");
+            u.searchParams.delete("conversation_id");
+            history.pushState({}, "", u.toString());
+            bootActiveFromURL();
+        });
+
+        // send
+        msgForm?.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const t = (msgInput.value || "").trim();
+            if (!t) return;
+            msgInput.value = "";
+            try { await sendMessage(t); }
+            catch(err){ setHint(msgHint, String(err?.message || err)); }
+        });
+
+        window.addEventListener("popstate", bootActiveFromURL);
+
+    } catch (e){
+        console.error(e);
+        setHint(inboxHint, "Login required or auth failed.");
+        setHint(msgHint, String(e?.message || e));
+    }
 })();
