@@ -3,22 +3,20 @@ import { account } from "/assets/appwrite.js";
 
 console.log("✅ u.js loaded (profile + followers/following drawer)");
 
-// ---- Netlify Functions ----
+// Netlify functions
 const FN_GET = "/.netlify/functions/get_profile";
 const FN_ENSURE = "/.netlify/functions/ensure_profile";
 const FN_LIST_FOLLOWERS = "/.netlify/functions/list_followers";
 const FN_LIST_FOLLOWING = "/.netlify/functions/list_following";
 
-// sayfa linki
+// pages
 const PROFILE_PAGE = "/u/index.html";
-
-// messages page (DM)
 const MESSAGES_PAGE = "/messages/"; // /messages/index.html
 
 const qs = (k) => new URLSearchParams(location.search).get(k);
 const $ = (id) => document.getElementById(id);
 
-// ---- page elements ----
+// elements
 const $avatar = $("uAvatar");
 const $name = $("uName");
 const $bio = $("uBio");
@@ -32,18 +30,17 @@ const $msg = $("uMsg");
 const $followersBtn = $("uFollowersBtn");
 const $followingBtn = $("uFollowingBtn");
 
-// action buttons
 const $followBtn = $("uFollowBtn");
 const $msgBtn = $("uMsgBtn");
 
-// ---- drawer elements ----
+// drawer
 const $drawer = $("uDrawer");
 const $drawerTitle = $("uDrawerTitle");
 const $drawerBody = $("uDrawerBody");
 const $drawerClose = $("uDrawerClose");
 const $drawerBackdrop = $("uDrawerBackdrop");
 
-// ---- helpers ----
+// helpers
 function esc(s) {
     return String(s ?? "")
         .replaceAll("&", "&amp;")
@@ -54,40 +51,31 @@ function esc(s) {
 }
 
 function safeHost(url) {
-    try {
-        return new URL(url).hostname;
-    } catch {
-        return url || "";
-    }
+    try { return new URL(url).hostname; } catch { return url || ""; }
 }
 
 function setMsg(t) {
     if ($msg) $msg.textContent = t || "";
 }
 
-// ✅ Message button control (HARD SAFE)
+// ✅ ALWAYS hide Message on own profile
 function setMessageButton(isMe, profileUserId) {
     if (!$msgBtn) return;
-
     if (isMe) {
         $msgBtn.hidden = true;
-        $msgBtn.removeAttribute("href");
-        $msgBtn.style.pointerEvents = "none";
+        $msgBtn.href = "#";
         return;
     }
-
     $msgBtn.hidden = false;
-    $msgBtn.style.pointerEvents = "";
     $msgBtn.href = `${MESSAGES_PAGE}?to=${encodeURIComponent(profileUserId)}`;
 }
 
-// ✅ Follow button control
 function setFollowButton(isMe) {
     if (!$followBtn) return;
     $followBtn.hidden = !!isMe;
 }
 
-// ---- drawer control ----
+// drawer
 function openDrawer(title) {
     $drawerTitle.textContent = title || "—";
     $drawerBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Loading...</div>`;
@@ -119,27 +107,21 @@ function renderUserList(list) {
         return;
     }
 
-    $drawerBody.innerHTML = list
-        .map((u) => {
-            const name = esc(u?.name || "User");
-            const av = u?.avatar_url ? esc(u.avatar_url) : "";
-            const id = u?.id || "";
-            return `
+    $drawerBody.innerHTML = list.map((u) => {
+        const name = esc(u?.name || "User");
+        const av = u?.avatar_url ? esc(u.avatar_url) : "";
+        const id = u?.id || "";
+        return `
       <div class="uUserRow">
-        ${
-                av
-                    ? `<img class="uUserAva" src="${av}" alt="">`
-                    : `<div class="uUserAva"></div>`
-            }
+        ${av ? `<img class="uUserAva" src="${av}" alt="">` : `<div class="uUserAva"></div>`}
         <div class="uUserName">${name}</div>
         <a class="uUserGo" href="${PROFILE_PAGE}?id=${encodeURIComponent(id)}">View</a>
       </div>
     `;
-        })
-        .join("");
+    }).join("");
 }
 
-// ---- render profile ----
+// render profile
 function renderProfile(data) {
     const p = data?.profile || {};
     const c = data?.counts || {};
@@ -183,37 +165,30 @@ function renderProfile(data) {
     });
 }
 
-// ---- API ----
+// API
 async function fetchProfile(uid) {
     const r = await fetch(`${FN_GET}?id=${encodeURIComponent(uid)}`, { cache: "no-store" });
-    if (!r.ok) {
-        const err = await r.json().catch(() => ({}));
-        throw new Error(err?.error || `get_profile ${r.status}`);
-    }
-    return r.json();
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out?.error || `get_profile ${r.status}`);
+    return out;
 }
 
-// ensure_profile (JWT)
 async function getJwtHeaders() {
     const jwtObj = await account.createJWT();
     const jwt = jwtObj?.jwt;
     if (!jwt) throw new Error("JWT could not be created");
     return {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${jwt}`,
+        "Authorization": `Bearer ${jwt}`,
         "X-Appwrite-JWT": jwt,
-        "x-jwt": jwt,
+        "x-jwt": jwt
     };
 }
 
 async function ensureProfile() {
     try {
         const headers = await getJwtHeaders();
-        await fetch(FN_ENSURE, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ ok: true }),
-        });
+        await fetch(FN_ENSURE, { method: "POST", headers, body: JSON.stringify({ ok: true }) });
     } catch (e) {
         console.warn("ensure_profile failed:", e?.message || e);
     }
@@ -226,73 +201,64 @@ async function loadList(url) {
     return out?.list || [];
 }
 
-// ✅ viewerId’yi her zaman Appwrite’dan kesin al (localStorage sapıtmasın)
+// ✅ Get REAL viewer id from Appwrite (do not trust localStorage)
 async function getViewerIdStrict() {
-    try {
-        const me = await account.get();
-        const id = me?.$id || "";
-        if (id) localStorage.setItem("sm_uid", id);
-        return id;
-    } catch {
-        return localStorage.getItem("sm_uid") || "";
-    }
+    const me = await account.get(); // if not logged -> throws
+    const id = me?.$id || "";
+    if (!id) throw new Error("Missing viewer id");
+    // keep localStorage in sync (optional)
+    localStorage.setItem("sm_uid", id);
+    return id;
 }
 
-// ---- BOOT ----
+// BOOT
 (async function boot() {
-    // 1) Profil sahibi uid
-    let uid = (qs("id") || "").trim();
+    // 1) resolve profile uid
+    let uid = qs("id");
 
-    // ✅ Kendi profilini bu şekilde aç: /u/index.html?me=1
+    // me=1 => show my own profile explicitly
     if (!uid && qs("me") === "1") {
-        uid = localStorage.getItem("sm_uid") || "";
-        if (!uid) {
-            try {
-                const me = await account.get();
-                uid = me?.$id || "";
-                if (uid) localStorage.setItem("sm_uid", uid);
-            } catch {
-                location.href = "/auth/login.html";
-                return;
-            }
-        }
-    }
-
-    // uid yoksa login kontrol edip kendi uid yap
-    if (!uid) {
         try {
-            const me = await account.get();
-            uid = me?.$id || "";
-            if (uid) localStorage.setItem("sm_uid", uid);
+            uid = await getViewerIdStrict();
         } catch {
             location.href = "/auth/login.html";
             return;
         }
     }
 
+    // if still no uid => default to my profile
     if (!uid) {
-        setMsg("❌ Missing user id");
+        try {
+            uid = await getViewerIdStrict();
+        } catch {
+            location.href = "/auth/login.html";
+            return;
+        }
+    }
+
+    // 2) get viewer id (strict)
+    let viewerId = "";
+    try {
+        viewerId = await getViewerIdStrict();
+    } catch {
+        location.href = "/auth/login.html";
         return;
     }
 
-    // 2) İzleyen (viewer) id -> kesin
-    const viewerId = await getViewerIdStrict();
-    const isMe = !!viewerId && viewerId === uid;
+    const isMe = String(viewerId) === String(uid);
 
-    // 3) Buttons
+    // ✅ show/hide actions (NOW ALWAYS CORRECT)
     setFollowButton(isMe);
     setMessageButton(isMe, uid);
 
-    // 4) cache-first (instant)
+    // 3) cache-first
     const cacheKey = "profile_cache_" + uid;
     const cachedRaw = localStorage.getItem(cacheKey);
     if (cachedRaw) {
-        try {
-            renderProfile(JSON.parse(cachedRaw));
-        } catch {}
+        try { renderProfile(JSON.parse(cachedRaw)); } catch {}
     }
 
-    // 5) load fresh
+    // 4) load fresh (with ensure fallback)
     try {
         const data = await fetchProfile(uid);
         renderProfile(data);
@@ -312,16 +278,14 @@ async function getViewerIdStrict() {
         }
     }
 
-    // 6) Followers / Following -> Drawer
+    // drawer events
     $followersBtn?.addEventListener("click", async () => {
         try {
             openDrawer("Followers");
             const list = await loadList(`${FN_LIST_FOLLOWERS}?id=${encodeURIComponent(uid)}`);
             renderUserList(list);
         } catch (e) {
-            $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(
-                e?.message || e
-            )}</div>`;
+            $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
         }
     });
 
@@ -331,13 +295,11 @@ async function getViewerIdStrict() {
             const list = await loadList(`${FN_LIST_FOLLOWING}?id=${encodeURIComponent(uid)}`);
             renderUserList(list);
         } catch (e) {
-            $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(
-                e?.message || e
-            )}</div>`;
+            $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
         }
     });
 
-    // Drawer close handlers
+    // drawer close handlers
     $drawerClose?.addEventListener("click", closeDrawer);
     $drawerBackdrop?.addEventListener("click", closeDrawer);
 

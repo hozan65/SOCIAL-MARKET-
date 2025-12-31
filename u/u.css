@@ -1,4 +1,11 @@
 /* /u/u.css */
+:root{
+    --siteTopGap: 16px;          /* topbar top:16px */
+    --siteTopbarH: 68px;         /* topbar yüksekliği (gerekirse 62-74 arası oynat) */
+    --drawerSafeTop: calc(var(--siteTopGap) + var(--siteTopbarH) + 8px);
+}
+
+/* page */
 .uPage{ padding-top:18px; }
 
 .uTop{ display:flex; gap:16px; align-items:flex-start; }
@@ -48,7 +55,8 @@
 .uPostCap{ padding:10px; font-weight:900; opacity:.85; white-space:pre-wrap; }
 
 /* =========================
-   Right Drawer (Followers/Following)
+   Right Drawer (Followers/Following) ✅ FIXED
+   - header ile çakışmayı bitirir
 ========================= */
 .uDrawerBackdrop{
     position: fixed;
@@ -57,24 +65,28 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity .18s ease;
-    z-index: 900;
+    z-index: 9000; /* daha yukarı */
 }
 
 .uDrawer{
     position: fixed;
-    top: 0;
     right: 0;
-    height: 100vh;
+
+    /* ✅ topbar’ın ALTINDAN başla */
+    top: var(--drawerSafeTop);
+    height: calc(100vh - var(--drawerSafeTop));
+
     width: min(420px, 92vw);
     background: #fff;
     border-left: 1px solid rgba(0,0,0,.08);
     box-shadow: -12px 0 30px rgba(0,0,0,.12);
     transform: translateX(105%);
     transition: transform .18s ease;
-    z-index: 910;
+    z-index: 9100;
 
     display: flex;
     flex-direction: column;
+    border-top-left-radius: 18px; /* daha güzel */
 }
 
 .uDrawer.open{
@@ -86,12 +98,18 @@ body.uDrawerOpen .uDrawerBackdrop{
     pointer-events: auto;
 }
 
+/* drawer header: sticky olsun */
 .uDrawerHead{
+    position: sticky;
+    top: 0;
+    z-index: 2;
+
     display:flex;
     align-items:center;
     justify-content:space-between;
     padding: 14px 14px;
     border-bottom: 1px solid rgba(0,0,0,.08);
+    background: #fff;
 }
 
 .uDrawerTitle{
@@ -109,7 +127,7 @@ body.uDrawerOpen .uDrawerBackdrop{
 .uDrawerBody{
     padding: 12px 14px;
     overflow: auto;
-    max-height: calc(100vh - 56px);
+    flex: 1;                 /* ✅ max-height yerine bu daha doğru */
 }
 
 /* list row */
@@ -134,12 +152,19 @@ body.uDrawerOpen .uDrawerBackdrop{
     color:inherit;
 }
 
+/* posts grid responsive */
 @media (max-width:720px){
     .uPostsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+
+    /* mobilde topbar daha farklıysa drawer safe top biraz küçülsün */
+    :root{
+        --siteTopGap: 0px;
+        --siteTopbarH: 64px;
+    }
 }
 
 /* =========================
-   ✅ NEW: Follow + Message actions
+   Follow + Message actions
 ========================= */
 .uActions{
     display:flex;
