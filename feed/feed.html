@@ -153,22 +153,41 @@
 </section>
 
 <!-- ================= SCRIPTS ================= -->
+
+<!-- Supabase CDN (read-only feed için) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<!-- Header -->
 <script src="/assets1/header.js"></script>
 
+<!-- Auth (JWT) -->
 <script type="module" src="/assets/auth-ui.js"></script>
 <script type="module" src="/assets/jwt.js"></script>
 
-<!-- Page JS -->
+<!-- ✅ Socket.IO client -->
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+<!-- ✅ Socket server adresi -->
+<script>
+    window.SOCKET_URL = "https://socket.chriontoken.com";
+</script>
+
+
+<!-- ✅ Realtime bridge (socket dinleyici) -->
+<script src="/assets1/realtime.js"></script>
+
+<!-- Page JS (like click vs) -->
 <script src="/feed/feed.js"></script>
+
+<!-- Diğer UI scriptleri -->
 <script src="/assets1/crypto-tabs.js"></script>
 <script src="/assets1/heatmap.js"></script>
 
-<!-- ✅ Cookie bar (cache kırmak için v ekledim) -->
+<!-- Cookie bar -->
 <script src="/assets1/cookie-consent.js?v=9"></script>
 
-<!-- ✅ Text News Feed -->
+<!-- Text News Feed -->
 <script src="/textnews/textnews-feed.js"></script>
+
 </body>
 </html>

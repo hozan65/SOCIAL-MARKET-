@@ -6,6 +6,9 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const SOCKET_DM_EMIT_URL = process.env.SOCKET_DM_EMIT_URL || ""; // https://socket.domain.com/emit/dm
+const SOCKET_SECRET = process.env.SOCKET_SECRET || "";
+
 const json = (status, body) => ({
     statusCode: status,
     headers: {
@@ -53,8 +56,42 @@ export const handler = async (event) => {
 
         if (e2) return json(500, { error: e2.message });
 
+        // ✅ karşı taraf id
+        const other_id = conv.user1_id === me ? conv.user2_id : conv.user1_id;
+
+        // ✅ socket'e bildir (fail olsa bile mesaj kaydı başarılı kalsın)
+        emitDMSafe({
+            message_id: inserted.id,
+            conversation_id: inserted.conversation_id,
+            from_id: me,
+            to_id: other_id,
+            body: inserted.body,
+            created_at: inserted.created_at
+        });
+
         return json(200, { ok: true, message: inserted });
     } catch (e) {
         return json(500, { error: String(e?.message || e) });
     }
 };
+
+async function emitDMSafe(payload) {
+    try {
+        if (!SOCKET_DM_EMIT_URL) return;
+
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 1500);
+
+        await fetch(SOCKET_DM_EMIT_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-socket-secret": SOCKET_SECRET
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+        });
+
+        clearTimeout(t);
+    } catch {}
+}

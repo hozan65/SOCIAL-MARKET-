@@ -1,9 +1,5 @@
 /* =========================
   VIEW.JS (NO MODULE / NO IMPORT)
-  - Loads single post by ?id=
-  - Renders: image + meta + author + created_at + content (expand)
-  - Comments list + add comment
-  - Like + Follow
 ========================= */
 
 console.log("✅ view.js running");
@@ -70,7 +66,6 @@ function getPostIdFromQuery() {
     return String(u.searchParams.get("id") || "").trim();
 }
 
-// ✅ FIX: image_path bazen storage path -> URL'e çevir
 function resolveImageUrl(image_path) {
     const p = String(image_path ?? "").trim();
     if (!p) return "";
@@ -121,7 +116,7 @@ async function toggleFollow(targetUserId) {
 }
 
 // =========================
-// CURRENT USER (for follow hydrate)
+// CURRENT USER
 // =========================
 let _meCache = null;
 
@@ -223,10 +218,6 @@ async function loadComments(postId, limit = 100) {
     return data || [];
 }
 
-/**
- * OPTIONAL profiles hydrate (fallback’lı)
- * Eğer sende profiles tablosu yoksa, user_id gösterir.
- */
 const PROFILES_TABLE = "profiles";
 async function loadProfiles(userIds) {
     const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
@@ -278,7 +269,9 @@ function renderPostView(row, likeCount, isFollowing) {
 
     <div class="pvHead">
       <div class="pvTitle">${pairsText || "PAIR"}</div>
-      <div class="pvMeta">${market}${market && category ? " • " : ""}${category}${(market||category) && timeframe ? " • " : ""}${timeframe}</div>
+      <div class="pvMeta">${market}${market && category ? " • " : ""}${category}${
+        (market || category) && timeframe ? " • " : ""
+    }${timeframe}</div>
 
       <div class="pvSub">
         <div class="pvAuthor">Author: <span class="pvMono">${authorId || "-"}</span></div>
@@ -287,7 +280,9 @@ function renderPostView(row, likeCount, isFollowing) {
 
       <div class="pvActions">
         <button id="pvLikeBtn" class="pvBtn" type="button">❤️ <span id="pvLikeCount">${likeCount}</span></button>
-        <button id="pvFollowBtn" class="pvBtn ${isFollowing ? "isFollowing" : ""}" type="button" ${authorId ? "" : "disabled"}>
+        <button id="pvFollowBtn" class="pvBtn ${isFollowing ? "isFollowing" : ""}" type="button" ${
+        authorId ? "" : "disabled"
+    }>
           ${isFollowing ? "Following" : "Follow"}
         </button>
       </div>
@@ -320,7 +315,7 @@ function renderComments(list, profilesMap) {
             const avatar = esc(p?.avatar_url || "");
 
             return `
-      <div class="cItem">
+      <div class="cItem" data-comment-id="${esc(c.id)}">
         <div class="cAvatar">
           ${
                 avatar
@@ -341,11 +336,65 @@ function renderComments(list, profilesMap) {
         .join("");
 }
 
+function addCommentToUI(comment, profilesMap) {
+    // comment: {post_id, comment_id, user_id, content, created_at}
+    if (!commentsList) return;
+
+    const cid = String(comment.comment_id || comment.id || "").trim();
+    if (!cid) return;
+
+    // duplicate guard
+    if (commentsList.querySelector(`[data-comment-id="${CSS.escape(cid)}"]`)) return;
+
+    const uid = String(comment.user_id || "").trim();
+    const p = profilesMap?.get(uid);
+    const name = esc(p?.username || uid || "user");
+    const avatar = esc(p?.avatar_url || "");
+
+    const html = `
+    <div class="cItem" data-comment-id="${esc(cid)}">
+      <div class="cAvatar">
+        ${
+        avatar
+            ? `<img src="${avatar}" alt="" loading="lazy" decoding="async">`
+            : `<div class="cAvatarFallback">${esc(name.slice(0, 1).toUpperCase())}</div>`
+    }
+      </div>
+
+      <div class="cBody">
+        <div class="cRow">
+          <div class="cName">${name}</div>
+          <div class="cTime">${esc(formatTime(comment.created_at))}</div>
+        </div>
+        <div class="cText">${esc(comment.content)}</div>
+      </div>
+    </div>
+  `;
+
+    // empty state varsa temizle
+    const empty = commentsList.querySelector(".cEmpty");
+    if (empty) empty.remove();
+
+    commentsList.insertAdjacentHTML("beforeend", html);
+
+    // count +
+    if (cCount) {
+        const n = Number(cCount.textContent || "0") || 0;
+        cCount.textContent = String(n + 1);
+    }
+
+    // scroll bottom
+    try { commentsList.scrollTop = commentsList.scrollHeight; } catch {}
+}
+
 // =========================
 // MAIN LOAD
 // =========================
 let CURRENT_POST = null;
 let CURRENT_POST_ID = null;
+let CURRENT_AUTHOR_ID = null;
+
+let _profilesForComments = new Map(); // cache (commenters)
 
 async function loadAll() {
     CURRENT_POST_ID = getPostIdFromQuery();
@@ -371,6 +420,7 @@ async function loadAll() {
             return;
         }
         CURRENT_POST = row;
+        CURRENT_AUTHOR_ID = String(row.author_id || "").trim();
 
         const likeCount = await getLikeCount(CURRENT_POST_ID).catch(() => 0);
 
@@ -438,8 +488,8 @@ async function loadAll() {
         const list = await loadComments(CURRENT_POST_ID);
         if (cCount) cCount.textContent = `${list.length}`;
 
-        const profiles = await loadProfiles(list.map((x) => x.user_id));
-        renderComments(list, profiles);
+        _profilesForComments = await loadProfiles(list.map((x) => x.user_id));
+        renderComments(list, _profilesForComments);
 
         setMsg("");
     } catch (err) {
@@ -460,18 +510,76 @@ commentForm?.addEventListener("submit", async (e) => {
     if (btn) btn.disabled = true;
 
     try {
+        // ✅ DB insert + socket emit function içinde var
         await addComment(CURRENT_POST_ID, text);
         if (commentInput) commentInput.value = "";
 
+        // ✅ fallback refresh (socket gelmese de)
         const list = await loadComments(CURRENT_POST_ID);
         if (cCount) cCount.textContent = `${list.length}`;
-        const profiles = await loadProfiles(list.map((x) => x.user_id));
-        renderComments(list, profiles);
+        _profilesForComments = await loadProfiles(list.map((x) => x.user_id));
+        renderComments(list, _profilesForComments);
     } catch (err) {
         alert("❌ " + (err?.message || err));
     } finally {
         if (btn) btn.disabled = false;
     }
+});
+
+// ✅ REALTIME LISTENERS (from /assets1/realtime.js)
+window.addEventListener("sm:comment_new", async (e) => {
+    const p = e.detail || {};
+    const postId = String(p.post_id || "").trim();
+    if (!CURRENT_POST_ID || postId !== CURRENT_POST_ID) return;
+
+    // yeni yorum ekranda yoksa ekle
+    // profil bilgisi yoksa da sorun değil (uid yazar)
+    addCommentToUI(
+        {
+            post_id: postId,
+            comment_id: p.comment_id || p.id,
+            user_id: p.user_id,
+            content: p.content,
+            created_at: p.created_at || new Date().toISOString(),
+        },
+        _profilesForComments
+    );
+});
+
+window.addEventListener("sm:like_update", (e) => {
+    const p = e.detail || {};
+    const postId = String(p.post_id || "").trim();
+    if (!CURRENT_POST_ID || postId !== CURRENT_POST_ID) return;
+
+    const likes = Number(p.likes_count);
+    if (!Number.isFinite(likes)) return;
+
+    const span = document.getElementById("pvLikeCount");
+    if (span) span.textContent = String(likes);
+});
+
+window.addEventListener("sm:follow_update", async (e) => {
+    const p = e.detail || {};
+    const target = String(p.target_user_id || "").trim();
+    if (!CURRENT_AUTHOR_ID || target !== CURRENT_AUTHOR_ID) return;
+
+    // bu sayfada follow button sadece author içindi, güncelleyebiliriz:
+    const btn = document.getElementById("pvFollowBtn");
+    if (!btn) return;
+
+    // actor benim mi? (benim takip/çıkma)
+    try {
+        const myId = await getMyUserId();
+        const actor = String(p.actor_user_id || "").trim();
+        if (actor && myId && actor !== myId) return; // başkasının follow'uysa benim butonumu değiştirme
+    } catch {
+        // login değilse dokunma
+        return;
+    }
+
+    const following = !!p.following;
+    btn.textContent = following ? "Following" : "Follow";
+    btn.classList.toggle("isFollowing", following);
 });
 
 // init

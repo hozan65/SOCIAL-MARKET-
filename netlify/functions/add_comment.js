@@ -1,12 +1,13 @@
 // netlify/functions/add_comment.js
-// FINAL: Appwrite JWT verify -> Supabase insert into public.post_comments
-// Includes CORS + OPTIONS
-
 const { createClient } = require("@supabase/supabase-js");
 const { authUser } = require("./_auth_user");
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
 const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+// 🔥 socket
+const SOCKET_COMMENT_EMIT_URL = process.env.SOCKET_COMMENT_EMIT_URL || "";
+const SOCKET_SECRET = process.env.SOCKET_SECRET || "";
 
 function json(statusCode, bodyObj) {
     return {
@@ -56,9 +57,39 @@ exports.handler = async (event) => {
 
         if (error) throw error;
 
+        // 🔥 SOCKET: yorumu anında yayınla
+        emitCommentSafe({
+            post_id: data.post_id,
+            comment_id: data.id,
+            user_id: data.user_id,
+            content: data.content,
+            created_at: data.created_at,
+        });
+
         return json(200, { ok: true, comment: data });
     } catch (e) {
         console.error("add_comment error:", e);
         return json(500, { error: e.message || "Server error" });
     }
 };
+
+async function emitCommentSafe(payload) {
+    try {
+        if (!SOCKET_COMMENT_EMIT_URL) return;
+
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), 1500);
+
+        await fetch(SOCKET_COMMENT_EMIT_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-socket-secret": SOCKET_SECRET,
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+        });
+
+        clearTimeout(t);
+    } catch {}
+}
