@@ -2,26 +2,41 @@
 (() => {
     console.log("messages.js LOADED ✅");
 
+    // -----------------------------
+    // DOM
+    // -----------------------------
     const msgList = document.getElementById("msgList");
     const msgForm = document.getElementById("msgForm");
     const msgInput = document.getElementById("msgInput");
 
+    // -----------------------------
+    // STATE
+    // -----------------------------
+    const params = new URL(location.href).searchParams;
     const state = {
         me: localStorage.getItem("sm_uid"),
-        conversation_id: new URL(location.href).searchParams.get("conversation_id") || "",
+        conversation_id: params.get("conversation_id") || "",
     };
 
+    // -----------------------------
+    // HELPERS
+    // -----------------------------
     function esc(s) {
         return String(s || "")
             .replaceAll("&", "&amp;")
             .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;");
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
     }
 
     function renderMessage(m) {
         const mine = m.from_id === state.me;
         const cls = mine ? "mMine" : "mTheirs";
-        const time = m.created_at ? new Date(m.created_at).toLocaleTimeString() : "";
+        const time = m.created_at
+            ? new Date(m.created_at).toLocaleTimeString()
+            : "";
+
         return `
       <div class="mRow ${cls}">
         <div class="mBubble">
@@ -37,13 +52,15 @@
         msgList.scrollTop = msgList.scrollHeight;
     }
 
-    // 🔥 SOCKET – SERVER `dm_new` EMIT EDİYOR
+    // -----------------------------
+    // SOCKET – REALTIME (SERVER dm_new)
+    // -----------------------------
     const socket = window.rt?.socket;
     if (socket) {
         socket.on("dm_new", (m) => {
             console.log("📩 dm_new received:", m);
 
-            // sadece açık conversation ise bas
+            // sadece açık conversation ise ekrana bas
             if (m.conversation_id === state.conversation_id) {
                 appendMessage(m);
             }
@@ -52,39 +69,51 @@
         console.warn("⚠️ socket not ready in messages.js");
     }
 
-    // FORM SUBMIT (mesaj gönder)
+    // -----------------------------
+    // SEND MESSAGE (JWT İLE)
+    // -----------------------------
     msgForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
+
         const text = msgInput.value.trim();
         if (!text) return;
 
         msgInput.value = "";
 
-        const payload = {
-            conversation_id: state.conversation_id,
-            text,
-        };
-
-        // optimistic UI
+        // optimistic UI (anında göster)
         appendMessage({
             from_id: state.me,
             text,
             created_at: new Date().toISOString(),
         });
 
+        const jwt = localStorage.getItem("sm_jwt");
+        if (!jwt) {
+            alert("JWT missing. Please refresh page.");
+            return;
+        }
+
         try {
             const r = await fetch("/.netlify/functions/dm_send", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + jwt, // 🔥 HATANIN ASIL ÇÖZÜMÜ
+                },
+                body: JSON.stringify({
+                    conversation_id: state.conversation_id,
+                    text,
+                }),
             });
 
             const d = await r.json();
             if (!r.ok) throw new Error(d.error || "send failed");
 
+            // NOT:
+            // Mesaj tekrar basılmıyor çünkü
             // server zaten socket ile dm_new gönderecek
         } catch (err) {
-            console.error(err);
+            console.error("❌ dm_send error:", err);
             alert("Mesaj gönderilemedi");
         }
     });
