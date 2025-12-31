@@ -20,13 +20,12 @@ export const handler = async (event) => {
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
         const body = JSON.parse(event.body || "{}");
-        let { conversation_id, text, peer_id, is_private } = body;
+        let { conversation_id, text, peer_id } = body;
 
-        // text/body
         const msgBody = String(text ?? body.body ?? "").trim();
         if (!msgBody) return json(400, { error: "Missing text" });
 
-        // conversation_id yoksa peer_id ile ensure yap
+        // ensure conversation if missing
         if (!conversation_id) {
             const p = String(peer_id || "").trim();
             if (!p) return json(400, { error: "Missing conversation_id or peer_id" });
@@ -54,7 +53,7 @@ export const handler = async (event) => {
             }
         }
 
-        // convo auth + peer determine
+        // convo auth + peer
         const { data: convo, error: eC } = await sb
             .from("conversations")
             .select("id,user1_id,user2_id")
@@ -68,36 +67,32 @@ export const handler = async (event) => {
 
         const peer = convo.user1_id === sender_id ? convo.user2_id : convo.user1_id;
 
-        // insert message
         const now = new Date().toISOString();
+
+        // insert message (ONLY columns that surely exist)
         const { data: row, error: e3 } = await sb
             .from("messages")
             .insert([{
                 conversation_id,
                 sender_id,
                 body: msgBody,
-                event: "dm",
-                private: is_private ?? true,
                 inserted_at: now,
                 updated_at: now,
             }])
-            .select("id,conversation_id,sender_id,body,created_at,inserted_at,updated_at,read_at,private,event")
+            .select("id,conversation_id,sender_id,body,created_at,inserted_at,updated_at,read_at")
             .single();
 
         if (e3) throw new Error(e3.message);
 
-        // bump conversation updated_at
-        await sb
-            .from("conversations")
-            .update({ updated_at: now })
-            .eq("id", conversation_id);
+        // bump convo updated_at
+        await sb.from("conversations").update({ updated_at: now }).eq("id", conversation_id);
 
         // normalize for UI
         const normalized = {
             id: row.id,
             conversation_id: row.conversation_id,
             from_id: row.sender_id,
-            to_id: peer, // UI convenience (table doesn't store it)
+            to_id: peer,
             text: row.body,
             created_at: row.created_at || row.inserted_at || now,
             raw: row,

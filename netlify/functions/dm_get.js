@@ -28,27 +28,26 @@ export const handler = async (event) => {
             .select("id,user1_id,user2_id")
             .eq("id", conversation_id)
             .single();
-
         if (e1) throw new Error(e1.message);
+
         if (!(convo.user1_id === uid || convo.user2_id === uid)) return json(403, { error: "Forbidden" });
 
         const peer_id = convo.user1_id === uid ? convo.user2_id : convo.user1_id;
 
         const { data: rows, error: e2 } = await sb
             .from("messages")
-            .select("id,conversation_id,sender_id,body,created_at,read_at,private,updated_at,inserted_at")
+            .select("id,conversation_id,sender_id,body,created_at,inserted_at,updated_at,read_at")
             .eq("conversation_id", conversation_id)
             .order("created_at", { ascending: true });
 
         if (e2) throw new Error(e2.message);
 
-        // UI kolaylığı için normalize edelim:
         const normalized = (rows || []).map((m) => ({
             id: m.id,
             conversation_id: m.conversation_id,
-            from_id: m.sender_id,     // UI bunu bekliyorsa
-            text: m.body,             // UI bunu bekliyorsa
-            created_at: m.created_at || m.inserted_at || null,
+            from_id: m.sender_id,
+            text: m.body,
+            created_at: m.created_at || m.inserted_at || m.updated_at || null,
             raw: m,
         }));
 
