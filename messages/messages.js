@@ -1,4 +1,3 @@
-// messages/messages.js
 import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
 
 (() => {
@@ -9,15 +8,6 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
 
     if (!listEl || !inputEl || !formEl) {
         console.error("Missing #msgList / #msgInput / #msgForm in HTML");
-        return;
-    }
-
-    // URL: messages.html?conversation_id=UUID
-    const params = new URLSearchParams(location.search);
-    const conversation_id = (params.get("conversation_id") || "").trim();
-
-    if (!conversation_id) {
-        setHint("Select a chat (missing conversation_id in URL)");
         return;
     }
 
@@ -33,6 +23,8 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
         const jwt = getJWT() || ""; // sm_jwt
         const h = { ...extra };
         if (jwt) h["X-Appwrite-JWT"] = jwt;
+        // bazı function’lar x-jwt de kabul ediyor, ikisini de basalım:
+        if (jwt) h["x-jwt"] = jwt;
         return h;
     }
 
@@ -55,7 +47,39 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
         listEl.scrollTop = listEl.scrollHeight;
     }
 
-    async function loadHistory() {
+    async function ensureConversationId() {
+        const params = new URLSearchParams(location.search);
+
+        // 1) önce direkt conversation_id varsa onu kullan
+        let conversation_id = (params.get("conversation_id") || "").trim();
+        if (conversation_id) return conversation_id;
+
+        // 2) yoksa ?to=OTHER_ID varsa ensure_conversation çağır
+        const to = (params.get("to") || "").trim();
+        if (!to) return "";
+
+        setHint("Opening chat...");
+
+        const res = await fetch(
+            `/.netlify/functions/ensure_conversation?to=${encodeURIComponent(to)}`,
+            { headers: authHeaders() }
+        );
+        const data = await res.json();
+        if (!data?.ok || !data?.conversation_id) {
+            throw new Error(data?.error || "ensure_conversation failed");
+        }
+
+        conversation_id = String(data.conversation_id);
+
+        // URL'yi temiz şekilde güncelle (reload yok)
+        params.set("conversation_id", conversation_id);
+        params.delete("to");
+        history.replaceState(null, "", `${location.pathname}?${params.toString()}`);
+
+        return conversation_id;
+    }
+
+    async function loadHistory(conversation_id) {
         setHint("");
         const res = await fetch(
             `/.netlify/functions/get_messages?conversation_id=${encodeURIComponent(conversation_id)}&limit=200`,
@@ -64,7 +88,7 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
         const data = await res.json();
         if (!data?.ok) throw new Error(data?.error || "get_messages failed");
 
-        (data.messages || []).forEach((m) => {
+        (data.messages || data.list || []).forEach((m) => {
             const id = String(m.id || "");
             if (!id || seenIds.has(id)) return;
             seenIds.add(id);
@@ -72,7 +96,7 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
         });
     }
 
-    function subscribeRealtime() {
+    function subscribeRealtime(conversation_id) {
         supabase
             .channel("msg-" + conversation_id)
             .on(
@@ -98,7 +122,7 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
             .subscribe((status) => console.log("Realtime:", status));
     }
 
-    async function sendMessage(text) {
+    async function sendMessage(conversation_id, text) {
         // optimistic UI
         renderMessage(
             {
@@ -123,23 +147,27 @@ import { supabase, getJWT, getAppwriteUID } from "/services/supabase.js";
             return;
         }
 
-        // realtime ile gelecek ama duplicate önle
         if (data?.message?.id) seenIds.add(String(data.message.id));
     }
 
-    // ✅ Form submit (HTML’inle birebir)
-    formEl.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const text = String(inputEl.value || "").trim();
-        if (!text) return;
-        inputEl.value = "";
-        await sendMessage(text);
-    });
-
-    // init
     (async () => {
-        await loadHistory();
-        subscribeRealtime();
+        const conversation_id = await ensureConversationId();
+        if (!conversation_id) {
+            setHint("Select a chat");
+            return;
+        }
+
+        await loadHistory(conversation_id);
+        subscribeRealtime(conversation_id);
+
+        formEl.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const text = String(inputEl.value || "").trim();
+            if (!text) return;
+            inputEl.value = "";
+            await sendMessage(conversation_id, text);
+        });
+
         setHint("");
     })().catch((err) => {
         console.error(err);
