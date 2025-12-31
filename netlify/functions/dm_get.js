@@ -21,34 +21,35 @@ export const handler = async (event) => {
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
             throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
         }
-
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
-        // conversation doğrula
+        // convo check
         const { data: convo, error: e1 } = await sb
             .from("conversations")
-            .select("id,user_a,user_b")
+            .select("id,user1_id,user2_id")
             .eq("id", conversation_id)
             .single();
 
         if (e1) throw new Error(e1.message);
-        if (!(convo.user_a === uid || convo.user_b === uid)) return json(403, { error: "Forbidden" });
 
-        const peer_id = convo.user_a === uid ? convo.user_b : convo.user_a;
+        if (!(convo.user1_id === uid || convo.user2_id === uid)) {
+            return json(403, { error: "Forbidden" });
+        }
 
-        const { data, error } = await sb
+        const peer_id = convo.user1_id === uid ? convo.user2_id : convo.user1_id;
+
+        const { data: rows, error: e2 } = await sb
             .from("messages")
             .select("id,conversation_id,from_id,to_id,text,created_at,client_id")
             .eq("conversation_id", conversation_id)
             .order("created_at", { ascending: true });
 
-        if (error) throw new Error(error.message);
+        if (e2) throw new Error(e2.message);
 
-        return json(200, { ok: true, peer_id, rows: data || [] });
+        return json(200, { ok: true, peer_id, rows: rows || [] });
     } catch (e) {
         const msg = String(e?.message || e);
-        const low = msg.toLowerCase();
-        const status = low.includes("jwt") ? 401 : 500;
+        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
         return json(status, { error: msg });
     }
 };

@@ -17,29 +17,53 @@ export const handler = async (event) => {
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
             throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
         }
-
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
-        const { data, error } = await sb
+        // conversations
+        const { data: convos, error: e1 } = await sb
             .from("conversations")
-            .select("id,user_a,user_b,last_message,last_at")
-            .or(`user_a.eq.${uid},user_b.eq.${uid}`)
-            .order("last_at", { ascending: false, nullsFirst: false });
+            .select("id,user1_id,user2_id,updated_at,created_at")
+            .or(`user1_id.eq.${uid},user2_id.eq.${uid}`)
+            .order("updated_at", { ascending: false });
 
-        if (error) throw new Error(error.message);
+        if (e1) throw new Error(e1.message);
 
-        const list = (data || []).map((c) => ({
-            conversation_id: c.id,
-            peer_id: c.user_a === uid ? c.user_b : c.user_a,
-            last_message: c.last_message || "",
-            last_at: c.last_at || null,
-        }));
+        const ids = (convos || []).map((c) => c.id);
+        let lastByConvo = new Map();
+
+        // last message for all convos (single query)
+        if (ids.length) {
+            const { data: msgs, error: e2 } = await sb
+                .from("messages")
+                .select("conversation_id,text,created_at")
+                .in("conversation_id", ids)
+                .order("created_at", { ascending: false });
+
+            if (e2) throw new Error(e2.message);
+
+            // keep first (latest) per conversation_id
+            for (const m of msgs || []) {
+                if (!lastByConvo.has(m.conversation_id)) {
+                    lastByConvo.set(m.conversation_id, m);
+                }
+            }
+        }
+
+        const list = (convos || []).map((c) => {
+            const peer_id = c.user1_id === uid ? c.user2_id : c.user1_id;
+            const last = lastByConvo.get(c.id);
+            return {
+                conversation_id: c.id,
+                peer_id,
+                last_message: last?.text || "",
+                last_at: last?.created_at || c.updated_at || c.created_at || null,
+            };
+        });
 
         return json(200, { ok: true, list });
     } catch (e) {
         const msg = String(e?.message || e);
-        const low = msg.toLowerCase();
-        const status = low.includes("jwt") ? 401 : 500;
+        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
         return json(status, { error: msg });
     }
 };

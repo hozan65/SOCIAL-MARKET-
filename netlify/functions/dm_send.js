@@ -17,7 +17,6 @@ export const handler = async (event) => {
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
             throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
         }
-
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
         const body = JSON.parse(event.body || "{}");
@@ -26,14 +25,14 @@ export const handler = async (event) => {
         if (!to_id) return json(400, { error: "Missing to_id" });
         if (!text || !String(text).trim()) return json(400, { error: "Missing text" });
 
-        // conversation_id yoksa otomatik conversation bul/oluştur
+        // convo yoksa bul/oluştur (user1_id/user2_id)
         if (!conversation_id) {
-            const a = from_id, b = to_id;
-
             const { data: existing, error: e1 } = await sb
                 .from("conversations")
-                .select("id,user_a,user_b")
-                .or(`and(user_a.eq.${a},user_b.eq.${b}),and(user_a.eq.${b},user_b.eq.${a})`)
+                .select("id,user1_id,user2_id")
+                .or(
+                    `and(user1_id.eq.${from_id},user2_id.eq.${to_id}),and(user1_id.eq.${to_id},user2_id.eq.${from_id})`
+                )
                 .limit(1);
 
             if (e1) throw new Error(e1.message);
@@ -43,16 +42,27 @@ export const handler = async (event) => {
             } else {
                 const { data: created, error: e2 } = await sb
                     .from("conversations")
-                    .insert([{ user_a: a, user_b: b, last_message: "", last_at: new Date().toISOString() }])
+                    .insert([{ user1_id: from_id, user2_id: to_id }])
                     .select("id")
                     .single();
 
                 if (e2) throw new Error(e2.message);
                 conversation_id = created.id;
             }
+        } else {
+            // convo user'a ait mi?
+            const { data: convo, error: e0 } = await sb
+                .from("conversations")
+                .select("id,user1_id,user2_id")
+                .eq("id", conversation_id)
+                .single();
+            if (e0) throw new Error(e0.message);
+            if (!(convo.user1_id === from_id || convo.user2_id === from_id)) {
+                return json(403, { error: "Forbidden" });
+            }
         }
 
-        // message insert
+        // insert message
         const { data: row, error: e3 } = await sb
             .from("messages")
             .insert([{
@@ -67,17 +77,16 @@ export const handler = async (event) => {
 
         if (e3) throw new Error(e3.message);
 
-        // conversation preview update
+        // bump updated_at (RLS yok çünkü service role)
         await sb
             .from("conversations")
-            .update({ last_message: String(text).slice(0, 140), last_at: new Date().toISOString() })
+            .update({ updated_at: new Date().toISOString() })
             .eq("id", conversation_id);
 
         return json(200, { ok: true, conversation_id, row });
     } catch (e) {
         const msg = String(e?.message || e);
-        const low = msg.toLowerCase();
-        const status = low.includes("jwt") ? 401 : 500;
+        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
         return json(status, { error: msg });
     }
 };

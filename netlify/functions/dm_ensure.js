@@ -19,7 +19,6 @@ export const handler = async (event) => {
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
             throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
         }
-
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
         const qs = event.queryStringParameters || {};
@@ -29,12 +28,13 @@ export const handler = async (event) => {
         if (!peer_id) return json(400, { error: "Missing peer_id" });
         if (peer_id === me) return json(400, { error: "peer_id cannot be self" });
 
-        const a = me, b = peer_id;
-
+        // existing conversation?
         const { data: existing, error: e1 } = await sb
             .from("conversations")
-            .select("id,user_a,user_b")
-            .or(`and(user_a.eq.${a},user_b.eq.${b}),and(user_a.eq.${b},user_b.eq.${a})`)
+            .select("id,user1_id,user2_id")
+            .or(
+                `and(user1_id.eq.${me},user2_id.eq.${peer_id}),and(user1_id.eq.${peer_id},user2_id.eq.${me})`
+            )
             .limit(1);
 
         if (e1) throw new Error(e1.message);
@@ -43,9 +43,10 @@ export const handler = async (event) => {
             return json(200, { ok: true, conversation_id: existing[0].id, existing: true });
         }
 
+        // create conversation
         const { data: created, error: e2 } = await sb
             .from("conversations")
-            .insert([{ user_a: a, user_b: b, last_message: "", last_at: new Date().toISOString() }])
+            .insert([{ user1_id: me, user2_id: peer_id }])
             .select("id")
             .single();
 
@@ -54,8 +55,7 @@ export const handler = async (event) => {
         return json(200, { ok: true, conversation_id: created.id, existing: false });
     } catch (e) {
         const msg = String(e?.message || e);
-        const low = msg.toLowerCase();
-        const status = low.includes("jwt") ? 401 : 500;
+        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
         return json(status, { error: msg });
     }
 };
