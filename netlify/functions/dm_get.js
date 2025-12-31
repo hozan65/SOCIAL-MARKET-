@@ -13,18 +13,16 @@ export const handler = async (event) => {
         const { user } = await getAppwriteUser(event);
         const me = user.$id;
 
-        const body = JSON.parse(event.body || "{}");
-        if (!body.conversation_id)
-            return json(400,{ error:"Missing conversation_id" });
+        const conversation_id = event.queryStringParameters?.conversation_id;
+        if (!conversation_id) return json(400,{ error:"Missing conversation_id" });
 
-        await supabase
+        const { data } = await supabase
             .from("messages")
-            .update({ read_at:new Date().toISOString() })
-            .eq("conversation_id", body.conversation_id)
-            .neq("sender_id", me)
-            .is("read_at", null);
+            .select("id,conversation_id,sender_id,body,created_at")
+            .eq("conversation_id", conversation_id)
+            .order("created_at",{ ascending:true });
 
-        return json(200,{ ok:true });
+        return json(200,{ ok:true, list:data||[] });
     } catch (e) {
         return json(401,{ error:String(e.message||e) });
     }

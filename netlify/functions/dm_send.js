@@ -6,92 +6,29 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const SOCKET_DM_EMIT_URL = process.env.SOCKET_DM_EMIT_URL || ""; // https://socket.domain.com/emit/dm
-const SOCKET_SECRET = process.env.SOCKET_SECRET || "";
-
-const json = (status, body) => ({
-    statusCode: status,
-    headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT, x-jwt",
-        "Access-Control-Allow-Methods": "GET,POST,OPTIONS"
-    },
-    body: JSON.stringify(body)
-});
+const json = (s,b)=>({statusCode:s,headers:{ "Content-Type":"application/json"},body:JSON.stringify(b)});
 
 export const handler = async (event) => {
     try {
-        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-        if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
-
         const { user } = await getAppwriteUser(event);
-        const me = user?.$id;
-        if (!me) return json(401, { error: "Unauthorized" });
+        const me = user.$id;
 
         const body = JSON.parse(event.body || "{}");
-        const conversation_id = String(body?.conversation_id || "").trim();
-        const text = String(body?.body || "").trim();
+        if (!body.conversation_id || !body.body)
+            return json(400,{ error:"Missing data" });
 
-        if (!conversation_id) return json(400, { error: "Missing conversation_id" });
-        if (!text) return json(400, { error: "Message is empty" });
-        if (text.length > 2000) return json(400, { error: "Message too long (max 2000)" });
-
-        // yetki: konuşmanın tarafı mı?
-        const { data: conv, error: e1 } = await supabase
-            .from("conversations")
-            .select("id,user1_id,user2_id")
-            .eq("id", conversation_id)
-            .maybeSingle();
-
-        if (e1) return json(500, { error: e1.message });
-        if (!conv?.id) return json(404, { error: "Conversation not found" });
-        if (conv.user1_id !== me && conv.user2_id !== me) return json(403, { error: "Forbidden" });
-
-        const { data: inserted, error: e2 } = await supabase
+        const { data } = await supabase
             .from("messages")
-            .insert({ conversation_id, sender_id: me, body: text })
-            .select("id,conversation_id,sender_id,body,created_at")
+            .insert({
+                conversation_id: body.conversation_id,
+                sender_id: me,
+                body: body.body
+            })
+            .select()
             .single();
 
-        if (e2) return json(500, { error: e2.message });
-
-        // ✅ karşı taraf id
-        const other_id = conv.user1_id === me ? conv.user2_id : conv.user1_id;
-
-        // ✅ socket'e bildir (fail olsa bile mesaj kaydı başarılı kalsın)
-        emitDMSafe({
-            message_id: inserted.id,
-            conversation_id: inserted.conversation_id,
-            from_id: me,
-            to_id: other_id,
-            body: inserted.body,
-            created_at: inserted.created_at
-        });
-
-        return json(200, { ok: true, message: inserted });
+        return json(200,{ ok:true, message:data });
     } catch (e) {
-        return json(500, { error: String(e?.message || e) });
+        return json(401,{ error:String(e.message||e) });
     }
 };
-
-async function emitDMSafe(payload) {
-    try {
-        if (!SOCKET_DM_EMIT_URL) return;
-
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), 1500);
-
-        await fetch(SOCKET_DM_EMIT_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-socket-secret": SOCKET_SECRET
-            },
-            body: JSON.stringify(payload),
-            signal: controller.signal
-        });
-
-        clearTimeout(t);
-    } catch {}
-}
