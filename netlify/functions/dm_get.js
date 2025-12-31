@@ -1,4 +1,3 @@
-// netlify/functions/dm_get.js
 import { getAppwriteUser } from "./_appwrite_user.js";
 import { createClient } from "@supabase/supabase-js";
 
@@ -14,50 +13,42 @@ export const handler = async (event) => {
         const { user } = await getAppwriteUser(event);
         const uid = user.$id;
 
-        const q = event.queryStringParameters || {};
-        const conversation_id = q.conversation_id || "";
-        if (!conversation_id) return json(400, { error: "Missing conversation_id" });
-
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
             throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
         }
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
-        const { data: convo, error: e1 } = await sb
+        const qs = event.queryStringParameters || {};
+        const conversation_id = String(qs.conversation_id || "").trim();
+        if (!conversation_id) return json(400, { error: "Missing conversation_id" });
+
+        // 1) authorize: user must be in conversation
+        const { data: convo, error: eC } = await sb
             .from("conversations")
             .select("id,user1_id,user2_id")
             .eq("id", conversation_id)
             .single();
-        if (e1) throw new Error(e1.message);
+        if (eC) throw new Error(eC.message);
 
         if (!(convo.user1_id === uid || convo.user2_id === uid)) {
             return json(403, { error: "Forbidden" });
         }
 
-        const peer_id = convo.user1_id === uid ? convo.user2_id : convo.user1_id;
-
-        // ✅ updated_at yok
-        const { data: rows, error: e2 } = await sb
+        // 2) fetch messages
+        const limit = Math.min(Number(qs.limit || 200), 500);
+        const { data: rows, error: eM } = await sb
             .from("messages")
             .select("id,conversation_id,sender_id,body,created_at,read_at")
             .eq("conversation_id", conversation_id)
-            .order("created_at", { ascending: true });
+            .order("created_at", { ascending: true })
+            .limit(limit);
 
-        if (e2) throw new Error(e2.message);
+        if (eM) throw new Error(eM.message);
 
-        const normalized = (rows || []).map((m) => ({
-            id: m.id,
-            conversation_id: m.conversation_id,
-            from_id: m.sender_id,
-            text: m.body,
-            created_at: m.created_at || null,
-            raw: m,
-        }));
-
-        return json(200, { ok: true, peer_id, rows: normalized });
+        return json(200, { ok: true, list: rows || [] });
     } catch (e) {
         const msg = String(e?.message || e);
-        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
+        const status = msg.toLowerCase().includes("jwt") ? 401 : 502;
         return json(status, { error: msg });
     }
 };
