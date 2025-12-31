@@ -23,7 +23,6 @@ export const handler = async (event) => {
         }
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
-        // convo check
         const { data: convo, error: e1 } = await sb
             .from("conversations")
             .select("id,user1_id,user2_id")
@@ -31,22 +30,29 @@ export const handler = async (event) => {
             .single();
 
         if (e1) throw new Error(e1.message);
-
-        if (!(convo.user1_id === uid || convo.user2_id === uid)) {
-            return json(403, { error: "Forbidden" });
-        }
+        if (!(convo.user1_id === uid || convo.user2_id === uid)) return json(403, { error: "Forbidden" });
 
         const peer_id = convo.user1_id === uid ? convo.user2_id : convo.user1_id;
 
         const { data: rows, error: e2 } = await sb
             .from("messages")
-            .select("id,conversation_id,from_id,to_id,text,created_at,client_id")
+            .select("id,conversation_id,sender_id,body,created_at,read_at,private,updated_at,inserted_at")
             .eq("conversation_id", conversation_id)
             .order("created_at", { ascending: true });
 
         if (e2) throw new Error(e2.message);
 
-        return json(200, { ok: true, peer_id, rows: rows || [] });
+        // UI kolaylığı için normalize edelim:
+        const normalized = (rows || []).map((m) => ({
+            id: m.id,
+            conversation_id: m.conversation_id,
+            from_id: m.sender_id,     // UI bunu bekliyorsa
+            text: m.body,             // UI bunu bekliyorsa
+            created_at: m.created_at || m.inserted_at || null,
+            raw: m,
+        }));
+
+        return json(200, { ok: true, peer_id, rows: normalized });
     } catch (e) {
         const msg = String(e?.message || e);
         const status = msg.toLowerCase().includes("jwt") ? 401 : 500;

@@ -19,7 +19,6 @@ export const handler = async (event) => {
         }
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
-        // conversations
         const { data: convos, error: e1 } = await sb
             .from("conversations")
             .select("id,user1_id,user2_id,updated_at,created_at")
@@ -29,23 +28,19 @@ export const handler = async (event) => {
         if (e1) throw new Error(e1.message);
 
         const ids = (convos || []).map((c) => c.id);
-        let lastByConvo = new Map();
+        const lastByConvo = new Map();
 
-        // last message for all convos (single query)
         if (ids.length) {
             const { data: msgs, error: e2 } = await sb
                 .from("messages")
-                .select("conversation_id,text,created_at")
+                .select("conversation_id,body,created_at")
                 .in("conversation_id", ids)
                 .order("created_at", { ascending: false });
 
             if (e2) throw new Error(e2.message);
 
-            // keep first (latest) per conversation_id
             for (const m of msgs || []) {
-                if (!lastByConvo.has(m.conversation_id)) {
-                    lastByConvo.set(m.conversation_id, m);
-                }
+                if (!lastByConvo.has(m.conversation_id)) lastByConvo.set(m.conversation_id, m);
             }
         }
 
@@ -55,7 +50,7 @@ export const handler = async (event) => {
             return {
                 conversation_id: c.id,
                 peer_id,
-                last_message: last?.text || "",
+                last_message: last?.body ? String(last.body) : "",
                 last_at: last?.created_at || c.updated_at || c.created_at || null,
             };
         });

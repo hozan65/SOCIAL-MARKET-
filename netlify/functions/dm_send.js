@@ -12,7 +12,7 @@ export const handler = async (event) => {
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
         const { user } = await getAppwriteUser(event);
-        const from_id = user.$id;
+        const sender_id = user.$id;
 
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
             throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
@@ -20,70 +20,90 @@ export const handler = async (event) => {
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
         const body = JSON.parse(event.body || "{}");
-        let { conversation_id, to_id, text, client_id } = body;
+        let { conversation_id, text, peer_id, is_private } = body;
 
-        if (!to_id) return json(400, { error: "Missing to_id" });
-        if (!text || !String(text).trim()) return json(400, { error: "Missing text" });
+        // text/body
+        const msgBody = String(text ?? body.body ?? "").trim();
+        if (!msgBody) return json(400, { error: "Missing text" });
 
-        // convo yoksa bul/oluştur (user1_id/user2_id)
+        // conversation_id yoksa peer_id ile ensure yap
         if (!conversation_id) {
+            const p = String(peer_id || "").trim();
+            if (!p) return json(400, { error: "Missing conversation_id or peer_id" });
+            if (p === sender_id) return json(400, { error: "peer_id cannot be self" });
+
             const { data: existing, error: e1 } = await sb
                 .from("conversations")
                 .select("id,user1_id,user2_id")
                 .or(
-                    `and(user1_id.eq.${from_id},user2_id.eq.${to_id}),and(user1_id.eq.${to_id},user2_id.eq.${from_id})`
+                    `and(user1_id.eq.${sender_id},user2_id.eq.${p}),and(user1_id.eq.${p},user2_id.eq.${sender_id})`
                 )
                 .limit(1);
 
             if (e1) throw new Error(e1.message);
 
-            if (existing && existing[0]) {
-                conversation_id = existing[0].id;
-            } else {
+            if (existing && existing[0]) conversation_id = existing[0].id;
+            else {
                 const { data: created, error: e2 } = await sb
                     .from("conversations")
-                    .insert([{ user1_id: from_id, user2_id: to_id }])
+                    .insert([{ user1_id: sender_id, user2_id: p }])
                     .select("id")
                     .single();
-
                 if (e2) throw new Error(e2.message);
                 conversation_id = created.id;
             }
-        } else {
-            // convo user'a ait mi?
-            const { data: convo, error: e0 } = await sb
-                .from("conversations")
-                .select("id,user1_id,user2_id")
-                .eq("id", conversation_id)
-                .single();
-            if (e0) throw new Error(e0.message);
-            if (!(convo.user1_id === from_id || convo.user2_id === from_id)) {
-                return json(403, { error: "Forbidden" });
-            }
         }
 
+        // convo auth + peer determine
+        const { data: convo, error: eC } = await sb
+            .from("conversations")
+            .select("id,user1_id,user2_id")
+            .eq("id", conversation_id)
+            .single();
+        if (eC) throw new Error(eC.message);
+
+        if (!(convo.user1_id === sender_id || convo.user2_id === sender_id)) {
+            return json(403, { error: "Forbidden" });
+        }
+
+        const peer = convo.user1_id === sender_id ? convo.user2_id : convo.user1_id;
+
         // insert message
+        const now = new Date().toISOString();
         const { data: row, error: e3 } = await sb
             .from("messages")
             .insert([{
                 conversation_id,
-                from_id,
-                to_id,
-                text: String(text),
-                client_id: client_id || null,
+                sender_id,
+                body: msgBody,
+                event: "dm",
+                private: is_private ?? true,
+                inserted_at: now,
+                updated_at: now,
             }])
-            .select("id,conversation_id,from_id,to_id,text,created_at,client_id")
+            .select("id,conversation_id,sender_id,body,created_at,inserted_at,updated_at,read_at,private,event")
             .single();
 
         if (e3) throw new Error(e3.message);
 
-        // bump updated_at (RLS yok çünkü service role)
+        // bump conversation updated_at
         await sb
             .from("conversations")
-            .update({ updated_at: new Date().toISOString() })
+            .update({ updated_at: now })
             .eq("id", conversation_id);
 
-        return json(200, { ok: true, conversation_id, row });
+        // normalize for UI
+        const normalized = {
+            id: row.id,
+            conversation_id: row.conversation_id,
+            from_id: row.sender_id,
+            to_id: peer, // UI convenience (table doesn't store it)
+            text: row.body,
+            created_at: row.created_at || row.inserted_at || now,
+            raw: row,
+        };
+
+        return json(200, { ok: true, conversation_id, peer_id: peer, row: normalized });
     } catch (e) {
         const msg = String(e?.message || e);
         const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
