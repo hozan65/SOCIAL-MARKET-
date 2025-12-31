@@ -2,275 +2,237 @@
 (() => {
     console.log("messages.js LOADED ✅", location.href);
 
-    // ---------- Helpers ----------
     const qs = (s, el = document) => el.querySelector(s);
-    const qsa = (s, el = document) => Array.from(el.querySelectorAll(s));
+    const esc = (s) => String(s ?? "")
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 
-    function getConversationId() {
-        const u = new URL(location.href);
-        return u.searchParams.get("conversation_id") || "";
-    }
+    const inboxList = qs("#inboxList");
+    const inboxHint = qs("#inboxHint");
+    const msgList = qs("#msgList");
+    const msgHint = qs("#msgHint");
 
-    function escapeHtml(str) {
-        return String(str || "")
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
-    }
+    const peerName = qs("#peerName");
+    const peerSub = qs("#peerSub");
 
-    // ---------- Appwrite JWT Refresh ----------
+    const msgForm = qs("#msgForm");
+    const msgInput = qs("#msgInput");
+
+    function params() { return new URL(location.href).searchParams; }
+    function convoId() { return params().get("conversation_id") || ""; }
+    function toId() { return params().get("to_id") || ""; }
+
+    // --- JWT / Auth ---
     async function ensureJWT() {
-        // Senin projede account objesi nerede ise buraya düşür.
-        const account =
-            window.account ||
-            window.appwrite?.account ||
-            window.appwriteAccount ||
-            null;
-
-        if (!account?.createJWT) {
-            // createJWT yoksa burası patlar. En azından net hata verelim.
-            throw new Error("Appwrite account client not found (createJWT missing).");
-        }
-
-        const jwtObj = await account.createJWT(); // { jwt: "..." }
-        const jwt = jwtObj?.jwt;
-
-        if (!jwt) throw new Error("JWT not returned from Appwrite.");
-
-        localStorage.setItem("sm_jwt", jwt);
-        return jwt;
+        const account = window.account || window.appwrite?.account;
+        if (!account?.createJWT) throw new Error("Appwrite account client not found (createJWT missing).");
+        const j = await account.createJWT();
+        if (!j?.jwt) throw new Error("JWT not returned");
+        localStorage.setItem("sm_jwt", j.jwt);
+        return j.jwt;
     }
+    const getJWT = () => localStorage.getItem("sm_jwt") || "";
 
-    function getJWT() {
-        return localStorage.getItem("sm_jwt") || "";
-    }
-
-    // ---------- Netlify Functions API ----------
     async function apiFetch(path, opts = {}) {
-        const url = `/.netlify/functions/${path.replace(/^\/+/, "")}`;
-
         let jwt = getJWT();
 
         const doReq = async () => {
             const headers = new Headers(opts.headers || {});
-            if (jwt) headers.set("Authorization", `Bearer ${jwt}`);
             headers.set("Accept", "application/json");
+            if (opts.method && opts.method !== "GET" && !headers.has("Content-Type")) {
+                headers.set("Content-Type", "application/json");
+            }
+            if (jwt) headers.set("Authorization", "Bearer " + jwt);
 
-            return fetch(url, {
-                ...opts,
-                headers
-            });
+            return fetch(`/.netlify/functions/${path}`, { ...opts, headers });
         };
 
         let r = await doReq();
-
-        // 401 => JWT refresh + 1 retry
         if (r.status === 401) {
-            try {
-                jwt = await ensureJWT();
-                r = await doReq();
-            } catch (e) {
-                // refresh de olmadıysa
-                throw new Error("Invalid JWT");
-            }
+            jwt = await ensureJWT();
+            r = await doReq();
         }
 
-        if (!r.ok) {
-            const txt = await r.text().catch(() => "");
-            throw new Error(`HTTP ${r.status} ${txt}`.trim());
-        }
-
-        return r.json();
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+        return data;
     }
 
     async function authUser() {
-        // Bu function sende var: /.netlify/functions/_auth_user
-        const data = await apiFetch("_auth_user", { method: "GET" });
-
-        // Senin _auth_user şu alanları döndürüyordu: user, uid, user_id
-        const uid = data?.uid || data?.user_id || data?.user?.$id || data?.user?.id || "";
-        const name = data?.user?.name || data?.user?.email || "";
-
-        if (!uid) throw new Error("Missing user id from _auth_user");
-
-        // global set (realtime.js join otomatik çalışsın diye)
+        await ensureJWT();
+        const d = await apiFetch("_auth_user", { method: "GET" });
+        const uid = d?.uid || d?.user_id || d?.user?.$id || "";
+        if (!uid) throw new Error("Missing uid from _auth_user");
         window.APPWRITE_USER_ID = uid;
-        window.user_id = uid;
         localStorage.setItem("sm_uid", uid);
-
-        return { uid, name, raw: data };
+        return uid;
     }
 
-    // ---------- UI Wiring ----------
-    const convoId = getConversationId();
+    // --- UI render ---
+    function renderInboxItem(x, active) {
+        // x field names sende farklı olabilir; en toleranslı şekilde okuyorum
+        const cid = x.conversation_id || x.id || x.convo_id || "";
+        const peer = x.peer_id || x.peer || x.other_id || x.user_id || "";
+        const last = x.last_message || x.last || x.preview || "";
+        const tRaw = x.last_at || x.updated_at || x.created_at || "";
+        const t = tRaw ? new Date(tRaw).toLocaleString() : "";
 
-    // Senin HTML yapın değişik olabilir, ama minimum:
-    // - messages container: #dmList veya .dmList
-    // - input: #dmInput
-    // - send button: #dmSend
-    const listEl =
-        qs("#dmList") ||
-        qs(".dmList") ||
-        qs("#messagesList") ||
-        qs(".messagesList");
-
-    const inputEl =
-        qs("#dmInput") ||
-        qs("input[name='message']") ||
-        qs("textarea[name='message']") ||
-        qs("#messageInput");
-
-    const sendBtn =
-        qs("#dmSend") ||
-        qs("button[data-send]") ||
-        qs("#sendBtn");
-
-    function renderMessageRow(m, selfId) {
-        const mine = m.from_id === selfId;
-        const cls = mine ? "dmRow dmMine" : "dmRow dmTheirs";
-
-        const t = m.created_at ? new Date(m.created_at).toLocaleString() : "";
         return `
-      <div class="${cls}" data-mid="${escapeHtml(m.id)}">
-        <div class="dmBubble">
-          <div class="dmText">${escapeHtml(m.text)}</div>
-          <div class="dmMeta">${escapeHtml(t)}</div>
+      <button class="inboxRow ${active ? "isActive" : ""}" type="button"
+        data-cid="${esc(cid)}" data-peer="${esc(peer)}">
+        <div class="inboxTop">
+          <div class="inboxName">${esc(peer || "User")}</div>
+          <div class="inboxTime">${esc(t)}</div>
+        </div>
+        <div class="inboxLast">${esc(last)}</div>
+      </button>
+    `;
+    }
+
+    function renderMsg(m, me) {
+        const mine = m.from_id === me;
+        const cls = mine ? "mRow mMine" : "mRow mTheirs";
+        const t = m.created_at ? new Date(m.created_at).toLocaleTimeString() : "";
+        return `
+      <div class="${cls}">
+        <div class="mBubble">
+          <div class="mText">${esc(m.text)}</div>
+          <div class="mMeta">${esc(t)}</div>
         </div>
       </div>
     `;
     }
 
-    function addMessageToUI(m, selfId) {
-        if (!listEl) return;
-        listEl.insertAdjacentHTML("beforeend", renderMessageRow(m, selfId));
-        // scroll bottom
-        listEl.scrollTop = listEl.scrollHeight;
+    function scrollBottom() {
+        if (!msgList) return;
+        msgList.scrollTop = msgList.scrollHeight;
     }
 
-    // Dedupe: aynı client_id veya id ile iki kez basmasın
-    const seen = new Set();
-    function seenKey(m) {
-        return m.client_id ? `c:${m.client_id}` : `id:${m.id}`;
-    }
+    // --- Load inbox ---
+    async function loadInbox() {
+        inboxHint.textContent = "Loading...";
+        inboxList.innerHTML = "";
 
-    // ---------- Socket Realtime ----------
-    function bindRealtime(selfId) {
-        const socket = window.rt?.socket;
+        const d = await apiFetch("dm_inbox", { method: "GET" });
 
-        if (!socket) {
-            console.warn("⚠️ realtime socket not ready (window.rt.socket missing)");
+        // ✅ senin çıktı: { ok:true, list:[...] }
+        const list = d.list || d.rows || [];
+        if (!list.length) {
+            inboxHint.textContent = "No chats yet.";
             return;
         }
 
-        // listener her zaman bir kere bağlansın
-        if (window.__dm_listener_bound) return;
-        window.__dm_listener_bound = true;
+        inboxHint.textContent = "";
+        const activeCid = convoId();
 
-        socket.on("dm:new", (msg) => {
-            try {
-                if (!msg) return;
+        inboxList.innerHTML = list.map(x => {
+            const cid = x.conversation_id || x.id || x.convo_id || "";
+            return renderInboxItem(x, cid === activeCid);
+        }).join("");
 
-                // sadece bu conversation’a ait mi? (sende msg.conversation_id varsa kontrol et)
-                // yoksa yine basıyoruz, çünkü sende event formatı farklı olabilir.
-                if (msg.conversation_id && convoId && msg.conversation_id !== convoId) return;
-
-                const key = seenKey(msg);
-                if (seen.has(key)) return;
-                seen.add(key);
-
-                addMessageToUI(msg, selfId);
-            } catch (e) {
-                console.error("dm:new handler error", e);
-            }
+        inboxList.querySelectorAll(".inboxRow").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const cid = btn.getAttribute("data-cid");
+                const peer = btn.getAttribute("data-peer");
+                const u = new URL(location.href);
+                u.searchParams.set("conversation_id", cid);
+                u.searchParams.set("to_id", peer);
+                location.href = u.toString();
+            });
         });
-
-        // connect olduysa join at
-        socket.emit("join", { user_id: selfId });
     }
 
-    // ---------- Send DM ----------
-    function sendDm(selfId, toId, text) {
-        const socket = window.rt?.socket;
-        if (!socket) throw new Error("Socket not connected");
-
-        const client_id = (crypto?.randomUUID?.() || String(Date.now()));
-        const payload = {
-            from_id: selfId,
-            to_id: toId,
-            text,
-            client_id,
-            conversation_id: convoId || undefined
-        };
-
-        // UI optimistic
-        const optimistic = {
-            ...payload,
-            id: `tmp-${client_id}`,
-            created_at: new Date().toISOString()
-        };
-
-        const k = seenKey(optimistic);
-        if (!seen.has(k)) {
-            seen.add(k);
-            addMessageToUI(optimistic, selfId);
+    // --- Load chat messages ---
+    async function loadChat(me) {
+        const cid = convoId();
+        if (!cid) {
+            peerName.textContent = "Select a chat";
+            peerSub.textContent = "Direct messages";
+            msgList.innerHTML = "";
+            msgHint.textContent = "Choose a conversation from the left.";
+            return;
         }
 
-        socket.emit("dm:send", payload, (ack) => {
-            if (!ack?.ok) {
-                console.error("❌ dm:send failed", ack);
-                // istersen UI’da hata yazdır
-            } else {
-                // ack.row varsa gerçek id/created_at gelir, ister replace yaparsın
-                // şimdilik seen set ile duplicate engelliyoruz
-            }
-        });
+        msgHint.textContent = "Loading...";
+        msgList.innerHTML = "";
+
+        const d = await apiFetch(`dm_get?conversation_id=${encodeURIComponent(cid)}`, { method: "GET" });
+        const rows = d.rows || d.list || d.messages || [];
+
+        const peer = toId() || d.peer_id || "User";
+        peerName.textContent = peer;
+        peerSub.textContent = "Direct messages";
+
+        msgList.innerHTML = rows.map(m => renderMsg(m, me)).join("");
+        msgHint.textContent = rows.length ? "" : "Say hi 👋";
+        scrollBottom();
     }
 
-    // ---------- INIT ----------
+    // --- Send message (DB first) ---
+    async function sendMessage(me) {
+        const text = String(msgInput.value || "").trim();
+        if (!text) return;
+
+        const cid = convoId();
+        const peer = toId();
+        if (!peer) return alert("Missing to_id (peer).");
+
+        // conversation_id yoksa bile dm_send artık kendi ensure ediyor
+        msgInput.value = "";
+
+        const client_id = crypto?.randomUUID?.() || String(Date.now());
+        const res = await apiFetch("dm_send", {
+            method: "POST",
+            body: JSON.stringify({
+                conversation_id: cid || null,
+                to_id: peer,
+                text,
+                client_id
+            })
+        });
+
+        if (!res?.ok || !res?.row) throw new Error(res?.error || "Send failed");
+
+        // eğer convoId boşken konuşma oluştuysa URL’i güncelle
+        if (!cid && res.conversation_id) {
+            const u = new URL(location.href);
+            u.searchParams.set("conversation_id", res.conversation_id);
+            u.searchParams.set("to_id", peer);
+            history.replaceState(null, "", u.toString());
+            await loadInbox(); // yeni chat inbox’a gelsin
+        }
+
+        // UI
+        msgList.insertAdjacentHTML("beforeend", renderMsg(res.row, me));
+        scrollBottom();
+
+        // realtime emit (server bunu dm:new yapacak şekilde ayarlıysa)
+        const socket = window.rt?.socket;
+        if (socket) socket.emit("dm:send", res.row);
+    }
+
+    // --- init ---
     async function init() {
         try {
-            // 1) JWT’yi garanti altına al
-            await ensureJWT();
-
-            // 2) user doğrula
             const me = await authUser();
 
-            // 3) realtime bind
-            bindRealtime(me.uid);
+            // socket join
+            const socket = window.rt?.socket;
+            if (socket) socket.emit("join", { user_id: me });
 
-            // 4) send UI
-            if (sendBtn && inputEl) {
-                const toId =
-                    new URL(location.href).searchParams.get("to_id") ||
-                    new URL(location.href).searchParams.get("user_id") ||
-                    ""; // sende alıcı id paramı farklı olabilir
+            await loadInbox();
+            await loadChat(me);
 
-                sendBtn.addEventListener("click", () => {
-                    const text = String(inputEl.value || "").trim();
-                    if (!text) return;
-                    if (!toId) {
-                        console.error("❌ missing to_id in url (add ?to_id=...)");
-                        return;
-                    }
-                    inputEl.value = "";
-                    sendDm(me.uid, toId, text);
-                });
+            msgForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                try { await sendMessage(me); }
+                catch (err) { console.error(err); alert(String(err?.message || err)); }
+            });
 
-                // Enter ile gönder
-                inputEl.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        sendBtn.click();
-                    }
-                });
-            }
-
-            console.log("✅ messages init ok", { uid: me.uid, convoId });
+            console.log("✅ messages init ok", { uid: me, convoId: convoId() });
         } catch (e) {
-            console.error(e);
-            console.error("init @ messages.js failed:", String(e?.message || e));
+            console.error("init @ messages.js failed:", e);
         }
     }
 

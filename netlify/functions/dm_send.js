@@ -1,19 +1,9 @@
-import { createClient } from "@supabase/supabase-js";
+// netlify/functions/dm_send.js
 import { getAppwriteUser } from "./_appwrite_user.js";
+import { createClient } from "@supabase/supabase-js";
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-
-const json = (s, b) => ({
-    statusCode: s,
-    headers: {
-        "Content-Type": "application/json",
-        "Cache-Control": "no-store",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
-        "Access-Control-Allow-Methods": "POST,OPTIONS",
-    },
-    body: JSON.stringify(b),
-});
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE = process.env.SUPABASE_SERVICE_ROLE;
 
 export const handler = async (event) => {
     try {
@@ -21,41 +11,84 @@ export const handler = async (event) => {
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
         const { user } = await getAppwriteUser(event);
-        const me = user?.$id;
-        if (!me) return json(401, { error: "Unauthorized" });
+        const from_id = user.$id;
+
+        if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+            throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE env");
+        }
+        const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
         const body = JSON.parse(event.body || "{}");
-        const conversation_id = String(body?.conversation_id || "").trim();
-        const text = String(body?.body || "").trim();
+        let { conversation_id, to_id, text, client_id } = body;
 
-        if (!conversation_id) return json(400, { error: "Missing conversation_id" });
-        if (!text) return json(400, { error: "Message is empty" });
-        if (text.length > 2000) return json(400, { error: "Message too long (max 2000)" });
+        if (!to_id) return json(400, { error: "Missing to_id" });
+        if (!text || !String(text).trim()) return json(400, { error: "Missing text" });
 
-        const { data: conv, error: e1 } = await sb
-            .from("conversations")
-            .select("id,user1_id,user2_id")
-            .eq("id", conversation_id)
-            .maybeSingle();
+        // conversation yoksa oluştur
+        if (!conversation_id) {
+            const a = from_id, b = to_id;
 
-        if (e1) return json(500, { error: e1.message });
-        if (!conv?.id) return json(404, { error: "Conversation not found" });
+            const { data: existing, error: e1 } = await sb
+                .from("conversations")
+                .select("id,user_a,user_b")
+                .or(`and(user_a.eq.${a},user_b.eq.${b}),and(user_a.eq.${b},user_b.eq.${a})`)
+                .limit(1);
 
-        // ✅ participant check
-        if (conv.user1_id !== me && conv.user2_id !== me) return json(403, { error: "Forbidden" });
+            if (e1) throw new Error(e1.message);
 
-        const { data: inserted, error: e2 } = await sb
+            if (existing && existing[0]) {
+                conversation_id = existing[0].id;
+            } else {
+                const { data: created, error: e2 } = await sb
+                    .from("conversations")
+                    .insert([{ user_a: a, user_b: b, last_message: "", last_at: new Date().toISOString() }])
+                    .select("id")
+                    .single();
+
+                if (e2) throw new Error(e2.message);
+                conversation_id = created.id;
+            }
+        }
+
+        // insert message (tablo adı sende farklıysa burayı değiştir)
+        const { data: row, error: e3 } = await sb
             .from("messages")
-            .insert({ conversation_id, sender_id: me, body: text })
-            .select("id,conversation_id,sender_id,body,created_at")
+            .insert([{
+                conversation_id,
+                from_id,
+                to_id,
+                text: String(text),
+                client_id: client_id || null,
+            }])
+            .select("id,conversation_id,from_id,to_id,text,created_at,client_id")
             .single();
 
-        if (e2) return json(500, { error: e2.message });
+        if (e3) throw new Error(e3.message);
 
-        return json(200, { ok: true, message: inserted });
+        // update conversation preview
+        await sb
+            .from("conversations")
+            .update({ last_message: String(text).slice(0, 140), last_at: new Date().toISOString() })
+            .eq("id", conversation_id);
+
+        return json(200, { ok: true, conversation_id, row });
     } catch (e) {
         const msg = String(e?.message || e);
         const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
         return json(status, { error: msg });
     }
 };
+
+function json(statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+        },
+        body: JSON.stringify(body),
+    };
+}

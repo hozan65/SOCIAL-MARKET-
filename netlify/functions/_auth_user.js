@@ -21,11 +21,7 @@ export const handler = async (event) => {
     } catch (e) {
         const msg = String(e?.message || e);
         const low = msg.toLowerCase();
-        const status =
-            low.includes("jwt") || low.includes("unauthorized") || low.includes("invalid")
-                ? 401
-                : 500;
-
+        const status = low.includes("jwt") || low.includes("unauthorized") || low.includes("invalid") ? 401 : 500;
         return json(status, { error: msg });
     }
 };
@@ -36,8 +32,6 @@ function json(statusCode, body) {
         headers: {
             "Content-Type": "application/json",
             "Cache-Control": "no-store",
-
-            // Netlify function çağrısı same-origin olduğu için "*" sorun olmaz
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
