@@ -66,20 +66,18 @@ export const handler = async (event) => {
         }
 
         const peer = convo.user1_id === sender_id ? convo.user2_id : convo.user1_id;
-
         const now = new Date().toISOString();
 
-        // insert message (ONLY columns that surely exist)
+        // ✅ insert ONLY existing columns
         const { data: row, error: e3 } = await sb
             .from("messages")
             .insert([{
                 conversation_id,
                 sender_id,
                 body: msgBody,
-                inserted_at: now,
                 updated_at: now,
             }])
-            .select("id,conversation_id,sender_id,body,created_at,inserted_at,updated_at,read_at")
+            .select("id,conversation_id,sender_id,body,created_at,updated_at,read_at")
             .single();
 
         if (e3) throw new Error(e3.message);
@@ -87,14 +85,13 @@ export const handler = async (event) => {
         // bump convo updated_at
         await sb.from("conversations").update({ updated_at: now }).eq("id", conversation_id);
 
-        // normalize for UI
         const normalized = {
             id: row.id,
             conversation_id: row.conversation_id,
             from_id: row.sender_id,
             to_id: peer,
             text: row.body,
-            created_at: row.created_at || row.inserted_at || now,
+            created_at: row.created_at || row.updated_at || now,
             raw: row,
         };
 

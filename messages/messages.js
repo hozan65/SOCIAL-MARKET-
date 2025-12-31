@@ -131,7 +131,7 @@
         const mine = (m.from_id || m.sender_id) === state.me;
         const cls = mine ? "mRow mMine" : "mRow mTheirs";
         const text = m.text ?? m.body ?? "";
-        const ts = m.created_at || m.inserted_at || m.updated_at || "";
+        const ts = m.created_at || m.updated_at || "";
         const t = ts ? new Date(ts).toLocaleTimeString() : "";
         const id = m.id ? `data-mid="${esc(m.id)}"` : "";
         return `
