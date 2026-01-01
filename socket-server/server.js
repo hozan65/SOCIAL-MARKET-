@@ -93,12 +93,14 @@ app.post("/emit/follow", (req, res) => {
 });
 
 app.post("/emit/dm", (req, res) => {
+    console.log("HIT /emit/dm", req.body);
     if (!checkSecret(req, res)) return;
     const p = req.body || {};
     if (p.to_id) io.to(`user:${p.to_id}`).emit("dm_new", p);
     if (p.from_id) io.to(`user:${p.from_id}`).emit("dm_new", p);
     return res.json({ ok: true });
 });
+
 
 app.post("/emit/comment", (req, res) => {
     if (!checkSecret(req, res)) return;
