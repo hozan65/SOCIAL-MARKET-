@@ -1,4 +1,4 @@
-// netlify/functions/dm_send.js  (FULL)
+// netlify/functions/dm_send.js (FIXED - convo ensure + safer emit debug)
 
 import { getAppwriteUser } from "./_appwrite_user.js";
 import { createClient } from "@supabase/supabase-js";
@@ -6,6 +6,20 @@ import { createClient } from "@supabase/supabase-js";
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE =
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+
+function json(statusCode, body) {
+    return {
+        statusCode,
+        headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+        },
+        body: JSON.stringify(body),
+    };
+}
 
 export const handler = async (event) => {
     try {
@@ -16,7 +30,7 @@ export const handler = async (event) => {
         const sender_id = user.$id;
 
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
-            throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env");
+            throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE(_KEY) env");
         }
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
@@ -34,26 +48,25 @@ export const handler = async (event) => {
             if (!p) return json(400, { error: "Missing conversation_id or peer_id" });
             if (p === sender_id) return json(400, { error: "peer_id cannot be self" });
 
-            // ✅ ORDER IDs to satisfy conversations_ordered constraint
             const a = sender_id < p ? sender_id : p;
             const b = sender_id < p ? p : sender_id;
 
-            // Find existing conversation in ordered columns
+            // Find existing conversation (ordered)
             const { data: existing, error: e1 } = await sb
                 .from("conversations")
                 .select("id,user1_id,user2_id")
                 .eq("user1_id", a)
                 .eq("user2_id", b)
-                .limit(1);
+                .maybeSingle();
 
             if (e1) throw new Error(e1.message);
 
-            if (existing && existing[0]) {
-                conversation_id = existing[0].id;
+            if (existing?.id) {
+                conversation_id = existing.id;
             } else {
                 const { data: created, error: e2 } = await sb
                     .from("conversations")
-                    .insert([{ user1_id: a, user2_id: b }])
+                    .insert([{ user1_id: a, user2_id: b, updated_at: new Date().toISOString() }])
                     .select("id,user1_id,user2_id")
                     .single();
 
@@ -68,6 +81,7 @@ export const handler = async (event) => {
             .select("id,user1_id,user2_id")
             .eq("id", conversation_id)
             .single();
+
         if (eC) throw new Error(eC.message);
 
         if (!(convo.user1_id === sender_id || convo.user2_id === sender_id)) {
@@ -76,7 +90,7 @@ export const handler = async (event) => {
 
         const peer = convo.user1_id === sender_id ? convo.user2_id : convo.user1_id;
 
-        // insert message (safe cols)
+        // insert message
         const { data: row, error: e3 } = await sb
             .from("messages")
             .insert([{ conversation_id, sender_id, body: msgBody }])
@@ -85,13 +99,20 @@ export const handler = async (event) => {
 
         if (e3) throw new Error(e3.message);
 
+        // update conversation updated_at
+        await sb
+            .from("conversations")
+            .update({ updated_at: new Date().toISOString() })
+            .eq("id", conversation_id);
+
         // ✅ realtime DM push (socket-server emit)
+        let emit_status = "skipped";
         try {
-            const emitUrl = process.env.SOCKET_DM_EMIT_URL || process.env.SOCKET_EMIT_URL || "";
+            const emitUrl = process.env.SOCKET_DM_EMIT_URL || ""; // 🔥 tek env ismi
             const secret = process.env.SOCKET_SECRET || "";
 
             if (emitUrl) {
-                await fetch(emitUrl, {
+                const r = await fetch(emitUrl, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -105,24 +126,21 @@ export const handler = async (event) => {
                         created_at: row.created_at || new Date().toISOString(),
                     }),
                 });
+
+                emit_status = r.ok ? "sent" : "failed";
             } else {
-                console.warn("socket emit skipped: SOCKET_DM_EMIT_URL missing");
+                emit_status = "skipped"; // env yok
             }
         } catch (err) {
-            // emit başarısız olsa bile mesaj DB'de var; request'i fail etmiyoruz
+            emit_status = "failed";
             console.warn("socket emit failed:", String(err?.message || err));
         }
-
-        // update conversation updated_at (exists in your schema)
-        await sb
-            .from("conversations")
-            .update({ updated_at: new Date().toISOString() })
-            .eq("id", conversation_id);
 
         return json(200, {
             ok: true,
             conversation_id,
             peer_id: peer,
+            emit: emit_status,
             row: {
                 id: row.id,
                 conversation_id: row.conversation_id,
@@ -138,17 +156,3 @@ export const handler = async (event) => {
         return json(status, { error: msg });
     }
 };
-
-function json(statusCode, body) {
-    return {
-        statusCode,
-        headers: {
-            "Content-Type": "application/json",
-            "Cache-Control": "no-store",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-        },
-        body: JSON.stringify(body),
-    };
-}

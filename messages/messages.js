@@ -1,34 +1,27 @@
-// /messages/messages.js
+// /messages/messages.js (FINAL - uses dm_inbox.peer_name + dm_get.peer + mobile switch + realtime)
 (() => {
     console.log("messages.js LOADED ✅", location.href);
 
-    // -----------------------------
     // DOM
-    // -----------------------------
     const inboxList = document.getElementById("inboxList");
     const inboxHint = document.getElementById("inboxHint");
+    const chatBackBtn = document.getElementById("chatBackBtn");
 
     const peerNameEl = document.getElementById("peerName");
     const peerSubEl = document.getElementById("peerSub");
+    const peerAvaEl = document.getElementById("peerAva");
 
     const msgList = document.getElementById("msgList");
     const msgHint = document.getElementById("msgHint");
 
     const msgForm = document.getElementById("msgForm");
     const msgInput = document.getElementById("msgInput");
+    const leftSearch = document.getElementById("leftSearch");
 
-    // -----------------------------
     // URL helpers
-    // -----------------------------
     const params = () => new URL(location.href).searchParams;
-    function getURLPeerId() {
-        const p = params();
-        return p.get("to_id") || p.get("to") || "";
-    }
-    function getURLConvoId() {
-        const p = params();
-        return p.get("conversation_id") || "";
-    }
+    const getURLPeerId = () => (params().get("to_id") || params().get("to") || "");
+    const getURLConvoId = () => (params().get("conversation_id") || "");
     function setURL({ conversation_id, peer_id }) {
         const u = new URL(location.href);
         if (peer_id) u.searchParams.set("to", peer_id);
@@ -36,9 +29,7 @@
         history.replaceState(null, "", u.toString());
     }
 
-    // -----------------------------
     // Utils
-    // -----------------------------
     function esc(s) {
         return String(s || "")
             .replaceAll("&", "&amp;")
@@ -47,20 +38,25 @@
             .replaceAll('"', "&quot;")
             .replaceAll("'", "&#039;");
     }
-
-    function setPeerHeader(peerId) {
-        peerNameEl.textContent = peerId ? peerId : "Select a chat";
-        peerSubEl.textContent = peerId ? "Direct messages" : "Direct messages";
+    function isMobile() {
+        return window.matchMedia && window.matchMedia("(max-width: 860px)").matches;
     }
-
+    function setMobileModeChat(open) {
+        document.body.classList.toggle("dmChatOpen", !!open);
+    }
+    function clearMsgs() {
+        msgList.innerHTML = "";
+    }
     function renderMsg(m) {
-        const me = state.me;
-        const mine = String(m.from_id || m.sender_id || "") === String(me);
+        const mine = String(m.from_id || m.sender_id || "") === String(state.me);
         const cls = mine ? "mMine" : "mTheirs";
         const time = m.created_at ? new Date(m.created_at).toLocaleTimeString() : "";
         const text = m.text ?? m.body ?? "";
+        const localKey = m._localKey
+            ? ` data-local="1" data-local-key="${esc(m._localKey)}"`
+            : "";
         return `
-      <div class="mRow ${cls}">
+      <div class="mRow ${cls}"${localKey}>
         <div class="mBubble">
           <div class="mText">${esc(text)}</div>
           <div class="mTime">${esc(time)}</div>
@@ -68,35 +64,24 @@
       </div>
     `;
     }
-
-    function clearMsgs() {
-        msgList.innerHTML = "";
-    }
     function appendMsg(m) {
         msgList.insertAdjacentHTML("beforeend", renderMsg(m));
         msgList.scrollTop = msgList.scrollHeight;
     }
-
-    function renderInboxItem(it) {
-        const peer_id = it.peer_id || it.other_id || it.to_id || "";
-        const convo_id = it.conversation_id || it.id || "";
-        const last = it.last_text || it.preview || "";
-        const ts = it.last_at || it.updated_at || it.created_at || "";
-        const when = ts ? new Date(ts).toLocaleString() : "";
-        return `
-      <button class="inboxItem" data-peer="${esc(peer_id)}" data-convo="${esc(convo_id)}" type="button">
-        <div class="inboxTitle">${esc(peer_id || "Unknown")}</div>
-        <div class="inboxMeta">${esc(when)}</div>
-        <div class="inboxPreview">${esc(last)}</div>
-      </button>
-    `;
+    function makeLocalKey({ from_id, to_id, conversation_id, text }) {
+        return [
+            String(conversation_id || ""),
+            String(from_id || ""),
+            String(to_id || ""),
+            String(text || "").trim(),
+        ].join("|");
     }
 
+    // Auth / API
     async function ensureJWT() {
-        // sm_jwt yoksa Appwrite’dan al
         let jwt = localStorage.getItem("sm_jwt");
         if (!jwt) {
-            if (!window.account?.createJWT) throw new Error("Appwrite account client not found (createJWT missing).");
+            if (!window.account?.createJWT) throw new Error("Appwrite account client not found.");
             const r = await window.account.createJWT();
             jwt = r?.jwt;
             if (!jwt) throw new Error("JWT create failed");
@@ -104,15 +89,11 @@
         }
         return jwt;
     }
-
     async function api(path, { method = "GET", body } = {}) {
         const jwt = await ensureJWT();
         const r = await fetch(`/.netlify/functions/${path}`, {
             method,
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + jwt,
-            },
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + jwt },
             body: body ? JSON.stringify(body) : undefined,
         });
         const data = await r.json().catch(() => ({}));
@@ -120,32 +101,79 @@
         return data;
     }
 
-    // -----------------------------
     // State
-    // -----------------------------
     const state = {
         me: localStorage.getItem("sm_uid") || window.APPWRITE_USER_ID || "",
         peer_id: getURLPeerId(),
         conversation_id: getURLConvoId(),
+        peer_name: "",
+        peer_avatar: "",
+        inboxRaw: [],
     };
 
-    // -----------------------------
-    // Load inbox
-    // -----------------------------
+    // Header
+    function setPeerHeader({ id, name, avatar_url } = {}) {
+        const title = name || (id ? id : "Select a chat");
+        peerNameEl.textContent = title || "Select a chat";
+        peerSubEl.textContent = "Direct messages";
+
+        if (peerAvaEl) {
+            if (avatar_url) {
+                peerAvaEl.style.backgroundImage = `url("${avatar_url}")`;
+                peerAvaEl.classList.add("hasImg");
+            } else {
+                peerAvaEl.style.backgroundImage = "";
+                peerAvaEl.classList.remove("hasImg");
+            }
+        }
+    }
+
+    // Inbox render (🔥 dm_inbox alan uyumu)
+    function renderInboxItem(it) {
+        const peer_id = it.peer_id || "";
+        const convo_id = it.conversation_id || "";
+        const title = it.peer_name || peer_id || "Unknown";
+        const last = it.last_message || "";              // ✅ SENDE last_message var
+        const ts = it.last_at || it.updated_at || it.created_at || "";
+        const when = ts ? new Date(ts).toLocaleString() : "";
+
+        return `
+      <button class="inboxItem" data-peer="${esc(peer_id)}" data-convo="${esc(convo_id)}" type="button">
+        <div class="inboxTitle">${esc(title)}</div>
+        <div class="inboxMeta">${esc(when)}</div>
+        <div class="inboxPreview">${esc(last)}</div>
+      </button>
+    `;
+    }
+
     async function loadInbox() {
         inboxHint.textContent = "Loading...";
         try {
             const d = await api("dm_inbox");
             const list = d.list || [];
+            state.inboxRaw = list;
             inboxList.innerHTML = list.map(renderInboxItem).join("");
             inboxHint.textContent = list.length ? "" : "No chats yet.";
+            applySearch();
         } catch (e) {
             inboxHint.textContent = "Inbox load failed.";
             console.error(e);
         }
     }
 
-    // click inbox -> open chat
+    function applySearch() {
+        const q = (leftSearch?.value || "").trim().toLowerCase();
+        const items = inboxList?.querySelectorAll(".inboxItem") || [];
+        items.forEach((btn) => {
+            if (!q) return (btn.style.display = "");
+            const peer = btn.getAttribute("data-peer") || "";
+            const title = (btn.querySelector(".inboxTitle")?.textContent || "").toLowerCase();
+            const ok = title.includes(q) || peer.toLowerCase().includes(q);
+            btn.style.display = ok ? "" : "none";
+        });
+    }
+    leftSearch?.addEventListener("input", applySearch);
+
     inboxList?.addEventListener("click", (e) => {
         const btn = e.target.closest(".inboxItem");
         if (!btn) return;
@@ -154,74 +182,93 @@
         openChat({ peer_id, conversation_id });
     });
 
-    // -----------------------------
-    // Load chat
-    // -----------------------------
+    // Chat load (dm_get -> peer bilgisi ile header güncelle)
     async function loadChat(conversation_id) {
         msgHint.textContent = "Loading...";
         clearMsgs();
-        try {
-            const d = await api(`dm_get?conversation_id=${encodeURIComponent(conversation_id)}`);
-            const rows = d.list || d.rows || [];
-            rows.forEach((m) => {
-                appendMsg({
-                    from_id: m.sender_id || m.from_id,
-                    text: m.body ?? m.text,
-                    created_at: m.created_at,
-                });
-            });
-            msgHint.textContent = rows.length ? "" : "Start messaging...";
-        } catch (e) {
-            msgHint.textContent = "Chat load failed.";
-            console.error(e);
-            alert(String(e?.message || e));
+        const d = await api(`dm_get?conversation_id=${encodeURIComponent(conversation_id)}`);
+
+        // ✅ peer info from backend
+        if (d.peer) {
+            state.peer_id = d.peer.id || state.peer_id;
+            state.peer_name = d.peer.name || "";
+            state.peer_avatar = d.peer.avatar_url || "";
+            setPeerHeader({ id: state.peer_id, name: state.peer_name, avatar_url: state.peer_avatar });
         }
+
+        const rows = d.list || [];
+        rows.forEach((m) => {
+            appendMsg({
+                from_id: m.sender_id,
+                text: m.body,
+                created_at: m.created_at,
+            });
+        });
+        msgHint.textContent = rows.length ? "" : "Start messaging...";
     }
 
     async function openChat({ peer_id, conversation_id }) {
         state.peer_id = peer_id || "";
         state.conversation_id = conversation_id || "";
 
-        setPeerHeader(state.peer_id);
-        if (state.peer_id || state.conversation_id) setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
-
-        // conversation_id varsa direkt yükle
-        if (state.conversation_id) {
-            await loadChat(state.conversation_id);
-            return;
+        // inbox’ta peer_name varsa header’a koy
+        const found = state.inboxRaw.find((x) => x.conversation_id === state.conversation_id);
+        if (found) {
+            state.peer_name = found.peer_name || "";
+            state.peer_avatar = found.peer_avatar || "";
         }
 
-        // conversation_id yoksa ama peer varsa: ilk mesajla dm_send oluşturacak.
-        clearMsgs();
-        msgHint.textContent = "Start messaging...";
+        setPeerHeader({ id: state.peer_id, name: state.peer_name, avatar_url: state.peer_avatar });
+
+        if (state.peer_id || state.conversation_id) {
+            setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
+        }
+
+        if (isMobile()) setMobileModeChat(true);
+
+        if (state.conversation_id) {
+            await loadChat(state.conversation_id);
+        } else {
+            clearMsgs();
+            msgHint.textContent = "Start messaging...";
+        }
     }
 
-    // -----------------------------
-    // Realtime (Socket dm_new)
-    // -----------------------------
+    chatBackBtn?.addEventListener("click", () => {
+        if (isMobile()) setMobileModeChat(false);
+    });
+
+    window.addEventListener("resize", () => {
+        if (!isMobile()) setMobileModeChat(false);
+    });
+
+    // Realtime (dm_new)
     const socket = window.rt?.socket;
     if (socket) {
         socket.on("dm_new", (p) => {
-            // p: { conversation_id, from_id, to_id, text, created_at ... }
-            console.log("📩 dm_new received:", p);
+            console.log("📩 dm_new received (page):", p);
 
             const cid = p.conversation_id || "";
-            const peerFrom = p.from_id || "";
-            const peerTo = p.to_id || "";
+            if (!cid) return;
 
-            // Eğer ilk defa conversation oluştuysa URL ve state’i sabitle
-            if (!state.conversation_id && cid) {
-                state.conversation_id = cid;
-                if (!state.peer_id) {
-                    // peer id’yi mesajdan tahmin et
-                    state.peer_id = (peerFrom === state.me) ? peerTo : peerFrom;
+            // current convo ise bas
+            if (cid === state.conversation_id) {
+                const isMine = String(p.from_id) === String(state.me);
+                if (isMine) {
+                    const lk = makeLocalKey({
+                        conversation_id: cid,
+                        from_id: p.from_id,
+                        to_id: p.to_id,
+                        text: p.text,
+                    });
+                    try {
+                        const el = msgList.querySelector(
+                            `.mRow[data-local="1"][data-local-key="${CSS.escape(lk)}"]`
+                        );
+                        if (el) el.remove();
+                    } catch (e) {}
                 }
-                setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
-                setPeerHeader(state.peer_id);
-            }
 
-            // sadece açık conversation ise ekrana bas
-            if (cid && cid === state.conversation_id) {
                 appendMsg({
                     from_id: p.from_id,
                     text: p.text,
@@ -229,57 +276,52 @@
                 });
             }
 
-            // inbox’u güncellemek için hızlı refresh
+            // inbox refresh
             loadInbox();
         });
     } else {
         console.warn("⚠️ socket not ready in messages.js");
     }
 
-    // -----------------------------
-    // Send message
-    // -----------------------------
+    // Send
     msgForm?.addEventListener("submit", async (e) => {
         e.preventDefault();
         const text = msgInput.value.trim();
         if (!text) return;
         msgInput.value = "";
 
-        // optimistic UI
-        appendMsg({ from_id: state.me, text, created_at: new Date().toISOString() });
-
-        // payload: conversation_id varsa onu, yoksa peer_id ile oluştur
         const payload = { text };
         if (state.conversation_id) payload.conversation_id = state.conversation_id;
         else if (state.peer_id) payload.peer_id = state.peer_id;
-        else {
-            alert("Kime mesaj atacaksın? URL’de ?to=<USER_ID> yok.");
-            return;
-        }
+        else return alert("Kime mesaj atacaksın?");
+
+        const optimistic = {
+            conversation_id: state.conversation_id || "pending",
+            from_id: state.me,
+            to_id: state.peer_id,
+            text,
+            created_at: new Date().toISOString(),
+        };
+        optimistic._localKey = makeLocalKey(optimistic);
+        appendMsg(optimistic);
 
         try {
             const d = await api("dm_send", { method: "POST", body: payload });
-
-            // dm_send conversation_id döndürürse state'e yaz
             if (!state.conversation_id && d.conversation_id) {
                 state.conversation_id = d.conversation_id;
                 setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
             }
-
-            // Not: mesajın gerçek anlık düşmesi socket dm_new ile olur
         } catch (err) {
             console.error("❌ dm_send error:", err);
             alert(String(err?.message || err));
         }
     });
 
-    // -----------------------------
     // Init
-    // -----------------------------
     (async () => {
         try {
-            await ensureJWT(); // JWT hazır olsun
-            // uid’yi sakla (auth_user için)
+            await ensureJWT();
+
             if (!localStorage.getItem("sm_uid") && window.APPWRITE_USER_ID) {
                 localStorage.setItem("sm_uid", window.APPWRITE_USER_ID);
                 state.me = window.APPWRITE_USER_ID;
@@ -288,7 +330,11 @@
             await loadInbox();
             await openChat({ peer_id: state.peer_id, conversation_id: state.conversation_id });
 
-            console.log("✅ messages init ok", { me: state.me, peer_id: state.peer_id, conversation_id: state.conversation_id });
+            console.log("✅ messages init ok", {
+                me: state.me,
+                peer_id: state.peer_id,
+                conversation_id: state.conversation_id,
+            });
         } catch (e) {
             console.error("init failed:", e);
             alert(String(e?.message || e));
