@@ -140,6 +140,40 @@
   </div>
 </div>
 
+<script>
+  (async () => {
+    const host = document.getElementById("siteTopbar");
+    if (!host) return;
+
+    const res = await fetch("/partials/topbar.html", { cache: "no-store" });
+    host.innerHTML = await res.text();
+
+    // mobile menu toggle (minimal)
+    const btn = document.getElementById("hamburgerBtn");
+    const menu = document.getElementById("mobileMenu");
+    const back = document.getElementById("menuBackdrop");
+
+    function openMenu(){
+      btn?.setAttribute("aria-expanded","true");
+      menu?.setAttribute("aria-hidden","false");
+      menu?.classList.add("isOpen");
+      back?.classList.add("isOpen");
+    }
+    function closeMenu(){
+      btn?.setAttribute("aria-expanded","false");
+      menu?.setAttribute("aria-hidden","true");
+      menu?.classList.remove("isOpen");
+      back?.classList.remove("isOpen");
+    }
+    btn?.addEventListener("click", () => {
+      const isOpen = menu?.classList.contains("isOpen");
+      isOpen ? closeMenu() : openMenu();
+    });
+    back?.addEventListener("click", closeMenu);
+  })();
+</script>
+
+<script src="/assets1/header.js"></script>
 <script src="./marketplace.js"></script>
 </body>
 </html>
