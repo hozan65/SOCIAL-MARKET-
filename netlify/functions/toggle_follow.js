@@ -7,21 +7,19 @@ export const handler = async (event) => {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        // ENV check (çok önemli)
         const SUPABASE_URL = process.env.SUPABASE_URL;
-        const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const SUPABASE_KEY =
+            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+
         if (!SUPABASE_URL || !SUPABASE_KEY) {
-            console.error("Missing env:", { hasUrl: !!SUPABASE_URL, hasKey: !!SUPABASE_KEY });
+            console.error("Missing supabase env", { hasUrl: !!SUPABASE_URL, hasKey: !!SUPABASE_KEY });
             return json(500, { error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" });
         }
+
         const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        // Auth check (çok önemli)
         const { user } = await getAppwriteUser(event);
-        if (!user?.$id) {
-            console.error("Unauthorized: no user from getAppwriteUser");
-            return json(401, { error: "Unauthorized" });
-        }
+        if (!user?.$id) return json(401, { error: "Unauthorized (missing/invalid jwt)" });
         const myUid = user.$id;
 
         let body = {};
@@ -47,16 +45,18 @@ export const handler = async (event) => {
             if (delErr) return json(500, { error: delErr.message });
             following = false;
         } else {
-            const { error: insErr } = await sb.from("follows").insert([{ follower_uid: myUid, following_uid }]);
+            const { error: insErr } = await sb
+                .from("follows")
+                .insert([{ follower_uid: myUid, following_uid }]);
             if (insErr) return json(500, { error: insErr.message });
             following = true;
         }
 
-        // counts (error check ekledim)
         const [a, b] = await Promise.all([
             sb.from("follows").select("*", { count: "exact", head: true }).eq("following_uid", following_uid),
             sb.from("follows").select("*", { count: "exact", head: true }).eq("follower_uid", myUid),
         ]);
+
         if (a.error) return json(500, { error: a.error.message });
         if (b.error) return json(500, { error: b.error.message });
 
