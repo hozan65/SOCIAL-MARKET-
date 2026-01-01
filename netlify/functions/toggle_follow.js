@@ -18,6 +18,7 @@ export const handler = async (event) => {
 
         const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+        // 🔐 Appwrite user
         const { user } = await getAppwriteUser(event);
         if (!user?.$id) return json(401, { error: "Unauthorized (missing/invalid jwt)" });
         const myUid = user.$id;
@@ -29,6 +30,15 @@ export const handler = async (event) => {
         if (!following_uid) return json(400, { error: "Missing following_uid" });
         if (following_uid === myUid) return json(400, { error: "Cannot follow yourself" });
 
+        // ✅ FK FIX: profiles tablosunda iki kullanıcı da olsun (yoksa insert patlar)
+        // profiles tablonun PK'si "id" ise bu çalışır.
+        const p1 = await sb.from("profiles").upsert([{ id: myUid }], { onConflict: "id" });
+        if (p1.error) return json(500, { error: `profiles upsert (me) failed: ${p1.error.message}` });
+
+        const p2 = await sb.from("profiles").upsert([{ id: following_uid }], { onConflict: "id" });
+        if (p2.error) return json(500, { error: `profiles upsert (target) failed: ${p2.error.message}` });
+
+        // 🔎 mevcut ilişki var mı?
         const { data: existing, error: e1 } = await sb
             .from("follows")
             .select("id")
@@ -40,6 +50,7 @@ export const handler = async (event) => {
 
         let following = false;
 
+        // 🔁 toggle
         if (existing?.id) {
             const { error: delErr } = await sb.from("follows").delete().eq("id", existing.id);
             if (delErr) return json(500, { error: delErr.message });
@@ -52,6 +63,7 @@ export const handler = async (event) => {
             following = true;
         }
 
+        // ✅ counts
         const [a, b] = await Promise.all([
             sb.from("follows").select("*", { count: "exact", head: true }).eq("following_uid", following_uid),
             sb.from("follows").select("*", { count: "exact", head: true }).eq("follower_uid", myUid),
@@ -67,8 +79,10 @@ export const handler = async (event) => {
             following_count: Number(b.count || 0),
         });
     } catch (e) {
-        console.error("toggle_follow crash:", e);
-        return json(500, { error: String(e?.message || e) });
+        const msg = String(e?.message || e);
+        console.error("toggle_follow error:", msg);
+        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
+        return json(status, { error: msg });
     }
 };
 
