@@ -571,34 +571,56 @@ document.addEventListener("click", (e) => {
 // =========================
 // EVENTS (Like/Follow)
 // =========================
-document.addEventListener("click", async (e) => {
-    const likeBtn = e.target.closest(".likeBtn");
-    if (likeBtn) {
-        const postId = likeBtn.dataset.postId;
-        likeBtn.disabled = true;
+const likeBtn = e.target.closest(".likeBtn");
+if (likeBtn) {
+    const postId = String(likeBtn.dataset.postId || "").trim();
+    if (!postId) return;
 
-        try {
-            await toggleLike(postId);
+    const countSpan = likeBtn.querySelector(".likeCount");
+    const prevCount = countSpan ? Number(countSpan.textContent || 0) : 0;
 
-            // DB -> kesin sayı
-            const c = await getLikeCount(postId);
+    // liked state'i class ile tut
+    const prevLiked = likeBtn.classList.contains("isLiked");
+    const nextLiked = !prevLiked;
 
-            // UI update (local)
-            const span = likeBtn.querySelector(".likeCount");
-            if (span) span.textContent = String(c);
-
-            // ✅ REALTIME: herkese yayın (post room)
-            let userId = "";
-            try { userId = await getMyUserId(); } catch {}
-            rtEmit("like:toggle", { postId: String(postId), userId, likeCount: c });
-
-        } catch (err) {
-            alert("❌ " + (err?.message || err));
-        } finally {
-            likeBtn.disabled = false;
-        }
-        return;
+    // ✅ OPTIMISTIC (ANINDA)
+    likeBtn.classList.toggle("isLiked", nextLiked);
+    if (countSpan) {
+        const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
+        countSpan.textContent = String(nextCount);
     }
+
+    // spam engeli
+    likeBtn.disabled = true;
+    likeBtn.classList.add("isLoading");
+
+    try {
+        // ✅ server truth: direkt likes_count geliyor
+        const out = await toggleLike(postId);
+        const liked = !!out?.liked;
+        const likesCount = Number(out?.likes_count || 0);
+
+        likeBtn.classList.toggle("isLiked", liked);
+        if (countSpan) countSpan.textContent = String(likesCount);
+
+        // ✅ REALTIME: herkese yayın (post room)
+        let userId = "";
+        try { userId = await getMyUserId(); } catch {}
+        rtEmit("like:toggle", { postId: String(postId), userId, likeCount: likesCount });
+
+    } catch (err) {
+        // ❌ ROLLBACK
+        console.error("❌ toggleLike failed:", err);
+        likeBtn.classList.toggle("isLiked", prevLiked);
+        if (countSpan) countSpan.textContent = String(Math.max(0, prevCount));
+        alert("❌ " + (err?.message || err));
+    } finally {
+        likeBtn.disabled = false;
+        likeBtn.classList.remove("isLoading");
+    }
+    return;
+}
+
 
     // ✅✅✅ OPTIMISTIC FOLLOW (FIX)
     const followBtn = e.target.closest(".followBtn");

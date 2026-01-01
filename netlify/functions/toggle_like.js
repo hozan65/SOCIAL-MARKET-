@@ -2,15 +2,20 @@
 import { createClient } from "@supabase/supabase-js";
 import { getAppwriteUser } from "./_appwrite_user.js";
 
-const sb = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
+
+        if (!SUPABASE_URL || !SUPABASE_KEY) {
+            return json(500, { error: "Missing SUPABASE env" });
+        }
 
         const { user } = await getAppwriteUser(event);
         const uid = user.$id;
@@ -54,8 +59,7 @@ export const handler = async (event) => {
 
         if (cErr) return json(500, { error: cErr.message });
 
-        const likes_count = Number(count || 0);
-        return json(200, { ok: true, liked, likes_count });
+        return json(200, { ok: true, liked, likes_count: Number(count || 0) });
     } catch (e) {
         const msg = String(e?.message || e);
         const status = msg.toLowerCase().includes("jwt") ? 401 : 500;

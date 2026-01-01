@@ -762,3 +762,5 @@
 }
 
 .followBtn.isLoading{ opacity:.6; pointer-events:none; }
+.likeBtn.isLoading{ opacity:.6; pointer-events:none; }
+.likeBtn.isLiked{ transform: translateY(-1px); }
