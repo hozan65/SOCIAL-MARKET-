@@ -1,3 +1,5 @@
+// netlify/functions/dm_send.js  (FULL)
+
 import { getAppwriteUser } from "./_appwrite_user.js";
 import { createClient } from "@supabase/supabase-js";
 
@@ -82,6 +84,34 @@ export const handler = async (event) => {
             .single();
 
         if (e3) throw new Error(e3.message);
+
+        // ✅ realtime DM push (socket-server emit)
+        try {
+            const emitUrl = process.env.SOCKET_DM_EMIT_URL || process.env.SOCKET_EMIT_URL || "";
+            const secret = process.env.SOCKET_SECRET || "";
+
+            if (emitUrl) {
+                await fetch(emitUrl, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        ...(secret ? { "x-socket-secret": secret } : {}),
+                    },
+                    body: JSON.stringify({
+                        conversation_id,
+                        from_id: sender_id,
+                        to_id: peer,
+                        text: msgBody,
+                        created_at: row.created_at || new Date().toISOString(),
+                    }),
+                });
+            } else {
+                console.warn("socket emit skipped: SOCKET_DM_EMIT_URL missing");
+            }
+        } catch (err) {
+            // emit başarısız olsa bile mesaj DB'de var; request'i fail etmiyoruz
+            console.warn("socket emit failed:", String(err?.message || err));
+        }
 
         // update conversation updated_at (exists in your schema)
         await sb
