@@ -4,29 +4,33 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Social Market • Marketplace</title>
+
+  <!-- Senin global css'lerin (topbar/menu renkleri) -->
+  <link rel="stylesheet" href="/assets/u.css" />
+  <link rel="stylesheet" href="/assets/app.css" />
+
+  <!-- Marketplace theme -->
   <link rel="stylesheet" href="./marketplace.css" />
 </head>
+
 <body>
 
-<!-- TOPBAR -->
-<header class="mpTop">
-  <div class="mpBrand">
-    <div class="mpLogo">SM</div>
-    <div class="mpBrandText">
-      <div class="mpTitle">Social Market</div>
-      <div class="mpSub">Marketplace</div>
+<!-- ✅ HEADER YOK: Senin sistem zaten bunu ekliyor -->
+
+<main class="mpWrap mpWrapTopbar">
+  <div class="mpPageHead">
+    <div>
+      <h1 class="mpH1">Marketplace</h1>
+      <p class="mpP">Buy boosts, services and packages using your coins.</p>
+    </div>
+
+    <div class="mpHeadActions">
+      <button class="mpBtn" id="mpOpenAdd">+ Add Listing</button>
+      <button class="mpBtn mpBtnPrimary" id="mpOpenCart">
+        Cart <span class="mpBadge" id="mpCartCount">0</span>
+      </button>
     </div>
   </div>
-
-  <div class="mpActions">
-    <button class="mpBtn" id="mpOpenAdd">+ Add Listing</button>
-    <button class="mpBtn mpBtnPrimary" id="mpOpenCart">
-      Cart <span class="mpBadge" id="mpCartCount">0</span>
-    </button>
-  </div>
-</header>
-
-<main class="mpWrap">
 
   <!-- FILTERS -->
   <section class="mpFilters">
@@ -62,9 +66,8 @@
 
   <footer class="mpFooter">
     <div>© <span id="mpYear"></span> Social Market</div>
-    <div class="mpHint">Runs on LocalStorage (easy to connect to Supabase later).</div>
+    <div class="mpHint">LocalStorage version (we can connect Supabase orders later).</div>
   </footer>
-
 </main>
 
 <!-- ADD LISTING MODAL -->
