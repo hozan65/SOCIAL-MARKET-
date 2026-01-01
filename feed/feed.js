@@ -29,7 +29,6 @@ function rtEmit(eventName, payload) {
     try {
         const s = getSocket();
         if (!s) return;
-        // connected değilse bile emit’i kuyruğa alabiliyor; yine de güvenli:
         s.emit(eventName, payload);
     } catch {}
 }
@@ -38,7 +37,7 @@ function rtOn(eventName, handler) {
     try {
         const s = getSocket();
         if (!s) return;
-        s.off?.(eventName); // aynı sayfada hot reload vs olursa çift dinleyici olmasın
+        s.off?.(eventName);
         s.on(eventName, handler);
     } catch {}
 }
@@ -110,18 +109,14 @@ function formatPairs(pairs) {
     return String(pairs ?? "");
 }
 
-// ✅ FEED’de açıklama 1 satır olacak (ellips)
 function oneLineText(s) {
     return String(s ?? "").trim();
 }
 
-// image_path bazen full url, bazen sadece path olur
 function resolveImageUrl(image_path) {
     const p = String(image_path ?? "").trim();
     if (!p) return "";
     if (p.startsWith("http://") || p.startsWith("https://")) return p;
-
-    // storage public bucket varsayımı:
     return `${SUPABASE_URL}/storage/v1/object/public/analysis-images/${p}`;
 }
 
@@ -340,7 +335,6 @@ async function hydrateNewPosts(justAddedRows) {
             const span = btn?.querySelector(".likeCount");
             if (span) span.textContent = String(c);
 
-            // ✅ realtime: bu post için odaya katıl (like update sadece o post’a gelsin)
             rtEmit("join:post", postId);
         } catch {}
     }
@@ -354,7 +348,6 @@ async function hydrateNewPosts(justAddedRows) {
             const btn = grid.querySelector(`.followBtn[data-user-id="${CSS.escape(authorId)}"]`);
             if (!btn || btn.disabled) continue;
 
-            // self follow disable (opsiyonel ama faydalı)
             try {
                 const myId = await getMyUserId();
                 if (myId && authorId === myId) {
@@ -595,7 +588,6 @@ document.addEventListener("click", async (e) => {
             if (span) span.textContent = String(c);
 
             // ✅ REALTIME: herkese yayın (post room)
-            // userId opsiyonel: best-effort
             let userId = "";
             try { userId = await getMyUserId(); } catch {}
             rtEmit("like:toggle", { postId: String(postId), userId, likeCount: c });
@@ -608,15 +600,29 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
+    // ✅✅✅ OPTIMISTIC FOLLOW (FIX)
     const followBtn = e.target.closest(".followBtn");
     if (followBtn && !followBtn.disabled) {
-        const targetUserId = followBtn.dataset.userId;
+        const targetUserId = String(followBtn.dataset.userId || "").trim();
+        if (!targetUserId) return;
+
+        // snapshot
+        const prevText = followBtn.textContent;
+        const prevFollowing = followBtn.classList.contains("isFollowing");
+
+        // optimistic apply (ANINDA)
+        const nextFollowing = !prevFollowing;
+        followBtn.textContent = nextFollowing ? "Following" : "Follow";
+        followBtn.classList.toggle("isFollowing", nextFollowing);
+
         followBtn.disabled = true;
+        followBtn.classList.add("isLoading");
 
         try {
             const r = await toggleFollow(targetUserId);
             const isFollowing = !!r?.following;
 
+            // server truth
             followBtn.textContent = isFollowing ? "Following" : "Follow";
             followBtn.classList.toggle("isFollowing", isFollowing);
 
@@ -624,19 +630,19 @@ document.addEventListener("click", async (e) => {
             try {
                 const myId = await getMyUserId();
                 const set = getFollowingSetFromCache(myId);
-                const tid = String(targetUserId || "").trim();
-                if (tid) {
-                    if (isFollowing) set.add(tid);
-                    else set.delete(tid);
-                    saveFollowingSetToCache(myId, set);
-                }
+                if (isFollowing) set.add(targetUserId);
+                else set.delete(targetUserId);
+                saveFollowingSetToCache(myId, set);
             } catch {}
-
-            // (Follow realtime'i istersen sonraki dosyada ekleriz. Like ile finalledik.)
         } catch (err) {
+            // rollback
+            console.error("❌ toggleFollow failed:", err);
+            followBtn.textContent = prevText;
+            followBtn.classList.toggle("isFollowing", prevFollowing);
             alert("❌ " + (err?.message || err));
         } finally {
             followBtn.disabled = false;
+            followBtn.classList.remove("isLoading");
         }
         return;
     }
