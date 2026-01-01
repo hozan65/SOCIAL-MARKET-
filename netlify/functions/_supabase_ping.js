@@ -2,9 +2,11 @@ import { createClient } from "@supabase/supabase-js";
 
 export const handler = async () => {
     const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 
-    if (!url || !key) return { statusCode: 500, body: "Missing SUPABASE env" };
+    if (!url || !key) {
+        return { statusCode: 500, body: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" };
+    }
 
     const sb = createClient(url, key);
 
