@@ -2,29 +2,35 @@
 import { createClient } from "@supabase/supabase-js";
 import { getAppwriteUser } from "./_appwrite_user.js";
 
-const sb = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        // 🔐 JWT -> Appwrite user
+        // ENV check (çok önemli)
+        const SUPABASE_URL = process.env.SUPABASE_URL;
+        const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!SUPABASE_URL || !SUPABASE_KEY) {
+            console.error("Missing env:", { hasUrl: !!SUPABASE_URL, hasKey: !!SUPABASE_KEY });
+            return json(500, { error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" });
+        }
+        const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // Auth check (çok önemli)
         const { user } = await getAppwriteUser(event);
+        if (!user?.$id) {
+            console.error("Unauthorized: no user from getAppwriteUser");
+            return json(401, { error: "Unauthorized" });
+        }
         const myUid = user.$id;
 
         let body = {};
         try { body = JSON.parse(event.body || "{}"); } catch {}
 
-        // hem following_uid hem following_id kabul (geri uyum)
         const following_uid = String(body.following_uid || body.following_id || "").trim();
         if (!following_uid) return json(400, { error: "Missing following_uid" });
         if (following_uid === myUid) return json(400, { error: "Cannot follow yourself" });
 
-        // 🔎 mevcut ilişki var mı?
         const { data: existing, error: e1 } = await sb
             .from("follows")
             .select("id")
@@ -36,35 +42,33 @@ export const handler = async (event) => {
 
         let following = false;
 
-        // 🔁 toggle
         if (existing?.id) {
             const { error: delErr } = await sb.from("follows").delete().eq("id", existing.id);
             if (delErr) return json(500, { error: delErr.message });
             following = false;
         } else {
-            const { error: insErr } = await sb
-                .from("follows")
-                .insert([{ follower_uid: myUid, following_uid }]);
+            const { error: insErr } = await sb.from("follows").insert([{ follower_uid: myUid, following_uid }]);
             if (insErr) return json(500, { error: insErr.message });
             following = true;
         }
 
-        // ✅ counts
-        const [{ count: followersCount }, { count: followingCount }] = await Promise.all([
+        // counts (error check ekledim)
+        const [a, b] = await Promise.all([
             sb.from("follows").select("*", { count: "exact", head: true }).eq("following_uid", following_uid),
             sb.from("follows").select("*", { count: "exact", head: true }).eq("follower_uid", myUid),
         ]);
+        if (a.error) return json(500, { error: a.error.message });
+        if (b.error) return json(500, { error: b.error.message });
 
         return json(200, {
             ok: true,
             following,
-            followers_count: Number(followersCount || 0),
-            following_count: Number(followingCount || 0),
+            followers_count: Number(a.count || 0),
+            following_count: Number(b.count || 0),
         });
     } catch (e) {
-        const msg = String(e?.message || e);
-        const status = msg.toLowerCase().includes("jwt") ? 401 : 500;
-        return json(status, { error: msg });
+        console.error("toggle_follow crash:", e);
+        return json(500, { error: String(e?.message || e) });
     }
 };
 
