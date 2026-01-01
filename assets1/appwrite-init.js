@@ -2,7 +2,7 @@
 (() => {
     // Appwrite SDK yüklü mü?
     if (!window.Appwrite) {
-        console.error("❌ Appwrite SDK not found. Include appwrite CDN before this file.");
+        console.error(" Appwrite SDK not found. Include appwrite CDN before this file.");
         return;
     }
 

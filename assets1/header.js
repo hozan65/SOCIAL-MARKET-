@@ -163,8 +163,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
 
-        console.log("✅ Header fully initialized (clean)");
+        console.log(" Header fully initialized (clean)");
     } catch (err) {
-        console.error("❌ HEADER ERROR:", err);
+        console.error(" HEADER ERROR:", err);
     }
 });

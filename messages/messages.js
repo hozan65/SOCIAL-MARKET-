@@ -1,6 +1,10 @@
-// /messages/messages.js (FINAL - uses dm_inbox.peer_name + dm_get.peer + mobile switch + realtime)
+// /messages/messages.js (FINAL - chat-only scroll + no loading text + inbox fields fixed)
 (() => {
     console.log("messages.js LOADED ✅", location.href);
+
+    // ✅ sayfa scroll kilitle (CSS var ama garanti olsun)
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
 
     // DOM
     const inboxList = document.getElementById("inboxList");
@@ -11,9 +15,7 @@
     const peerSubEl = document.getElementById("peerSub");
     const peerAvaEl = document.getElementById("peerAva");
 
-    const msgList = document.getElementById("msgList");
-    const msgHint = document.getElementById("msgHint");
-
+    const msgList = document.getElementById("msgList"); // msgBody
     const msgForm = document.getElementById("msgForm");
     const msgInput = document.getElementById("msgInput");
     const leftSearch = document.getElementById("leftSearch");
@@ -48,13 +50,15 @@
         msgList.innerHTML = "";
     }
     function renderMsg(m) {
-        const mine = String(m.from_id || m.sender_id || "") === String(state.me);
+        const mine = String(m.from_id || "") === String(state.me);
         const cls = mine ? "mMine" : "mTheirs";
         const time = m.created_at ? new Date(m.created_at).toLocaleTimeString() : "";
-        const text = m.text ?? m.body ?? "";
+        const text = m.text ?? "";
+
         const localKey = m._localKey
             ? ` data-local="1" data-local-key="${esc(m._localKey)}"`
             : "";
+
         return `
       <div class="mRow ${cls}"${localKey}>
         <div class="mBubble">
@@ -77,7 +81,7 @@
         ].join("|");
     }
 
-    // Auth / API
+    // API
     async function ensureJWT() {
         let jwt = localStorage.getItem("sm_jwt");
         if (!jwt) {
@@ -113,8 +117,7 @@
 
     // Header
     function setPeerHeader({ id, name, avatar_url } = {}) {
-        const title = name || (id ? id : "Select a chat");
-        peerNameEl.textContent = title || "Select a chat";
+        peerNameEl.textContent = name || (id ? id : "Select a chat");
         peerSubEl.textContent = "Direct messages";
 
         if (peerAvaEl) {
@@ -128,12 +131,12 @@
         }
     }
 
-    // Inbox render (🔥 dm_inbox alan uyumu)
+    // Inbox item (✅ dm_inbox field fix)
     function renderInboxItem(it) {
         const peer_id = it.peer_id || "";
         const convo_id = it.conversation_id || "";
         const title = it.peer_name || peer_id || "Unknown";
-        const last = it.last_message || "";              // ✅ SENDE last_message var
+        const last = it.last_message || ""; // ✅ sende last_message var
         const ts = it.last_at || it.updated_at || it.created_at || "";
         const when = ts ? new Date(ts).toLocaleString() : "";
 
@@ -146,8 +149,19 @@
     `;
     }
 
+    function applySearch() {
+        const q = (leftSearch?.value || "").trim().toLowerCase();
+        const items = inboxList?.querySelectorAll(".inboxItem") || [];
+        items.forEach((btn) => {
+            if (!q) return (btn.style.display = "");
+            const title = (btn.querySelector(".inboxTitle")?.textContent || "").toLowerCase();
+            const peer = (btn.getAttribute("data-peer") || "").toLowerCase();
+            btn.style.display = (title.includes(q) || peer.includes(q)) ? "" : "none";
+        });
+    }
+
     async function loadInbox() {
-        inboxHint.textContent = "Loading...";
+        inboxHint.textContent = " ";
         try {
             const d = await api("dm_inbox");
             const list = d.list || [];
@@ -161,17 +175,6 @@
         }
     }
 
-    function applySearch() {
-        const q = (leftSearch?.value || "").trim().toLowerCase();
-        const items = inboxList?.querySelectorAll(".inboxItem") || [];
-        items.forEach((btn) => {
-            if (!q) return (btn.style.display = "");
-            const peer = btn.getAttribute("data-peer") || "";
-            const title = (btn.querySelector(".inboxTitle")?.textContent || "").toLowerCase();
-            const ok = title.includes(q) || peer.toLowerCase().includes(q);
-            btn.style.display = ok ? "" : "none";
-        });
-    }
     leftSearch?.addEventListener("input", applySearch);
 
     inboxList?.addEventListener("click", (e) => {
@@ -182,13 +185,11 @@
         openChat({ peer_id, conversation_id });
     });
 
-    // Chat load (dm_get -> peer bilgisi ile header güncelle)
+    // Chat load
     async function loadChat(conversation_id) {
-        msgHint.textContent = "Loading...";
         clearMsgs();
         const d = await api(`dm_get?conversation_id=${encodeURIComponent(conversation_id)}`);
 
-        // ✅ peer info from backend
         if (d.peer) {
             state.peer_id = d.peer.id || state.peer_id;
             state.peer_name = d.peer.name || "";
@@ -204,14 +205,16 @@
                 created_at: m.created_at,
             });
         });
-        msgHint.textContent = rows.length ? "" : "Start messaging...";
+
+        // ✅ chat açılınca otomatik en alta
+        msgList.scrollTop = msgList.scrollHeight;
     }
 
     async function openChat({ peer_id, conversation_id }) {
         state.peer_id = peer_id || "";
         state.conversation_id = conversation_id || "";
 
-        // inbox’ta peer_name varsa header’a koy
+        // inbox'tan isim/avatar çek
         const found = state.inboxRaw.find((x) => x.conversation_id === state.conversation_id);
         if (found) {
             state.peer_name = found.peer_name || "";
@@ -230,10 +233,10 @@
             await loadChat(state.conversation_id);
         } else {
             clearMsgs();
-            msgHint.textContent = "Start messaging...";
         }
     }
 
+    // Back (mobil)
     chatBackBtn?.addEventListener("click", () => {
         if (isMobile()) setMobileModeChat(false);
     });
@@ -242,18 +245,17 @@
         if (!isMobile()) setMobileModeChat(false);
     });
 
-    // Realtime (dm_new)
+    // Realtime
     const socket = window.rt?.socket;
     if (socket) {
         socket.on("dm_new", (p) => {
-            console.log("📩 dm_new received (page):", p);
-
             const cid = p.conversation_id || "";
             if (!cid) return;
 
-            // current convo ise bas
             if (cid === state.conversation_id) {
                 const isMine = String(p.from_id) === String(state.me);
+
+                // optimistic duplicate remove
                 if (isMine) {
                     const lk = makeLocalKey({
                         conversation_id: cid,
@@ -276,11 +278,10 @@
                 });
             }
 
-            // inbox refresh
             loadInbox();
         });
     } else {
-        console.warn("⚠️ socket not ready in messages.js");
+        console.warn("⚠ socket not ready in messages.js");
     }
 
     // Send
@@ -295,6 +296,7 @@
         else if (state.peer_id) payload.peer_id = state.peer_id;
         else return alert("Kime mesaj atacaksın?");
 
+        // optimistic
         const optimistic = {
             conversation_id: state.conversation_id || "pending",
             from_id: state.me,
@@ -312,7 +314,7 @@
                 setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
             }
         } catch (err) {
-            console.error("❌ dm_send error:", err);
+            console.error(" dm_send error:", err);
             alert(String(err?.message || err));
         }
     });
@@ -322,6 +324,7 @@
         try {
             await ensureJWT();
 
+            // uid cache
             if (!localStorage.getItem("sm_uid") && window.APPWRITE_USER_ID) {
                 localStorage.setItem("sm_uid", window.APPWRITE_USER_ID);
                 state.me = window.APPWRITE_USER_ID;
@@ -329,12 +332,6 @@
 
             await loadInbox();
             await openChat({ peer_id: state.peer_id, conversation_id: state.conversation_id });
-
-            console.log("✅ messages init ok", {
-                me: state.me,
-                peer_id: state.peer_id,
-                conversation_id: state.conversation_id,
-            });
         } catch (e) {
             console.error("init failed:", e);
             alert(String(e?.message || e));

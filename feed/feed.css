@@ -431,31 +431,6 @@
 }
 
 
-/* =========================
-   ECON (arka kutu yok)
-========================= */
-.econWrap{ margin-top: 10px; }
-
-.econIframeWrap{
-    width:100%;
-    overflow:hidden;
-    border-radius:14px;
-    border:0;              /* ✅ dış border yok */
-    background: transparent;
-    box-shadow: none;
-}
-.econIframe{
-    width:100%;
-    height:620px;
-    border:0;
-    border-radius:14px;
-}
-.econMobile{ display:none; }
-
-@media (max-width: 900px){
-    .econDesktop{ display:none; }
-    .econMobile{ display:block; height:700px; }
-}
 
 /* =========================
    HEATMAP (CARD GRID) - FIX

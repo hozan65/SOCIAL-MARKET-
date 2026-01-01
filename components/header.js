@@ -58,9 +58,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (e.key === "Escape") close();
         });
 
-        console.log("✅ Header yüklendi:", page);
+        console.log(" Header yüklendi:", page);
 
     } catch (err) {
-        console.error("❌ HEADER LOAD ERROR:", err);
+        console.error(" HEADER LOAD ERROR:", err);
     }
 });

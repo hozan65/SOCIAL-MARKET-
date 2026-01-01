@@ -1,13 +1,27 @@
-/* /messages/messages.css (FINAL) */
+/* /messages/messages.css (FINAL - chat scroll only, hide scrollbar, no page scroll) */
 
-.msgShell{ padding-top: 18px; }
+/* ✅ Messages sayfasında body scroll kapat */
+html, body {
+    height: 100%;
+}
+body {
+    overflow: hidden;        /* ✅ artık sayfa değil, chat scroll olacak */
+}
+
+/* container çok uzamasın */
+.msgShell{
+    padding-top: 18px;
+    height: calc(100vh - 110px); /* header + boşluk payı (gerekirse 90-140 arası oynat) */
+}
 
 .msgApp{
     display: grid;
     grid-template-columns: 340px 1fr;
     gap: 16px;
     align-items: stretch;
-    min-height: 74vh;
+
+    height: 100%;           /* ✅ fixed */
+    min-height: 0;          /* ✅ IMPORTANT: child overflow çalışsın */
 }
 
 /* LEFT */
@@ -17,6 +31,10 @@
     border-radius: 18px;
     box-shadow: 0 10px 30px rgba(0,0,0,.08);
     overflow: hidden;
+
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 0;
 }
 
 .leftTop{
@@ -34,8 +52,23 @@
     background: rgba(255,255,255,.92);
 }
 
-.leftList{ padding: 8px; display: grid; gap: 8px; }
-.leftHint{ padding: 10px 14px; opacity: .75; }
+/* ✅ inbox liste kendi içinde scroll */
+.leftList{
+    padding: 8px;
+    display: grid;
+    gap: 8px;
+    overflow: auto;
+    min-height: 0;
+
+    /* scrollbar gizle ama scroll çalışsın */
+    scrollbar-width: none;
+}
+.leftList::-webkit-scrollbar{ width: 0; height: 0; }
+
+.leftHint{
+    padding: 10px 14px;
+    opacity: .75;
+}
 
 .inboxItem{
     width: 100%;
@@ -57,12 +90,17 @@
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0,0,0,.08);
     background: rgba(255,255,255,.75);
+
     display: grid;
-    grid-template-rows: auto 1fr;
+    grid-template-rows: auto 1fr; /* header + viewport */
+    min-height: 0;
 }
 
-/* header */
+/* header (buton tıklansın diye z-index) */
 .chatTop{
+    position: relative;
+    z-index: 5; /* ✅ tıklama üstte kalsın */
+
     display: flex;
     align-items: center;
     gap: 10px;
@@ -70,13 +108,18 @@
     background: rgba(255,255,255,.86);
     border-bottom: 1px solid rgba(0,0,0,.08);
 }
+
 .chatBack{
     border: 1px solid rgba(0,0,0,.10);
     background: rgba(255,255,255,.92);
     border-radius: 12px;
     padding: 8px 10px;
     cursor: pointer;
+
+    /* ✅ bazen overlay olunca tıklanmaz; garanti */
+    pointer-events: auto;
 }
+
 .chatPeer{ display: flex; align-items: center; gap: 10px; min-width: 0; }
 
 .peerAva{
@@ -91,13 +134,14 @@
 .peerName{ font-weight: 1000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .peerSub{ opacity: .65; font-size: 12px; }
 
-/* viewport (BURASI: açık beyaz-mavi, site bg’ye dokunmadan) */
+/* ✅ CHAT VIEWPORT: sadece burası scroll olacak */
 .chatViewport{
     position: relative;
     display: grid;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr auto; /* msgBody + composer */
     min-height: 0;
 
+    /* chat iç arkaplan */
     background: linear-gradient(180deg,
     rgba(210,235,255,.85) 0%,
     rgba(245,252,255,.92) 45%,
@@ -108,7 +152,12 @@
 .msgBody{
     padding: 14px;
     overflow: auto;
+    min-height: 0;
+
+    /* ✅ scrollbar gizle */
+    scrollbar-width: none;
 }
+.msgBody::-webkit-scrollbar{ width: 0; height: 0; }
 
 /* bubbles */
 .mRow{ display: flex; margin: 8px 0; }
@@ -155,28 +204,29 @@
 }
 .sendIcon{ width: 20px; height: 20px; }
 
-/* hint */
-.msgHint{
-    padding: 10px 14px;
-    opacity: .75;
-    background: rgba(255,255,255,.70);
-    border-top: 1px solid rgba(0,0,0,.06);
+/* ✅ “Loading…” yazısını tamamen gizle */
+#msgHint{
+    display: none !important;
 }
 
 /* =========================
    MOBILE: kişi seçince chat aç
 ========================= */
 @media (max-width: 860px){
+    .msgShell{
+        height: calc(100vh - 90px);
+    }
+
     .msgApp{
         grid-template-columns: 1fr;
         gap: 12px;
     }
 
-    /* default: sadece sol liste görünsün */
+    /* default: sadece sol liste */
     .msgRight{ display: none; }
     .chatBack{ display: inline-flex; }
 
-    /* chat açık mod */
+    /* chat açık */
     body.dmChatOpen .msgLeft{ display: none; }
     body.dmChatOpen .msgRight{ display: grid; }
 }

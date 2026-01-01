@@ -4,7 +4,7 @@ import { account } from "/assets/appwrite.js";
 console.log("✅ auth-ui.js loaded");
 
 waitFor("#authSlot", 6000).then(init).catch((e) => {
-    console.warn("❌ auth-ui: authSlot not found", e);
+    console.warn(" auth-ui: authSlot not found", e);
 });
 
 function waitFor(selector, timeoutMs = 4000) {

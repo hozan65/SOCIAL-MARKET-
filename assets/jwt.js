@@ -21,12 +21,12 @@ async function refreshJWT() {
         window.SM_JWT = jwt;
         localStorage.setItem("sm_jwt", jwt);
 
-        console.log("✅ sm_jwt updated");
+        console.log(" sm_jwt updated");
         return jwt;
     } catch (e) {
         window.SM_JWT = "";
         localStorage.removeItem("sm_jwt");
-        console.warn("⚠️ No session -> sm_jwt cleared");
+        console.warn("⚠ No session -> sm_jwt cleared");
         return null;
     }
 }

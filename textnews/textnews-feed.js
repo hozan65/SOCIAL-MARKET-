@@ -2,33 +2,59 @@
     const grid = document.getElementById("textNewsGrid");
     if (!grid) return;
 
-    const sb = supabase.createClient(
-        "https://yzrhqduuqvllatliulqv.supabase.co",
-        "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_"
-    );
-
-    function fmt(t){
-        return new Date(t).toLocaleString("tr-TR",{dateStyle:"short",timeStyle:"short"});
+    const sb = window.sb; // ✅ tek Supabase client
+    if (!sb) {
+        console.error("❌ window.sb yok. /assets/sb.js yüklenmemiş.");
+        return;
     }
 
-    async function load(){
-        const { data } = await sb
-            .from("news_feed")
-            .select("source,title,published_at,slug")
-            .order("published_at",{ascending:false})
-            .limit(6);
+    function fmt(t) {
+        return new Date(t).toLocaleString("tr-TR", {
+            dateStyle: "short",
+            timeStyle: "short",
+        });
+    }
 
-        grid.innerHTML = (data||[]).map(n=>`
-      <div class="textNewsItem">
-        <a class="textNewsLink" href="/textnews/textnews-detail.html?slug=${n.slug}">
-          <div class="textNewsTop">
-            <span class="textNewsSource">${n.source}</span>
-            <span>${fmt(n.published_at)}</span>
-          </div>
-          <div class="textNewsTitle">${n.title}</div>
-        </a>
-      </div>
-    `).join("");
+    function esc(str) {
+        return String(str ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    async function load() {
+        try {
+            const { data, error } = await sb
+                .from("news_feed")
+                .select("source,title,published_at,slug")
+                .order("published_at", { ascending: false })
+                .limit(6);
+
+            if (error) throw error;
+
+            grid.innerHTML = (data || [])
+                .map(
+                    (n) => `
+        <div class="textNewsItem">
+          <a class="textNewsLink" href="/textnews/textnews-detail.html?slug=${encodeURIComponent(
+                        n.slug
+                    )}">
+            <div class="textNewsTop">
+              <span class="textNewsSource">${esc(n.source)}</span>
+              <span>${esc(fmt(n.published_at))}</span>
+            </div>
+            <div class="textNewsTitle">${esc(n.title)}</div>
+          </a>
+        </div>
+      `
+                )
+                .join("");
+        } catch (e) {
+            console.error("textNewsGrid load error:", e);
+            grid.innerHTML = `<div class="textNewsItem"><div class="textNewsTitle">News unavailable</div></div>`;
+        }
     }
 
     load();

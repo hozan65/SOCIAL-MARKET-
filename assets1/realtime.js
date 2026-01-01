@@ -4,7 +4,7 @@
 
     const url = window.SOCKET_URL || "https://socket.chriontoken.com";
     if (!window.io) {
-        console.error("❌ socket.io not loaded");
+        console.error(" socket.io not loaded");
         return;
     }
 
@@ -25,13 +25,13 @@
         const uid = getUid();
         if (!uid) return false;
         socket.emit("auth_user", uid);
-        console.log("✅ auth_user sent:", uid);
+        console.log(" auth_user sent:", uid);
         authed = true;
         return true;
     }
 
     socket.on("connect", () => {
-        console.log("✅ realtime connected:", socket.id);
+        console.log(" realtime connected:", socket.id);
         authed = false;
 
         // 1) hemen dene
@@ -47,12 +47,12 @@
     });
 
     socket.on("disconnect", () => {
-        console.log("❌ realtime disconnected");
+        console.log(" realtime disconnected");
         authed = false;
     });
 
     // DEBUG: dm_new global log
     socket.on("dm_new", (p) => {
-        console.log("📩 dm_new (global):", p);
+        console.log(" dm_new (global):", p);
     });
 })();

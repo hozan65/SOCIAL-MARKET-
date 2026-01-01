@@ -41,7 +41,7 @@ function setMode(m){
 
     if (submitBtn) submitBtn.textContent = m === "login" ? "Login" : "Register";
     setMsg("");
-    console.log("✅ MODE:", mode);
+    console.log(" MODE:", mode);
 }
 
 tabLogin?.addEventListener("click", () => setMode("login"));
@@ -106,7 +106,7 @@ submitBtn?.addEventListener("click", async () => {
         setMsg("Preparing session...");
         await afterLogin();
 
-        setMsg("✅ Done");
+        setMsg(" Done");
         goFeed();
 
     } catch(e){

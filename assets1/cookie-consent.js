@@ -11,7 +11,7 @@ console.log("✅ cookie-consent.js loaded (SkySports-like)");
     const btnNecessary = document.getElementById("smCookieNecessary");
 
     if (!overlay || !bar || !btnAccept || !btnReject || !btnNecessary) {
-        console.warn("❌ Cookie bar DOM missing. Check IDs + placement inside <body>.");
+        console.warn(" Cookie bar DOM missing. Check IDs + placement inside <body>.");
         return;
     }
 
