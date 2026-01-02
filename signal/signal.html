@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Analyze</title>
+    <link rel="stylesheet" href="./signal.css" />
+</head>
+<body>
+
+<div class="app">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+        <div class="sbTop">
+            <div class="sbBrand">Social Market</div>
+        </div>
+
+        <!-- SADE: sadece yeni sohbet + ara -->
+        <nav class="sbNav">
+            <button class="sbBtn primary" type="button">
+                <span class="sbIco">＋</span>
+                <span>Yeni sohbet</span>
+            </button>
+
+            <button class="sbBtn" type="button">
+                <span class="sbIco">🔎</span>
+                <span>Sohbetleri ara</span>
+            </button>
+        </nav>
+
+        <div class="sbSectionTitle">Sohbetlerin</div>
+
+        <!-- SADE: sohbet listesi -->
+        <div class="sbChats">
+            <a class="chatRow active" href="#"><span class="dot"></span><span class="chatName">Analyze UI ve Sistem Kurulumu</span></a>
+            <a class="chatRow" href="#"><span class="dot"></span><span class="chatName">AI Chat Support Eklemek</span></a>
+            <a class="chatRow" href="#"><span class="dot"></span><span class="chatName">Profil Butonu Hatası</span></a>
+            <a class="chatRow" href="#"><span class="dot"></span><span class="chatName">Telegram Görünüm Düzeltmesi</span></a>
+            <a class="chatRow" href="#"><span class="dot"></span><span class="chatName">Süt bar görünmemesi</span></a>
+            <a class="chatRow" href="#"><span class="dot"></span><span class="chatName">Site Tasarımı ve Renk</span></a>
+        </div>
+
+        <!-- bottom mini profile -->
+        <div class="sbBottom">
+            <div class="profileMini">
+                <span class="avatarMini">HB</span>
+                <span class="profileMeta">
+          <span class="pName">Hozan Bilaloglu</span>
+          <span class="pPlan">Plus</span>
+        </span>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+
+        <header class="topHeader">
+
+            <div class="topLeft">
+                <button class="modelBtn" type="button">
+                    <span class="modelName">Analyze</span>
+                    <span class="chev">▾</span>
+                </button>
+            </div>
+
+            <div class="topRight">
+                <!-- sağ üst profil dropdown -->
+                <details class="profile">
+                    <summary class="profileBtn" aria-label="Profile">
+                        <span class="avatar">H</span>
+                        <span class="chev">▾</span>
+                    </summary>
+
+                    <div class="profileMenu">
+                        <a class="menuItem" href="/billing/payment.html">Payment</a>
+                        <a class="menuItem" href="/billing/history.html">Payment History</a>
+                        <a class="menuItem" href="/billing/upgrade.html">Upgrade Plan</a>
+                        <a class="menuItem" href="/help/index.html">Help</a>
+                        <a class="menuItem" href="/legal/terms.html">Terms of Use</a>
+                    </div>
+                </details>
+            </div>
+
+        </header>
+
+        <!-- boş orta alan -->
+        <section class="center" aria-label="Chat area"></section>
+
+        <!-- composer -->
+        <footer class="composerWrap">
+            <div class="composer">
+
+                <!-- + (image upload) -->
+                <details class="plus">
+                    <summary class="circleBtn" aria-label="Add">＋</summary>
+                    <div class="plusMenu">
+                        <label class="uploadBtn">
+                            Image Upload
+                            <input type="file" accept="image/*" hidden />
+                        </label>
+                    </div>
+                </details>
+
+                <input class="composerInput" type="text" placeholder="Herhangi bir şey sor" />
+
+                <button class="sendBtn" title="Send" aria-label="Send">➤</button>
+            </div>
+        </footer>
+
+    </main>
+
+</div>
+
+</body>
+</html>

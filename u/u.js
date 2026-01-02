@@ -1,5 +1,5 @@
-// /u/u.js
-import { account } from "/assets/appwrite.js";
+// /u/u.js  (FULL)
+// Profile page logic: load profile, stats, posts, follow/message/visit controls, drawer lists
 
 console.log("✅ u.js loaded (profile + follow toggle + posts cards + drawer)");
 
@@ -15,9 +15,10 @@ const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";   // POST { follow
 
 // pages
 const PROFILE_PAGE = "/u/index.html";
-const MESSAGES_PAGE = "/messages/";      // /messages/index.html
-const VIEW_PAGE = "/view/view.html";     // post detail page
+const MESSAGES_PAGE = "/messages/"; // /messages/index.html
+const VIEW_PAGE = "/view/view.html"; // post detail page
 
+// helpers
 const qs = (k) => new URLSearchParams(location.search).get(k);
 const $ = (id) => document.getElementById(id);
 
@@ -27,27 +28,62 @@ const $name = $("uName");
 const $bio = $("uBio");
 const $followers = $("uFollowers");
 const $following = $("uFollowing");
-const $posts = $("uPostsCount");
-const $links = $("uLinks");
-const $grid = $("uPostsGrid");
+const $postsCount = $("uPostsCount");
+const $postsGrid = $("uPostsGrid");
 const $msg = $("uMsg");
-
-const $followersBtn = $("uFollowersBtn");
-const $followingBtn = $("uFollowingBtn");
 
 const $followBtn = $("uFollowBtn");
 const $msgBtn = $("uMsgBtn");
+const $visitBtn = $("uVisitBtn"); // ✅ must exist in HTML
 
 // drawer
+const $drawerBackdrop = $("uDrawerBackdrop");
 const $drawer = $("uDrawer");
 const $drawerTitle = $("uDrawerTitle");
 const $drawerBody = $("uDrawerBody");
 const $drawerClose = $("uDrawerClose");
-const $drawerBackdrop = $("uDrawerBackdrop");
+const $followersBtn = $("uFollowersBtn");
+const $followingBtn = $("uFollowingBtn");
 
-// ---------- helpers ----------
-function esc(s) {
-    return String(s ?? "")
+// ---------------------------
+// JWT helper (same pattern as your other pages)
+// ---------------------------
+function getJWT() {
+    return window.SM_JWT || localStorage.getItem("sm_jwt") || "";
+}
+
+async function fnGet(url) {
+    const jwt = getJWT();
+    const r = await fetch(url, {
+        method: "GET",
+        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
+    return j;
+}
+
+async function fnPost(url, body) {
+    const jwt = getJWT();
+    const r = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+        },
+        body: JSON.stringify(body || {}),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
+    return j;
+}
+
+function setMsg(t) {
+    if ($msg) $msg.textContent = t || "";
+}
+
+function esc(str) {
+    return String(str ?? "")
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
@@ -55,437 +91,317 @@ function esc(s) {
         .replaceAll("'", "&#039;");
 }
 
-function safeHost(url) {
-    try { return new URL(url).hostname; } catch { return url || ""; }
+function safeUrl(u) {
+    const s = String(u || "").trim();
+    if (!s) return "";
+    // allow http(s) only
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    return "";
 }
 
-function setMsg(t) {
-    if ($msg) $msg.textContent = t || "";
-}
+// ---------------------------
+// Determine target profile
+// ---------------------------
+const params = new URLSearchParams(location.search);
+const isMe = params.get("me") === "1";     // ✅ primary rule
+const targetIdFromQuery = String(params.get("id") || "").trim();
 
-function shortText(str, max = 120) {
-    const s = String(str || "").trim();
-    if (!s) return { short: "", long: "", isLong: false };
-    if (s.length <= max) return { short: s, long: s, isLong: false };
-    return { short: s.slice(0, max).trim() + "…", long: s, isLong: true };
-}
+// We'll decide targetUserId like this:
+// - if me=1 => profile is mine (no need id)
+// - else => must have id
+let TARGET_UID = isMe ? "" : targetIdFromQuery;
 
-// ✅ ALWAYS hide Message on own profile
-function setMessageButton(isMe, profileUserId) {
-    if (!$msgBtn) return;
-    if (isMe) {
-        $msgBtn.hidden = true;
-        $msgBtn.href = "#";
-        return;
+// ---------------------------
+// UI visibility rules (Follow/Message/Visit)
+// ---------------------------
+function applyActionVisibility({ isMeProfile, targetUid, postsCount }) {
+    // Follow + Message only for other users
+    if ($followBtn) $followBtn.hidden = !!isMeProfile || !targetUid;
+    if ($msgBtn) $msgBtn.hidden = !!isMeProfile || !targetUid;
+
+    // Visit: your rule = only on other users AND only if postsCount > 0
+    if ($visitBtn) {
+        if (isMeProfile) {
+            $visitBtn.hidden = true;
+            $visitBtn.removeAttribute("href");
+        } else {
+            const ok = !!targetUid && (Number(postsCount) || 0) > 0;
+            $visitBtn.hidden = !ok;
+            if (ok) $visitBtn.href = `${VIEW_PAGE}?id=${encodeURIComponent(targetUid)}`;
+            else $visitBtn.removeAttribute("href");
+        }
     }
-    $msgBtn.hidden = false;
-    $msgBtn.href = `${MESSAGES_PAGE}?to=${encodeURIComponent(profileUserId)}`;
 }
 
-function setFollowButton(isMe) {
-    if (!$followBtn) return;
-    $followBtn.hidden = !!isMe;
+// ---------------------------
+// Profile fetchers
+// (Your functions may return different shapes; we normalize)
+// ---------------------------
+function normalizeProfilePayload(j) {
+    // Expected possible shapes:
+    // { profile: { user_id, username, avatar_url, bio }, stats: { followers, following, posts }, posts: [...] }
+    // or { user: {...}, followers_count, following_count, posts_count, posts: [...] }
+    const p = j?.profile || j?.user || j?.data || j || {};
+    const stats = j?.stats || {};
+
+    const user_id = String(p.user_id || p.uid || p.id || j?.user_id || j?.uid || "").trim();
+    const username = String(p.username || p.name || p.display_name || "—").trim();
+    const avatar_url = safeUrl(p.avatar_url || p.avatar || p.photo_url || "");
+    const bio = String(p.bio || p.about || "").trim();
+
+    const followers = Number(stats.followers ?? j?.followers_count ?? j?.followers ?? 0) || 0;
+    const following = Number(stats.following ?? j?.following_count ?? j?.following ?? 0) || 0;
+    const posts_count = Number(stats.posts ?? j?.posts_count ?? j?.posts ?? 0) || 0;
+
+    const posts = Array.isArray(j?.posts) ? j.posts : Array.isArray(p?.posts) ? p.posts : [];
+
+    return { user_id, username, avatar_url, bio, followers, following, posts_count, posts };
 }
 
-// ===== FOLLOW TOGGLE UI =====
-let _isFollowing = false;
+// Render a simple post card list (customize if you want)
+function renderPosts(posts) {
+    if (!$postsGrid) return;
 
-function paintFollowBtn() {
-    if (!$followBtn) return;
-    $followBtn.textContent = _isFollowing ? "Unfollow" : "Follow";
-    $followBtn.classList.toggle("isFollowing", _isFollowing);
-}
-
-// ---------- drawer ----------
-function openDrawer(title) {
-    if (!$drawer || !$drawerTitle || !$drawerBody || !$drawerBackdrop) return;
-
-    $drawerTitle.textContent = title || "—";
-    $drawerBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Loading...</div>`;
-
-    $drawerBackdrop.hidden = false;
-    $drawer.classList.add("open");
-    $drawer.setAttribute("aria-hidden", "false");
-
-    document.body.classList.add("uDrawerOpen");
-    document.documentElement.style.overflow = "hidden";
-}
-
-function closeDrawer() {
-    if (!$drawer || !$drawerBody || !$drawerBackdrop) return;
-
-    $drawer.classList.remove("open");
-    $drawer.setAttribute("aria-hidden", "true");
-    document.body.classList.remove("uDrawerOpen");
-    document.documentElement.style.overflow = "";
-
-    setTimeout(() => {
-        if (!$drawer.classList.contains("open")) $drawerBackdrop.hidden = true;
-    }, 180);
-
-    $drawerBody.innerHTML = "";
-}
-
-function renderUserList(list) {
-    if (!$drawerBody) return;
-
-    if (!list?.length) {
-        $drawerBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Empty</div>`;
+    if (!Array.isArray(posts) || !posts.length) {
+        $postsGrid.innerHTML = `<div class="uEmpty">No posts yet.</div>`;
         return;
     }
 
-    $drawerBody.innerHTML = list.map((u) => {
-        const name = esc(u?.name || "User");
-        const av = u?.avatar_url ? esc(u.avatar_url) : "";
-        const id = u?.id || "";
+    $postsGrid.innerHTML = posts.map((row) => {
+        // Try common fields
+        const id = String(row.id || row.post_id || "").trim();
+        const title = esc(row.title || row.pairs || row.market || "Post");
+        const time = esc(row.created_at || row.time || "");
+        const img = safeUrl(row.image_url || row.image_path || row.image || "");
+        const href = id ? `${VIEW_PAGE}?id=${encodeURIComponent(id)}` : "#";
+
         return `
-      <div class="uUserRow">
-        ${av ? `<img class="uUserAva" src="${av}" alt="">` : `<div class="uUserAva"></div>`}
-        <div class="uUserName">${name}</div>
-        <a class="uUserGo" href="${PROFILE_PAGE}?id=${encodeURIComponent(id)}">View</a>
-      </div>
+      <a class="uPostCard" href="${href}">
+        ${img ? `<img class="uPostImg" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : `<div class="uPostNoImg">NO IMAGE</div>`}
+        <div class="uPostBody">
+          <div class="uPostTitle">${title}</div>
+          <div class="uPostMeta">${esc(time)}</div>
+        </div>
+      </a>
     `;
     }).join("");
 }
 
-// ---------- render profile ----------
-function renderProfile(data) {
-    const p = data?.profile || {};
-    const c = data?.counts || {};
-    const postsArr = Array.isArray(data?.posts) ? data.posts : [];
-
-    if ($name) $name.textContent = p.name || "User";
-    if ($bio) $bio.textContent = p.bio || "";
-
-    if ($avatar) {
-        if (p.avatar_url) {
-            $avatar.src = p.avatar_url;
-            $avatar.style.display = "block";
-        } else {
-            $avatar.removeAttribute("src");
-            $avatar.style.display = "none";
-        }
-    }
-
-    if ($followers) $followers.textContent = c.followers ?? 0;
-    if ($following) $following.textContent = c.following ?? 0;
-    if ($posts) $posts.textContent = c.posts ?? postsArr.length ?? 0;
-
-    // links
-    if ($links) {
-        $links.innerHTML = "";
-        (p.links || []).forEach((l) => {
-            if (!l?.url) return;
-            const a = document.createElement("a");
-            a.className = "uLink";
-            a.href = l.url;
-            a.target = "_blank";
-            a.rel = "noopener";
-            a.textContent = safeHost(l.url);
-            $links.appendChild(a);
-        });
-    }
-
-    // posts grid
-    if (!$grid) return;
-    $grid.innerHTML = "";
-
-    postsArr.forEach((post) => {
-        const id = post.id || post.post_id || post.uuid || post.slug || "";
-        const imgUrl = post.image_url || post.image_path || post.image || post.photo_url || "";
-        if (!imgUrl) return;
-
-        // ✅ id yoksa view’e gidemez -> render etme (en temiz çözüm)
-        if (!id) return;
-
-        const caption = post.caption || post.text || post.body || post.description || "";
-        const coin = post.coin || post.symbol || post.crypto || post.asset || "";
-        const tf = post.timeframe || post.tf || post.interval || "";
-
-        const t = shortText(caption, 120);
-
-        const card = document.createElement("article");
-        card.className = "uPostCard";
-        card.dataset.id = id;
-
-        card.innerHTML = `
-      <div class="uPostImg">
-        <img loading="lazy" src="${esc(imgUrl)}" alt="">
-      </div>
-
-      <div class="uPostBody">
-        <div class="uPostMeta">
-          ${coin ? `<span class="uTag">${esc(coin)}</span>` : ""}
-          ${tf ? `<span class="uTag">${esc(tf)}</span>` : ""}
-          <a class="uVisitBtn" href="${VIEW_PAGE}?id=${encodeURIComponent(id)}">Visit →</a>
-        </div>
-
-        ${caption ? `
-          <div class="uPostText" data-open="0">
-            <span class="uPostShort">${esc(t.short)}</span>
-            ${t.isLong ? `<span class="uPostLong" hidden>${esc(t.long)}</span>` : ``}
-            ${t.isLong ? `<button class="uMoreBtn" type="button">Show more</button>` : ``}
-          </div>
-        ` : ``}
-      </div>
-    `;
-
-        // ✅ card click -> view (ama button/link gibi şeylere basınca değil)
-        card.addEventListener("click", (e) => {
-            const el = e.target;
-            if (!id) return;
-
-            // eğer kullanıcı button / link / input tıklıyorsa card yönlendirmesin
-            if (el && el.closest && el.closest("a,button,input,textarea,select,label")) return;
-
-            location.href = `${VIEW_PAGE}?id=${encodeURIComponent(id)}`;
-        });
-
-        // show more toggle
-        const moreBtn = card.querySelector(".uMoreBtn");
-        if (moreBtn) {
-            moreBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                const box = card.querySelector(".uPostText");
-                const shortEl = card.querySelector(".uPostShort");
-                const longEl = card.querySelector(".uPostLong");
-                const open = box?.getAttribute("data-open") === "1";
-
-                if (!open) {
-                    if (longEl) longEl.hidden = false;
-                    if (shortEl) shortEl.hidden = true;
-                    moreBtn.textContent = "Show less";
-                    box?.setAttribute("data-open", "1");
-                } else {
-                    if (longEl) longEl.hidden = true;
-                    if (shortEl) shortEl.hidden = false;
-                    moreBtn.textContent = "Show more";
-                    box?.setAttribute("data-open", "0");
-                }
-            });
-        }
-
-        $grid.appendChild(card);
-    });
-}
-
-// ---------- API ----------
-async function fetchProfile(uid) {
-    const r = await fetch(`${FN_GET}?id=${encodeURIComponent(uid)}`, { cache: "no-store" });
-    const out = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(out?.error || `get_profile ${r.status}`);
-    return out;
-}
-
-let _jwtCache = { jwt: null, ts: 0 };
-const JWT_TTL_MS = 60_000;
-
-async function getJwtHeaders() {
-    const now = Date.now();
-    if (_jwtCache.jwt && (now - _jwtCache.ts) < JWT_TTL_MS) {
-        const jwt = _jwtCache.jwt;
-        return {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${jwt}`,
-            "X-Appwrite-JWT": jwt,
-            "x-jwt": jwt
-        };
-    }
-
-    const jwtObj = await account.createJWT();
-    const jwt = jwtObj?.jwt;
-    if (!jwt) throw new Error("JWT could not be created");
-
-    _jwtCache = { jwt, ts: now };
-
-    return {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${jwt}`,
-        "X-Appwrite-JWT": jwt,
-        "x-jwt": jwt
-    };
-}
-
-async function ensureProfile() {
+// ---------------------------
+// Follow actions
+// ---------------------------
+async function isFollowing(targetUid) {
+    const id = String(targetUid || "").trim();
+    if (!id) return false;
     try {
-        const headers = await getJwtHeaders();
-        await fetch(FN_ENSURE, { method: "POST", headers, body: JSON.stringify({ ok: true }) });
-    } catch (e) {
-        console.warn("ensure_profile failed:", e?.message || e);
+        const r = await fnGet(`${FN_IS_FOLLOWING}?id=${encodeURIComponent(id)}`);
+        return !!(r?.following ?? r?.is_following ?? r?.data?.following);
+    } catch {
+        return false;
     }
 }
 
-async function loadList(url) {
-    const r = await fetch(url, { cache: "no-store" });
-    const out = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(out?.error || `HTTP ${r.status}`);
-    return out?.list || [];
-}
-
-// ✅ Get REAL viewer id from Appwrite (do not trust localStorage)
-async function getViewerIdStrict() {
-    const me = await account.get(); // if not logged -> throws
-    const id = me?.$id || "";
-    if (!id) throw new Error("Missing viewer id");
-    localStorage.setItem("sm_uid", id);
-    return id;
-}
-
-// ✅ Follow status
-async function loadFollowStatus(targetUid) {
-    const headers = await getJwtHeaders();
-    const r = await fetch(`${FN_IS_FOLLOWING}?id=${encodeURIComponent(targetUid)}`, {
-        method: "GET",
-        headers,
-        cache: "no-store"
-    });
-    const out = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(out?.error || `is_following ${r.status}`);
-    return !!out?.is_following;
-}
-
-// ✅ Toggle follow
 async function toggleFollow(targetUid) {
-    const headers = await getJwtHeaders();
-    const r = await fetch(FN_TOGGLE_FOLLOW, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-            following_uid: targetUid,
-            id: targetUid,
-            target_uid: targetUid
-        })
-    });
-    const out = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(out?.error || `toggle_follow ${r.status}`);
-
-    if (typeof out?.is_following === "boolean") return out.is_following;
-    if (typeof out?.following === "boolean") return out.following;
-    return await loadFollowStatus(targetUid);
+    const id = String(targetUid || "").trim();
+    if (!id) throw new Error("Target id missing");
+    return fnPost(FN_TOGGLE_FOLLOW, { following_uid: id });
 }
 
-// ---------- BOOT ----------
-(async function boot() {
-    // 1) resolve profile uid
-    let uid = qs("id");
+function setFollowBtnState(following) {
+    if (!$followBtn) return;
+    $followBtn.textContent = following ? "Following" : "Follow";
+    $followBtn.classList.toggle("isFollowing", !!following);
+}
 
-    // me=1 => my profile
-    if (!uid && qs("me") === "1") {
-        try { uid = await getViewerIdStrict(); }
-        catch { location.href = "/auth/login.html"; return; }
+// ---------------------------
+// Drawer (Followers / Following)
+// ---------------------------
+function openDrawer(title) {
+    if ($drawerBackdrop) $drawerBackdrop.hidden = false;
+    if ($drawer) {
+        $drawer.setAttribute("aria-hidden", "false");
+        $drawer.classList.add("isOpen");
+    }
+    if ($drawerTitle) $drawerTitle.textContent = title || "—";
+}
+
+function closeDrawer() {
+    if ($drawerBackdrop) $drawerBackdrop.hidden = true;
+    if ($drawer) {
+        $drawer.setAttribute("aria-hidden", "true");
+        $drawer.classList.remove("isOpen");
+    }
+    if ($drawerBody) $drawerBody.innerHTML = "";
+}
+
+async function loadDrawerList(kind) {
+    // kind: "followers" | "following"
+    if (!TARGET_UID && !isMe) return;
+
+    // For me profile, the backend should infer my uid from JWT.
+    // For other profile, pass target uid.
+    const url = kind === "followers"
+        ? (TARGET_UID ? `${FN_LIST_FOLLOWERS}?id=${encodeURIComponent(TARGET_UID)}` : FN_LIST_FOLLOWERS)
+        : (TARGET_UID ? `${FN_LIST_FOLLOWING}?id=${encodeURIComponent(TARGET_UID)}` : FN_LIST_FOLLOWING);
+
+    if ($drawerBody) $drawerBody.innerHTML = `<div class="uDrawerLoading">Loading...</div>`;
+
+    const j = await fnGet(url).catch((e) => ({ error: e?.message || "failed" }));
+    const list = Array.isArray(j?.list) ? j.list : Array.isArray(j?.data) ? j.data : Array.isArray(j) ? j : [];
+
+    if (!$drawerBody) return;
+
+    if (!list.length) {
+        $drawerBody.innerHTML = `<div class="uDrawerEmpty">Empty.</div>`;
+        return;
     }
 
-    // default to my profile
-    if (!uid) {
-        try { uid = await getViewerIdStrict(); }
-        catch { location.href = "/auth/login.html"; return; }
+    $drawerBody.innerHTML = list.map((x) => {
+        const uid = String(x.user_id || x.uid || x.id || "").trim();
+        const username = esc(x.username || x.name || uid || "user");
+        const avatar = safeUrl(x.avatar_url || x.avatar || "");
+
+        // click => open that user's profile (not me param)
+        const href = uid ? `${PROFILE_PAGE}?id=${encodeURIComponent(uid)}` : "#";
+
+        return `
+      <a class="uDrawerItem" href="${href}">
+        <div class="uDrawerAvatar">
+          ${avatar ? `<img src="${esc(avatar)}" alt="" loading="lazy" decoding="async">` : `<div class="uDrawerAvatarFallback">${username.slice(0, 1).toUpperCase()}</div>`}
+        </div>
+        <div class="uDrawerInfo">
+          <div class="uDrawerName">${username}</div>
+          <div class="uDrawerSub">${esc(uid)}</div>
+        </div>
+      </a>
+    `;
+    }).join("");
+}
+
+// ---------------------------
+// MAIN
+// ---------------------------
+async function loadProfile() {
+    setMsg("");
+
+    // ✅ If other profile but id missing -> show error
+    if (!isMe && !TARGET_UID) {
+        setMsg("❌ Missing profile id");
+        applyActionVisibility({ isMeProfile: false, targetUid: "", postsCount: 0 });
+        return;
     }
 
-    // 2) viewer id
-    let viewerId = "";
-    try { viewerId = await getViewerIdStrict(); }
-    catch { location.href = "/auth/login.html"; return; }
+    // Start with safe hidden state
+    applyActionVisibility({ isMeProfile: isMe, targetUid: TARGET_UID, postsCount: 0 });
 
-    const isMe = String(viewerId) === String(uid);
-
-    // show/hide actions
-    setFollowButton(isMe);
-    setMessageButton(isMe, uid);
-
-    // follow init + click
-    if (!isMe && $followBtn) {
-        try {
-            _isFollowing = await loadFollowStatus(uid);
-            paintFollowBtn();
-        } catch (e) {
-            console.warn("loadFollowStatus failed:", e?.message || e);
-            _isFollowing = false;
-            paintFollowBtn();
-        }
-
-        $followBtn.addEventListener("click", async () => {
-            try {
-                $followBtn.disabled = true;
-
-                const newVal = await toggleFollow(uid);
-                const prev = _isFollowing;
-                _isFollowing = !!newVal;
-                paintFollowBtn();
-
-                // UI followers count (safe)
-                const cur = parseInt($followers?.textContent || "0", 10) || 0;
-                if (prev !== _isFollowing) {
-                    $followers.textContent = String(_isFollowing ? cur + 1 : Math.max(0, cur - 1));
-                }
-                setMsg("");
-            } catch (e) {
-                console.error(e);
-                setMsg("❌ " + (e?.message || e));
-            } finally {
-                $followBtn.disabled = false;
-            }
-        });
-    }
-
-    // cache-first
-    const cacheKey = "profile_cache_" + uid;
-    const cachedRaw = localStorage.getItem(cacheKey);
-    if (cachedRaw) {
-        try { renderProfile(JSON.parse(cachedRaw)); } catch {}
-    }
-
-    // load fresh (ensure fallback)
     try {
-        const data = await fetchProfile(uid);
-        renderProfile(data);
-        localStorage.setItem(cacheKey, JSON.stringify(data));
-        setMsg("");
-    } catch (e) {
-        console.warn("get_profile failed:", e?.message || e);
-        await ensureProfile();
+        // Fetch profile
+        // - If me=1 => let backend infer user from JWT (FN_GET)
+        // - else => pass id
+        const url = isMe ? FN_GET : `${FN_GET}?id=${encodeURIComponent(TARGET_UID)}`;
+
+        // If backend requires ensure on first visit
+        // We'll try GET; if fails due to missing profile, we can ensure then GET again
+        let j;
         try {
-            const data2 = await fetchProfile(uid);
-            renderProfile(data2);
-            localStorage.setItem(cacheKey, JSON.stringify(data2));
-            setMsg("");
-        } catch (e2) {
-            console.error("Profile still cannot load:", e2);
-            setMsg("❌ Profile could not load");
+            j = await fnGet(url);
+        } catch (e) {
+            // try ensure_profile then retry once
+            try {
+                await fnPost(FN_ENSURE, {});
+                j = await fnGet(url);
+            } catch (e2) {
+                throw e2;
+            }
         }
+
+        const p = normalizeProfilePayload(j);
+
+        // If viewing other profile and backend returned user_id, trust it
+        if (!isMe && p.user_id) TARGET_UID = p.user_id;
+
+        // Fill UI
+        if ($name) $name.textContent = p.username || "—";
+        if ($bio) $bio.textContent = p.bio || "";
+        if ($followers) $followers.textContent = String(p.followers || 0);
+        if ($following) $following.textContent = String(p.following || 0);
+        if ($postsCount) $postsCount.textContent = String(p.posts_count || 0);
+
+        if ($avatar) {
+            if (p.avatar_url) $avatar.src = p.avatar_url;
+            else $avatar.removeAttribute("src");
+        }
+
+        // render posts
+        renderPosts(p.posts);
+
+        // ✅ Apply visibility rules AFTER we know posts_count
+        applyActionVisibility({ isMeProfile: isMe, targetUid: TARGET_UID, postsCount: p.posts_count });
+
+        // Follow button state
+        if (!isMe && TARGET_UID && $followBtn) {
+            const following = await isFollowing(TARGET_UID);
+            setFollowBtnState(following);
+            $followBtn.hidden = false;
+        }
+
+        // Message button link
+        if (!isMe && TARGET_UID && $msgBtn) {
+            $msgBtn.hidden = false;
+            $msgBtn.href = `${MESSAGES_PAGE}?id=${encodeURIComponent(TARGET_UID)}`;
+        }
+
+    } catch (err) {
+        console.error(err);
+        setMsg("❌ " + (err?.message || "unknown error"));
     }
+}
 
-    // drawer events
-    $followersBtn?.addEventListener("click", async () => {
-        try {
-            openDrawer("Followers");
-            const list = await loadList(`${FN_LIST_FOLLOWERS}?id=${encodeURIComponent(uid)}`);
-            renderUserList(list);
-        } catch (e) {
-            if ($drawerBody) {
-                $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
+// ---------------------------
+// EVENTS
+// ---------------------------
+$followBtn?.addEventListener("click", async () => {
+    if (!TARGET_UID) return;
+
+    $followBtn.disabled = true;
+    try {
+        const r = await toggleFollow(TARGET_UID);
+        const following = !!(r?.following ?? r?.is_following ?? r?.data?.following);
+        setFollowBtnState(following);
+
+        // update follower count optimistic if provided
+        if (typeof r?.followers_count === "number" && $followers) {
+            $followers.textContent = String(r.followers_count);
+        } else {
+            // fallback: just adjust +1/-1
+            if ($followers) {
+                const n = Number($followers.textContent || "0") || 0;
+                $followers.textContent = String(following ? (n + 1) : Math.max(0, n - 1));
             }
         }
-    });
+    } catch (err) {
+        alert("❌ " + (err?.message || err));
+    } finally {
+        $followBtn.disabled = false;
+    }
+});
 
-    $followingBtn?.addEventListener("click", async () => {
-        try {
-            openDrawer("Following");
-            const list = await loadList(`${FN_LIST_FOLLOWING}?id=${encodeURIComponent(uid)}`);
-            renderUserList(list);
-        } catch (e) {
-            if ($drawerBody) {
-                $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
-            }
-        }
-    });
+$followersBtn?.addEventListener("click", async () => {
+    openDrawer("Followers");
+    try { await loadDrawerList("followers"); } catch (e) { console.error(e); }
+});
 
-    // drawer close handlers
-    $drawerClose?.addEventListener("click", closeDrawer);
-    $drawerBackdrop?.addEventListener("click", closeDrawer);
+$followingBtn?.addEventListener("click", async () => {
+    openDrawer("Following");
+    try { await loadDrawerList("following"); } catch (e) { console.error(e); }
+});
 
-    document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && $drawer?.classList?.contains("open")) closeDrawer();
-    });
-})();
+$drawerBackdrop?.addEventListener("click", closeDrawer);
+$drawerClose?.addEventListener("click", closeDrawer);
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeDrawer();
+});
+
+// init
+document.addEventListener("DOMContentLoaded", loadProfile);
