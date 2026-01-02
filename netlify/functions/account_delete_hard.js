@@ -1,18 +1,26 @@
-// netlify/functions/account_delete_hard.js (FULL - Supabase hard delete)
+// netlify/functions/account_delete_hard.js
+import { Client, Account, Users } from "node-appwrite";
+import { createClient as createSupabase } from "@supabase/supabase-js";
 
-import { createClient } from "@supabase/supabase-js";
+const {
+    APPWRITE_ENDPOINT,
+    APPWRITE_PROJECT_ID,
+    APPWRITE_API_KEY,
 
-function json(statusCode, obj) {
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+} = process.env;
+
+function json(statusCode, body) {
     return {
         statusCode,
         headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type, Authorization",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
-        body: JSON.stringify(obj),
+        body: JSON.stringify(body),
     };
 }
 
@@ -21,68 +29,66 @@ export const handler = async (event) => {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        const SUPABASE_URL = process.env.SUPABASE_URL;
-        const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
-
-        if (!SUPABASE_URL || !SRK) {
-            return json(500, { error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" });
-        }
-
         const auth = event.headers.authorization || event.headers.Authorization || "";
-        if (!auth.startsWith("Bearer ")) return json(401, { error: "Missing Bearer token" });
-        const jwt = auth.slice(7).trim();
+        const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+        if (!token) return json(401, { error: "Invalid token" });
 
-        const sb = createClient(SUPABASE_URL, SRK, { auth: { persistSession: false } });
-
-        // 1) JWT -> user
-        const { data: u, error: uErr } = await sb.auth.getUser(jwt);
-        if (uErr || !u?.user?.id) return json(401, { error: "Invalid token" });
-
-        const uid = u.user.id;
-
-        // helper: delete + throw on error
-        async function del(promise, label) {
-            const { error } = await promise;
-            if (error) throw new Error(`${label}: ${error.message}`);
+        if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !APPWRITE_API_KEY) {
+            return json(500, { error: "Missing Appwrite envs" });
+        }
+        if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+            return json(500, { error: "Missing Supabase envs" });
         }
 
-        // 2) DB delete (ORDER MATTERS)
-        // Kullanıcı mesajları
-        await del(sb.from("messages").delete().eq("sender_id", uid), "messages");
+        // 1) Appwrite JWT verify -> get user
+        const aw = new Client()
+            .setEndpoint(APPWRITE_ENDPOINT)
+            .setProject(APPWRITE_PROJECT_ID)
+            .setKey(APPWRITE_API_KEY);
 
-        // Konuşmalar (user1/user2)
-        await del(
-            sb.from("conversations").delete().or(`user1_id.eq.${uid},user2_id.eq.${uid}`),
-            "conversations"
-        );
+        // JWT ile "account.get" yapabilmek için ayrı client:
+        const awJwt = new Client()
+            .setEndpoint(APPWRITE_ENDPOINT)
+            .setProject(APPWRITE_PROJECT_ID)
+            .setJWT(token);
 
-        // Follow ilişkileri
-        await del(
-            sb.from("follows").delete().or(`follower_uid.eq.${uid},following_uid.eq.${uid}`),
-            "follows"
-        );
+        const account = new Account(awJwt);
+        const me = await account.get(); // token valid mi?
+        const uid = me?.$id;
+        if (!uid) return json(401, { error: "Invalid token user" });
 
-        // Interactions (like/whatever)
-        await del(sb.from("interactions").delete().eq("user_uid", uid), "interactions");
+        // 2) Supabase hard delete (service role)
+        const sb = createSupabase(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-        // Post comment/like
-        await del(sb.from("post_comments").delete().eq("user_id", uid), "post_comments");
-        await del(sb.from("post_likes").delete().eq("user_id", uid), "post_likes");
+        // Senin tablolarına göre temizliyoruz:
+        // profiles: appwrite_user_id
+        // follows: follower_uid / following_uid
+        // conversations: user1_id / user2_id
+        // messages: sender_id + conversation_id (FK)
+        // post_likes: user_id
+        // post_comments: user_id
+        // interactions: user_uid
+        // analyses: author_uid
 
-        // Analyses
-        await del(sb.from("analyses").delete().eq("author_uid", uid), "analyses");
+        // messages -> conversations sırası önemli (FK var)
+        await sb.from("messages").delete().or(`sender_id.eq.${uid}`);
+        await sb.from("conversations").delete().or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
 
-        // Profiles (kolon adın farklıysa burayı değiştir!)
-        // Ekranda "appwrite_user" görünüyor diye buna göre yazdım.
-        await del(sb.from("profiles").delete().eq("appwrite_user", uid), "profiles");
+        await sb.from("follows").delete().or(`follower_uid.eq.${uid},following_uid.eq.${uid}`);
+        await sb.from("post_likes").delete().eq("user_id", uid);
+        await sb.from("post_comments").delete().eq("user_id", uid);
+        await sb.from("interactions").delete().eq("user_uid", uid);
+        await sb.from("analyses").delete().eq("author_uid", uid);
 
-        // 3) Auth user delete (LAST)
-        const { error: delAuthErr } = await sb.auth.admin.deleteUser(uid);
-        if (delAuthErr) throw new Error(`auth delete: ${delAuthErr.message}`);
+        await sb.from("profiles").delete().eq("appwrite_user_id", uid);
 
-        return json(200, { ok: true, deleted_user: uid });
+        // 3) Appwrite user delete (hard)
+        const users = new Users(aw);
+        await users.delete(uid);
+
+        return json(200, { ok: true, deleted: uid });
     } catch (e) {
-        console.error("account_delete_hard ERROR:", e);
-        return json(500, { error: e?.message || String(e) });
+        console.error("account_delete_hard error:", e);
+        return json(500, { error: "Server error", detail: String(e?.message || e) });
     }
 };
