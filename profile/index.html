@@ -258,54 +258,7 @@
         </div>
     </div>
 </div>
-
-<!-- ✅ SWITCH + MODAL JS (inline, same file) -->
-<script>
-    (() => {
-        // Tabs
-        const btns = document.querySelectorAll(".pNavItem[data-tab]");
-        const panels = {
-            public: document.getElementById("tab-public"),
-            security: document.getElementById("tab-security"),
-            social: document.getElementById("tab-social"),
-            email: document.getElementById("tab-email"),
-        };
-
-        function openTab(key){
-            btns.forEach(b => b.classList.toggle("active", b.dataset.tab === key));
-            Object.entries(panels).forEach(([k, el]) => {
-                if (!el) return;
-                el.classList.toggle("show", k === key);
-            });
-            history.replaceState(null, "", "#" + key);
-        }
-
-        btns.forEach(b => b.addEventListener("click", () => openTab(b.dataset.tab)));
-
-        const hash = (location.hash || "").replace("#","");
-        if (hash && panels[hash]) openTab(hash);
-        else openTab("public");
-
-        // Delete modal open/close
-        const modal = document.getElementById("deleteModal");
-        const openM = () => { if(modal) modal.hidden = false; };
-        const closeM = () => { if(modal) modal.hidden = true; };
-
-        document.getElementById("deleteAccountBtn")?.addEventListener("click", openM);
-        document.getElementById("cancelDeleteBtn")?.addEventListener("click", closeM);
-        modal?.addEventListener("click", (e) => {
-            if (e.target && e.target.dataset && e.target.dataset.close) closeM();
-        });
-
-        // Confirm delete (placeholder)
-        document.getElementById("confirmDeleteBtn")?.addEventListener("click", () => {
-            closeM();
-            alert("Delete account backend not connected yet.");
-        });
-    })();
-</script>
-
-<!-- Your existing logic (public profile save/upload etc.) -->
+<script src="/profile/settings.js"></script>
 <script type="module" src="/profile/profile.js"></script>
 
 </body>

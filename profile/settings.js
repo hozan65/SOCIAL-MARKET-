@@ -1,8 +1,9 @@
 // /profile/settings.js
 (() => {
-    /* =========================
+
+    /* ===============================
        HELPERS
-    ========================= */
+    =============================== */
     const $ = (id) => document.getElementById(id);
 
     function setMsg(id, text, type) {
@@ -12,9 +13,9 @@
         el.className = "pMsg" + (type ? " " + type : "");
     }
 
-    /* =========================
-       TAB SWITCH (SAME PAGE)
-    ========================= */
+    /* ===============================
+       TAB SWITCH (LEFT MENU)
+    =============================== */
     const tabButtons = document.querySelectorAll(".pNavItem[data-tab]");
     const panels = {
         public: $("tab-public"),
@@ -40,33 +41,33 @@
         btn.addEventListener("click", () => openTab(btn.dataset.tab));
     });
 
-    // initial tab
+    // First load
     const hash = (location.hash || "").replace("#", "");
-    if (hash && panels[hash]) openTab(hash);
-    else openTab("public");
+    openTab(panels[hash] ? hash : "public");
 
-    /* =========================
-       DELETE ACCOUNT MODAL
-    ========================= */
-    const deleteModal = $("deleteModal");
+    /* ===============================
+       DELETE MODAL OPEN / CLOSE
+    =============================== */
+    const modal = $("deleteModal");
 
     function openDeleteModal() {
-        if (deleteModal) deleteModal.hidden = false;
+        if (modal) modal.hidden = false;
     }
+
     function closeDeleteModal() {
-        if (deleteModal) deleteModal.hidden = true;
+        if (modal) modal.hidden = true;
     }
 
     $("deleteAccountBtn")?.addEventListener("click", openDeleteModal);
     $("cancelDeleteBtn")?.addEventListener("click", closeDeleteModal);
 
-    deleteModal?.addEventListener("click", (e) => {
+    modal?.addEventListener("click", (e) => {
         if (e.target?.dataset?.close) closeDeleteModal();
     });
 
-    /* =========================
-       HARD DELETE ACCOUNT
-    ========================= */
+    /* ===============================
+       HARD DELETE ACCOUNT (REAL)
+    =============================== */
     async function deleteAccountHard() {
         const btn = $("confirmDeleteBtn");
 
@@ -91,11 +92,10 @@
                 throw new Error(data?.error || "Delete failed");
             }
 
-            // ✅ client cleanup
+            // ✅ temizle + ana sayfaya at
             localStorage.removeItem("sm_jwt");
             localStorage.removeItem("sm_uid");
 
-            // ✅ redirect home
             closeDeleteModal();
             location.href = "/";
 
