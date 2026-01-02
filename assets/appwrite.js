@@ -19,3 +19,8 @@ export const DATABASE_ID = "6949590f0022a0f4370a";      // trading_db
 export const SETTINGS_COL = "69495c37000f41ab237f";    // user_settings table
 
 export { ID, Permission, Role };
+
+// expose to window for non-module scripts (settings.js gibi)
+window.client = client;
+window.account = account;
+window.db = db;
