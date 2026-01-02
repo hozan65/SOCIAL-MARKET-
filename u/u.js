@@ -1,13 +1,17 @@
 // /u/u.js
 import { account } from "/assets/appwrite.js";
 
-console.log("✅ u.js loaded (profile + followers/following drawer)");
+console.log("✅ u.js loaded (profile + follow toggle + followers/following drawer)");
 
 // Netlify functions
 const FN_GET = "/.netlify/functions/get_profile";
 const FN_ENSURE = "/.netlify/functions/ensure_profile";
 const FN_LIST_FOLLOWERS = "/.netlify/functions/list_followers";
 const FN_LIST_FOLLOWING = "/.netlify/functions/list_following";
+
+// ✅ follow
+const FN_IS_FOLLOWING = "/.netlify/functions/is_following";     // GET ?id=TARGET_UID
+const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";   // POST { id: TARGET_UID }
 
 // pages
 const PROFILE_PAGE = "/u/index.html";
@@ -73,6 +77,15 @@ function setMessageButton(isMe, profileUserId) {
 function setFollowButton(isMe) {
     if (!$followBtn) return;
     $followBtn.hidden = !!isMe;
+}
+
+// ===== FOLLOW TOGGLE UI =====
+let _isFollowing = false;
+
+function paintFollowBtn() {
+    if (!$followBtn) return;
+    $followBtn.textContent = _isFollowing ? "Unfollow" : "Follow";
+    $followBtn.classList.toggle("isFollowing", _isFollowing);
 }
 
 // drawer
@@ -206,9 +219,41 @@ async function getViewerIdStrict() {
     const me = await account.get(); // if not logged -> throws
     const id = me?.$id || "";
     if (!id) throw new Error("Missing viewer id");
-    // keep localStorage in sync (optional)
     localStorage.setItem("sm_uid", id);
     return id;
+}
+
+// ✅ Follow status
+async function loadFollowStatus(targetUid) {
+    const headers = await getJwtHeaders();
+    const r = await fetch(`${FN_IS_FOLLOWING}?id=${encodeURIComponent(targetUid)}`, {
+        method: "GET",
+        headers,
+        cache: "no-store"
+    });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out?.error || `is_following ${r.status}`);
+    return !!out?.is_following;
+}
+
+// ✅ Toggle follow
+async function toggleFollow(targetUid) {
+    const headers = await getJwtHeaders();
+    const r = await fetch(FN_TOGGLE_FOLLOW, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ id: targetUid }) // 👈 senin toggle_follow böyle beklerse
+    });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(out?.error || `toggle_follow ${r.status}`);
+
+    // toggle_follow farklı alan döndürüyorsa burayı uyarlarsın:
+    // ör: { following:true } ya da { is_following:true }
+    if (typeof out?.is_following === "boolean") return out.is_following;
+    if (typeof out?.following === "boolean") return out.following;
+
+    // en kötü: tekrar status çek
+    return await loadFollowStatus(targetUid);
 }
 
 // BOOT
@@ -250,6 +295,38 @@ async function getViewerIdStrict() {
     // ✅ show/hide actions (NOW ALWAYS CORRECT)
     setFollowButton(isMe);
     setMessageButton(isMe, uid);
+
+    // ✅ follow init + click
+    if (!isMe && $followBtn) {
+        try {
+            _isFollowing = await loadFollowStatus(uid);
+            paintFollowBtn();
+        } catch (e) {
+            console.warn("loadFollowStatus failed:", e?.message || e);
+            // buton yine görünür kalsın
+            _isFollowing = false;
+            paintFollowBtn();
+        }
+
+        $followBtn.addEventListener("click", async () => {
+            try {
+                $followBtn.disabled = true;
+
+                const newVal = await toggleFollow(uid);
+                _isFollowing = !!newVal;
+                paintFollowBtn();
+
+                // ✅ local UI followers count update (optional)
+                const cur = parseInt($followers?.textContent || "0", 10) || 0;
+                $followers.textContent = String(_isFollowing ? cur + 1 : Math.max(0, cur - 1));
+            } catch (e) {
+                console.error(e);
+                setMsg("❌ " + (e?.message || e));
+            } finally {
+                $followBtn.disabled = false;
+            }
+        });
+    }
 
     // 3) cache-first
     const cacheKey = "profile_cache_" + uid;
