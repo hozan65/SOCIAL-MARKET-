@@ -242,7 +242,11 @@ async function toggleFollow(targetUid) {
     const r = await fetch(FN_TOGGLE_FOLLOW, {
         method: "POST",
         headers,
-        body: JSON.stringify({ id: targetUid }) // 👈 senin toggle_follow böyle beklerse
+        body: JSON.stringify({
+            following_uid: targetUid, // ✅ senin hatada istenen bu
+            id: targetUid,            // yedek
+            target_uid: targetUid     // yedek
+        })
     });
     const out = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(out?.error || `toggle_follow ${r.status}`);
