@@ -11,7 +11,7 @@
 // - OPENAI_MAX_OUTPUT_TOKENS (default: 700)
 // - FREE_DAILY_MSG_LIMIT (default: 10)
 
-import { sbAdmin } from "./supabase.js";
+import { sbAdmin } from "/_supabase.js";
 
 
 const corsHeaders = {
