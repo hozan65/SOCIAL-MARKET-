@@ -1,18 +1,49 @@
+/* /signal/signal.css (FULL) */
+
+/* RESET */
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
-body{
-    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-    background:#0f0f10;
-    color:#e7e7ea;
+
+/* ✅ HEADER OVERLAP FIX */
+:root{
+    --topbar-h: 92px;      /* Feed'deki topbar yüksekliği gibi */
+    --bg: #0f0f10;
+    --panel: #111213;
+    --line: rgba(255,255,255,.06);
+    --line2: rgba(255,255,255,.10);
+    --txt: #e7e7ea;
+    --muted: #9ea2ad;
+    --blue: #2f6bff;
 }
 
-.app{height:100vh;display:flex}
+/* body background + header için üst boşluk */
+body{
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    background: var(--bg);
+    color: var(--txt);
+    padding-top: var(--topbar-h);
+}
+
+/* headerMount: header.js bunu dolduruyor
+   header (topbar) fixed/sticky ise en üstte kalsın */
+#headerMount{
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 9999;
+}
+
+/* APP */
+.app{
+    height: calc(100vh - var(--topbar-h));
+    display:flex;
+    min-height: 520px;
+}
 
 /* SIDEBAR */
 .sidebar{
     width:300px;
-    background:#111213;
-    border-right:1px solid rgba(255,255,255,.06);
+    background: var(--panel);
+    border-right:1px solid var(--line);
     display:flex;
     flex-direction:column;
     padding:12px;
@@ -26,7 +57,7 @@ body{
     opacity:.92;
 }
 
-/* SADE NAV (2 buton) */
+/* SADE NAV */
 .sbNav{
     display:flex;
     flex-direction:column;
@@ -43,7 +74,7 @@ body{
     border-radius:12px;
     border:1px solid rgba(255,255,255,.08);
     background:rgba(255,255,255,.03);
-    color:#e7e7ea;
+    color:var(--txt);
     cursor:pointer;
     font-weight:900;
     font-size:14px;
@@ -54,7 +85,12 @@ body{
     border-color:rgba(79,140,255,.25);
 }
 .sbBtn.primary:hover{background:rgba(79,140,255,.22)}
-.sbIco{width:20px;display:inline-block;text-align:center;opacity:.95}
+.sbIco{
+    width:20px;
+    display:inline-block;
+    text-align:center;
+    opacity:.95;
+}
 
 /* CHATS */
 .sbSectionTitle{
@@ -62,7 +98,7 @@ body{
     font-size:12px;
     font-weight:1000;
     letter-spacing:.4px;
-    color:#9ea2ad;
+    color:var(--muted);
     opacity:.9;
 }
 
@@ -70,6 +106,11 @@ body{
     padding:0 4px;
     overflow:auto;
     flex:1;
+}
+.sbChats::-webkit-scrollbar{width:10px}
+.sbChats::-webkit-scrollbar-thumb{
+    background:rgba(255,255,255,.08);
+    border-radius:999px;
 }
 .chatRow{
     display:flex;
@@ -97,10 +138,10 @@ body{
     opacity:.95;
 }
 
-/* bottom mini profile */
+/* bottom profile */
 .sbBottom{
     padding:10px 4px 4px;
-    border-top:1px solid rgba(255,255,255,.06);
+    border-top:1px solid var(--line);
 }
 .profileMini{
     width:100%;
@@ -118,9 +159,26 @@ body{
     display:grid;place-items:center;
     font-weight:1000;
 }
-.profileMeta{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
-.pName{font-weight:1000;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
-.pPlan{font-size:12px;color:#9ea2ad;font-weight:1000;margin-top:2px}
+.profileMeta{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    min-width:0;
+}
+.pName{
+    font-weight:1000;
+    font-size:13px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:200px;
+}
+.pPlan{
+    font-size:12px;
+    color:var(--muted);
+    font-weight:1000;
+    margin-top:2px;
+}
 
 /* MAIN */
 .main{
@@ -130,84 +188,24 @@ body{
     min-width:0;
 }
 
-.topHeader{
-    height:56px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:0 18px;
-}
-.modelBtn{
-    display:flex;
-    align-items:center;
-    gap:8px;
-    padding:10px 12px;
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,.08);
-    background:rgba(255,255,255,.03);
-    color:#fff;
-    cursor:pointer;
-    font-weight:1000;
-}
-.modelBtn:hover{background:rgba(255,255,255,.06)}
-.modelName{font-size:14px}
-.chev{opacity:.7}
-
-/* TOP RIGHT PROFILE DROPDOWN */
-.profile{position:relative}
-.profileBtn{
-    list-style:none;
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    gap:8px;
-    padding:8px 10px;
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,.08);
-    background:rgba(255,255,255,.03);
-    color:#fff;
-}
-.profileBtn::-webkit-details-marker{display:none}
-.profileBtn:hover{background:rgba(255,255,255,.06)}
-.profileBtn .avatar{
-    width:24px;height:24px;border-radius:999px;
-    display:grid;place-items:center;
-    background:rgba(79,140,255,.22);
-    font-weight:1000;
+/* center area (şimdilik boş) */
+.center{
+    flex:1;
+    position:relative;
 }
 
-.profileMenu{
-    position:absolute;
-    right:0;
-    top:calc(100% + 10px);
-    width:220px;
-    padding:8px;
-    border-radius:14px;
-    background:#0f1520;
-    border:1px solid rgba(255,255,255,.08);
-    box-shadow:0 18px 40px rgba(0,0,0,.35);
-}
-.menuItem{
-    display:block;
-    padding:10px 10px;
-    border-radius:10px;
-    text-decoration:none;
-    color:#e6e8eb;
-    font-weight:900;
-    font-size:13px;
-}
-.menuItem:hover{ background:rgba(255,255,255,.06); }
-
-/* center empty */
-.center{flex:1}
-
-/* composer */
+/* COMPOSER */
 .composerWrap{
     position:sticky;
     bottom:0;
     padding:14px 18px 18px;
-    background:linear-gradient(to top, rgba(15,15,16,.98), rgba(15,15,16,.85), rgba(15,15,16,0));
+    background:linear-gradient(to top,
+    rgba(15,15,16,.98),
+    rgba(15,15,16,.85),
+    rgba(15,15,16,0)
+    );
 }
+
 .composer{
     max-width:760px;
     margin:0 auto;
@@ -216,16 +214,17 @@ body{
     gap:10px;
     padding:10px 10px;
     border-radius:16px;
-    border:1px solid rgba(255,255,255,.10);
+    border:1px solid var(--line2);
     background:rgba(255,255,255,.04);
     box-shadow:0 18px 50px rgba(0,0,0,.35);
 }
+
 .circleBtn{
     width:40px;height:40px;
     border-radius:999px;
-    border:1px solid rgba(255,255,255,.10);
+    border:1px solid var(--line2);
     background:rgba(255,255,255,.04);
-    color:#e7e7ea;
+    color:var(--txt);
     cursor:pointer;
     font-size:18px;
     display:grid;place-items:center;
@@ -244,21 +243,24 @@ body{
     font-weight:900;
     padding:8px 6px;
 }
-.composerInput::placeholder{color:#9ea2ad;font-weight:900}
+.composerInput::placeholder{
+    color:var(--muted);
+    font-weight:900;
+}
 
 .sendBtn{
     width:44px;height:40px;
     border-radius:999px;
     border:none;
     cursor:pointer;
-    background:#2f6bff;
+    background:var(--blue);
     color:#fff;
     font-weight:1000;
     box-shadow:0 14px 34px rgba(47,107,255,.25);
 }
 .sendBtn:hover{filter:brightness(1.05)}
 
-/* plus menu (image only) */
+/* plus menu */
 .plus{ position:relative; }
 .plusMenu{
     position:absolute;
@@ -282,18 +284,25 @@ body{
 }
 .uploadBtn:hover{ background:rgba(255,255,255,.10); }
 
-/* mobile */
+/* RESPONSIVE */
 @media (max-width: 900px){
-    .sidebar{width:92px;padding:10px}
+    :root{ --topbar-h: 78px; } /* mobilde header daha küçük olabiliyor */
+
+    .sidebar{
+        width:92px;
+        padding:10px;
+    }
+
     .sbBtn span:last-child,
     .sbSectionTitle,
     .chatName,
     .profileMeta{display:none}
+
     .sbBtn{justify-content:center}
     .chatRow{justify-content:center}
     .profileMini{justify-content:center}
 }
+
 @media (max-width: 520px){
-    .topHeader{padding:0 12px}
     .composerWrap{padding:12px 12px 14px}
 }
