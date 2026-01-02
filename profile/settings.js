@@ -1,12 +1,14 @@
-// /profile/settings.js (FULL, NO MODULE)
-// Tabs + Delete modal + Hard delete call via sm_jwt
+// /profile/settings.js (FULL)
+// Tabs + Delete modal + Hard delete + Change password (Appwrite)
+
+import { account } from "/assets/appwrite.js";
 
 (() => {
     const $ = (id) => document.getElementById(id);
 
-    // -------------------------
-    // Tabs (same page panels)
-    // -------------------------
+    // =========================
+    // Tabs
+    // =========================
     const btns = document.querySelectorAll(".pNavItem[data-tab]");
     const panels = {
         public: $("tab-public"),
@@ -24,84 +26,136 @@
         history.replaceState(null, "", "#" + key);
     }
 
-    btns.forEach((b) =>
-        b.addEventListener("click", () => openTab(b.dataset.tab))
-    );
+    btns.forEach((b) => b.addEventListener("click", () => openTab(b.dataset.tab)));
 
     const hash = (location.hash || "").replace("#", "");
     openTab(hash && panels[hash] ? hash : "public");
 
-    // -------------------------
-    // Delete modal open/close
-    // -------------------------
+    // =========================
+    // Helpers (msgs)
+    // =========================
+    const secMsg = $("secMsg");
+    function showSec(text, isErr = false) {
+        if (!secMsg) return;
+        secMsg.textContent = text || "";
+        secMsg.className = "pMsg " + (isErr ? "err" : "ok");
+    }
+
+    // =========================
+    // Password change (Appwrite)
+    // =========================
+    const updatePasswordBtn = $("updatePasswordBtn");
+    updatePasswordBtn?.addEventListener("click", async () => {
+        const cur = $("curPass")?.value?.trim() || "";
+        const n1 = $("newPass")?.value?.trim() || "";
+        const n2 = $("newPass2")?.value?.trim() || "";
+
+        if (!cur || !n1 || !n2) return showSec("All password fields are required.", true);
+        if (n1.length < 8) return showSec("New password must be at least 8 characters.", true);
+        if (n1 !== n2) return showSec("New passwords do not match.", true);
+
+        updatePasswordBtn.disabled = true;
+
+        try {
+            showSec("Updating password...");
+            await account.updatePassword(n1, cur); // ✅ Appwrite
+
+            // ✅ Şifre değişti -> login düşmez, user içeride kalır
+            showSec("Password updated successfully.", false);
+
+            $("curPass").value = "";
+            $("newPass").value = "";
+            $("newPass2").value = "";
+
+        } catch (e) {
+            console.error("updatePassword failed:", e);
+            showSec(e?.message || "Password update failed.", true);
+        } finally {
+            updatePasswordBtn.disabled = false;
+        }
+    });
+
+    // =========================
+    // Delete Modal open/close
+    // =========================
     const modal = $("deleteModal");
     const openM = () => { if (modal) modal.hidden = false; };
     const closeM = () => { if (modal) modal.hidden = true; };
 
-    const deleteBtn = $("deleteAccountBtn");
-    const cancelBtn = $("cancelDeleteBtn");
-    const confirmBtn = $("confirmDeleteBtn");
+    $("deleteAccountBtn")?.addEventListener("click", openM);
+    $("cancelDeleteBtn")?.addEventListener("click", closeM);
 
-    deleteBtn && deleteBtn.addEventListener("click", openM);
-    cancelBtn && cancelBtn.addEventListener("click", closeM);
+    modal?.addEventListener("click", (e) => {
+        if (e.target?.dataset?.close) closeM();
+    });
 
-    if (modal) {
-        modal.addEventListener("click", (e) => {
-            if (e.target && e.target.dataset && e.target.dataset.close) closeM();
-        });
-    }
+    // =========================
+    // Hard Delete (Netlify function)
+    // =========================
+    const confirmDeleteBtn = $("confirmDeleteBtn");
 
-    // -------------------------
-    // Hard delete
-    // -------------------------
     async function hardDelete() {
+        const msg = $("secMsg") || $("pMsg");
+
         const jwt = localStorage.getItem("sm_jwt");
+        const uid = localStorage.getItem("sm_uid");
 
         if (!jwt) {
-            closeM();
-            alert("JWT yok. Logout/Login yap.");
-            location.href = "/auth/login.html";
+            if (msg) { msg.className = "pMsg err"; msg.textContent = "No token (sm_jwt). Logout/Login again."; }
+            return;
+        }
+        if (!uid) {
+            if (msg) { msg.className = "pMsg err"; msg.textContent = "No user id (sm_uid). Logout/Login again."; }
             return;
         }
 
-        if (confirmBtn) {
-            confirmBtn.disabled = true;
-            confirmBtn.textContent = "Deleting...";
-        }
-
         try {
+            if (msg) { msg.className = "pMsg"; msg.textContent = "Deleting account..."; }
+            confirmDeleteBtn && (confirmDeleteBtn.disabled = true);
+
             const res = await fetch("/.netlify/functions/account_delete_hard", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Authorization": "Bearer " + jwt,
+                    "Authorization": `Bearer ${jwt}`,
                 },
-                body: JSON.stringify({ hard: true }),
+                // ✅ userId gönderiyoruz (backend isterse hazır)
+                body: JSON.stringify({ confirm: true, userId: uid }),
             });
 
-            const data = await res.json().catch(() => ({}));
+            const text = await res.text();
+            let data = {};
+            try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
 
             if (!res.ok) {
                 console.error("delete failed:", res.status, data);
-                alert(data?.error || data?.message || ("Delete failed: " + res.status));
+                if (msg) {
+                    msg.className = "pMsg err";
+                    msg.textContent = `Delete failed (${res.status}): ${data?.error || data?.detail || data?.raw || "Unknown error"}`;
+                }
                 return;
             }
 
-            // success
+            // ✅ başarılı: local temizle + anasayfa
             localStorage.clear();
             sessionStorage.clear();
+
             closeM();
-            location.href = "/index.html";
-        } catch (err) {
-            console.error(err);
-            alert("Network error while deleting account.");
+
+            if (msg) { msg.className = "pMsg ok"; msg.textContent = "Account deleted. Redirecting..."; }
+
+            setTimeout(() => {
+                location.href = "/index.html";
+            }, 300);
+
+        } catch (e) {
+            console.error("hardDelete exception:", e);
+            if (msg) { msg.className = "pMsg err"; msg.textContent = "Delete error: " + (e?.message || e); }
         } finally {
-            if (confirmBtn) {
-                confirmBtn.disabled = false;
-                confirmBtn.textContent = "Delete";
-            }
+            confirmDeleteBtn && (confirmDeleteBtn.disabled = false);
         }
     }
 
-    confirmBtn && confirmBtn.addEventListener("click", hardDelete);
+    confirmDeleteBtn?.addEventListener("click", hardDelete);
+
 })();
