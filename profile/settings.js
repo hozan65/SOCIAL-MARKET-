@@ -1,9 +1,12 @@
-// /profile/settings.js (FULL)
+// /profile/settings.js (FULL, NO MODULE)
+// Tabs + Delete modal + Hard delete call via sm_jwt
 
 (() => {
     const $ = (id) => document.getElementById(id);
 
-    // Tabs
+    // -------------------------
+    // Tabs (same page panels)
+    // -------------------------
     const btns = document.querySelectorAll(".pNavItem[data-tab]");
     const panels = {
         public: $("tab-public"),
@@ -21,35 +24,49 @@
         history.replaceState(null, "", "#" + key);
     }
 
-    btns.forEach((b) => b.addEventListener("click", () => openTab(b.dataset.tab)));
+    btns.forEach((b) =>
+        b.addEventListener("click", () => openTab(b.dataset.tab))
+    );
+
     const hash = (location.hash || "").replace("#", "");
     openTab(hash && panels[hash] ? hash : "public");
 
-    // Modal
+    // -------------------------
+    // Delete modal open/close
+    // -------------------------
     const modal = $("deleteModal");
     const openM = () => { if (modal) modal.hidden = false; };
     const closeM = () => { if (modal) modal.hidden = true; };
 
-    $("deleteAccountBtn")?.addEventListener("click", openM);
-    $("cancelDeleteBtn")?.addEventListener("click", closeM);
-    modal?.addEventListener("click", (e) => {
-        if (e.target?.dataset?.close) closeM();
-    });
+    const deleteBtn = $("deleteAccountBtn");
+    const cancelBtn = $("cancelDeleteBtn");
+    const confirmBtn = $("confirmDeleteBtn");
 
-    // HARD DELETE
+    deleteBtn && deleteBtn.addEventListener("click", openM);
+    cancelBtn && cancelBtn.addEventListener("click", closeM);
+
+    if (modal) {
+        modal.addEventListener("click", (e) => {
+            if (e.target && e.target.dataset && e.target.dataset.close) closeM();
+        });
+    }
+
+    // -------------------------
+    // Hard delete
+    // -------------------------
     async function hardDelete() {
-        const jwt = localStorage.getItem("sm_jwt"); // ✅ auth-ui.js artık bunu üretiyor
+        const jwt = localStorage.getItem("sm_jwt");
+
         if (!jwt) {
             closeM();
-            alert("JWT yok. Çıkış yapıp tekrar giriş yap.");
+            alert("JWT yok. Logout/Login yap.");
             location.href = "/auth/login.html";
             return;
         }
 
-        const btn = $("confirmDeleteBtn");
-        if (btn) {
-            btn.disabled = true;
-            btn.textContent = "Deleting...";
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = "Deleting...";
         }
 
         try {
@@ -70,17 +87,21 @@
                 return;
             }
 
-            // ✅ başarılı: her şeyi temizle + ana sayfa
+            // success
             localStorage.clear();
             sessionStorage.clear();
             closeM();
             location.href = "/index.html";
-        } catch (e) {
-            console.error(e);
-            alert("Network error");
+        } catch (err) {
+            console.error(err);
+            alert("Network error while deleting account.");
         } finally {
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = "Delete";
+            if (confirmBtn) {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = "Delete";
             }
         }
+    }
+
+    confirmBtn && confirmBtn.addEventListener("click", hardDelete);
+})();
