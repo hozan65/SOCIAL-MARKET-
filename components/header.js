@@ -9,27 +9,30 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
-        // 1) HEADER HTML YÜKLE
+        /* ===============================
+           1️⃣ HEADER HTML YÜKLE
+        =============================== */
         const res = await fetch("/components/header.html", { cache: "no-store" });
         if (!res.ok) throw new Error("header.html bulunamadı");
 
         mount.innerHTML = await res.text();
 
-        // 2) AKTİF MENÜ
+        /* ===============================
+           2️⃣ AKTİF MENÜ
+        =============================== */
         const page = location.pathname.split("/")[1]; // feed, news, post...
-        mount.querySelectorAll("[data-page]").forEach((a) => {
+        mount.querySelectorAll("[data-page]").forEach(a => {
             if (a.dataset.page === page) a.classList.add("active");
         });
 
-        // 3) HAMBURGER / MOBILE MENU
+        /* ===============================
+           3️⃣ HAMBURGER / MOBILE MENU
+        =============================== */
         const btn = document.getElementById("hamburgerBtn");
         const menu = document.getElementById("mobileMenu");
         const backdrop = document.getElementById("menuBackdrop");
 
-        if (!btn || !menu || !backdrop) {
-            console.log("Header loaded (no mobile menu elements).");
-            return;
-        }
+        if (!btn || !menu || !backdrop) return;
 
         const open = () => {
             menu.classList.add("open");
@@ -51,11 +54,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
 
         backdrop.addEventListener("click", close);
-        document.addEventListener("keydown", (e) => {
+        document.addEventListener("keydown", e => {
             if (e.key === "Escape") close();
         });
 
         console.log("✅ Header yüklendi:", page);
+
     } catch (err) {
         console.error("❌ HEADER LOAD ERROR:", err);
     }
