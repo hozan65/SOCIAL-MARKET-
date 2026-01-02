@@ -171,402 +171,213 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
 /* =========================================================
-   ✅ AI SUPPORT WIDGET (PRO) - site-wide inject
-   Replace your old injectSupportWidget() block with this
+   AI SUPPORT WIDGET – FINAL PRO VERSION
+   Single source: /assets1/header.js
 ========================================================= */
-(function injectSupportWidgetPRO() {
+(function () {
     if (window.__ASW_INJECTED__) return;
     window.__ASW_INJECTED__ = true;
 
     const API_URL = "/.netlify/functions/ai_support";
+    const SUPPORT_ICON_URL = "/assets1/img/support.png"; // ikon yoksa fallback var
 
-    // ✅ buraya kendi ikonunu koy (png/svg/webp)
-    const SUPPORT_ICON_URL = "/assets1/img/support.png"; // <-- senin path
-    // Eğer icon yoksa fallback: küçük bir SVG kullanır
-    const FALLBACK_ICON_SVG =
+    const FALLBACK_ICON =
         "data:image/svg+xml;utf8," +
         encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-        <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9eefc"/>
-        </linearGradient></defs>
-        <circle cx="32" cy="32" r="30" fill="url(#g)" stroke="rgba(0,0,0,.12)" stroke-width="2"/>
-        <path d="M20 40c0-8 6-14 14-14s14 6 14 14" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="3" stroke-linecap="round"/>
-        <circle cx="26" cy="28" r="2" fill="rgba(0,0,0,.55)"/>
-        <circle cx="38" cy="28" r="2" fill="rgba(0,0,0,.55)"/>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="30" fill="#fff" stroke="#ddd" stroke-width="2"/>
+        <circle cx="24" cy="28" r="2" fill="#333"/>
+        <circle cx="40" cy="28" r="2" fill="#333"/>
+        <path d="M20 40c3-4 21-4 24 0" stroke="#333" stroke-width="3" fill="none"/>
       </svg>
     `);
 
-    // Telegram (paper plane) SVG (emoji değil)
-    const TELEGRAM_SVG =
+    const TELEGRAM_ICON =
         "data:image/svg+xml;utf8," +
         encodeURIComponent(`
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none">
-        <path d="M21.8 3.2c.4.2.3.7.3 1.1l-3.3 16.1c-.2.9-1 .9-1.6.6l-4.6-3.4-2.2 2.2c-.2.2-.4.4-.8.4l.3-5.1 9.3-8.4c.4-.4-.1-.6-.6-.3l-11.4 7.2-4.9-1.5c-1.1-.3-1.1-1 .2-1.5L20.5 3c.5-.2.9-.1 1.3.2Z" fill="rgba(0,0,0,.75)"/>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <path d="M21.8 3.2L2.7 10.8c-1.2.5-1.2 1.2-.2 1.5l4.9 1.5 11.4-7.2c.5-.3 1-.1.6.3l-9.3 8.4-.3 5.1c.4 0 .6-.2.8-.4l2.2-2.2 4.6 3.4c.6.3 1.4.3 1.6-.6l3.3-16.1c.1-.4.1-.9-.3-1.1z"
+              fill="rgba(0,0,0,.8)"/>
       </svg>
     `);
 
+    /* ================= CSS ================= */
     const css = `
-  /* ====== Floating Button ====== */
-  #aswFab{
-    position: fixed;
-    right: 12px;
-    bottom: 12px;
-    width: 54px;
-    height: 54px;
-    border-radius: 999px;
-    z-index: 999999;
-    cursor: pointer;
-    user-select: none;
-    border: 1px solid rgba(0,0,0,.12);
-    background: rgba(255,255,255,.92);
-    box-shadow: 0 10px 28px rgba(0,0,0,.18);
-    backdrop-filter: blur(10px);
-    display: grid;
-    place-items: center;
-    overflow: hidden;
-  }
-  #aswFab img{
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 999px;
-    display:block;
-  }
+#aswFab,#aswBox,#aswFlyWrap{z-index:2147483647}
 
-  /* ====== Flying messages above icon ====== */
-  #aswFlyWrap{
-    position: fixed;
-    right: 12px;
-    bottom: 72px;
-    z-index: 999999;
-    pointer-events: none;
-    display:flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-end;
-  }
-  .aswFlyMsg{
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: .2px;
-    padding: 8px 10px;
-    border-radius: 999px;
-    background: rgba(255,255,255,.92);
-    border: 1px solid rgba(0,0,0,.10);
-    box-shadow: 0 10px 24px rgba(0,0,0,.16);
-    backdrop-filter: blur(10px);
-    opacity: 0;
-    transform: translateY(10px);
-    animation: aswFly 7s linear infinite;
-  }
-  .aswFlyMsg:nth-child(2){
-    animation-delay: 3.5s; /* ikinci mesaj yarım periyot gecikmeli */
-  }
-  @keyframes aswFly{
-    0%   { opacity: 0; transform: translateY(10px); }
-    10%  { opacity: 1; transform: translateY(0px); }
-    70%  { opacity: 1; transform: translateY(-22px); }
-    100% { opacity: 0; transform: translateY(-48px); }
-  }
+#aswFab{
+  position:fixed;right:12px;bottom:12px;
+  width:54px;height:54px;border-radius:999px;
+  background:#fff;border:1px solid rgba(0,0,0,.12);
+  box-shadow:0 10px 28px rgba(0,0,0,.18);
+  display:grid;place-items:center;cursor:pointer
+}
+#aswFab img{width:100%;height:100%;border-radius:999px;object-fit:cover}
 
-  /* ====== Chat Box ====== */
-  #aswBox{
-    position: fixed;
-    right: 12px;
-    bottom: 76px;
-    width: min(380px, calc(100vw - 24px));
-    height: 560px;
-    z-index: 999999;
+#aswFlyWrap{
+  position:fixed;right:12px;bottom:78px;
+  display:flex;flex-direction:column;gap:8px;
+  pointer-events:none
+}
+.aswFly{
+  font-size:12px;font-weight:800;
+  padding:7px 10px;border-radius:999px;
+  background:#fff;border:1px solid rgba(0,0,0,.1);
+  animation:fly 7s linear infinite;
+  opacity:0
+}
+.aswFly:nth-child(2){animation-delay:3.5s}
+@keyframes fly{
+  0%{opacity:0;transform:translateY(10px)}
+  10%{opacity:1}
+  70%{opacity:1;transform:translateY(-20px)}
+  100%{opacity:0;transform:translateY(-40px)}
+}
 
-    border-radius: 18px;
-    background: rgba(255,255,255,.94);
-    border: 1px solid rgba(0,0,0,.12);
-    box-shadow: 0 18px 40px rgba(0,0,0,.22);
-    backdrop-filter: blur(12px);
+#aswBox{
+  position:fixed;right:12px;bottom:78px;
+  width:380px;max-width:calc(100vw - 24px);
+  height:560px;background:#fff;border-radius:18px;
+  border:1px solid rgba(0,0,0,.12);
+  box-shadow:0 18px 40px rgba(0,0,0,.22);
+  display:flex;flex-direction:column
+}
+.aswHidden{display:none}
 
-    display:flex;
-    flex-direction: column;
-    overflow:hidden;
-  }
-  .aswHidden{ display:none; }
+.aswTop{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px;border-bottom:1px solid rgba(0,0,0,.08)
+}
+.aswLogo{display:flex;gap:10px;align-items:center}
+.aswLogo img{width:30px;height:30px;border-radius:999px}
+.aswTitle{font-weight:900}
+.aswClose{border:0;background:none;font-size:18px;cursor:pointer}
 
-  .aswTop{
-    display:flex;
-    align-items:center;
-    justify-content: space-between;
-    padding: 12px 12px;
-    border-bottom: 1px solid rgba(0,0,0,.08);
-  }
-  .aswTopLeft{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    min-width:0;
-  }
-  .aswMiniLogo{
-    width: 30px;
-    height: 30px;
-    border-radius: 999px;
-    border: 1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.9);
-    display:grid;
-    place-items:center;
-    overflow:hidden;
-    flex: 0 0 auto;
-  }
-  .aswMiniLogo img{ width:100%; height:100%; object-fit:cover; border-radius:999px; display:block; }
+#aswMsgs{flex:1;padding:12px;overflow:auto}
+.aswMsg{max-width:85%;padding:10px 12px;border-radius:14px;margin-bottom:10px}
+.aswMsg.user{margin-left:auto;background:#f1f1f1}
+.aswMsg.ai{background:#fff;border:1px solid #eee}
 
-  .aswTitleWrap{ min-width:0; }
-  .aswTitle{
-    font-weight: 1000;
-    font-size: 14px;
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow:hidden;
-    text-overflow: ellipsis;
-  }
-  .aswSub{
-    font-size: 12px;
-    opacity:.65;
-    white-space: nowrap;
-    overflow:hidden;
-    text-overflow: ellipsis;
-  }
+.aswBottom{padding:10px;border-top:1px solid #eee}
+.aswRow{display:flex;gap:8px}
+#aswInput{flex:1;padding:10px;border-radius:12px;border:1px solid #ddd}
+#aswSend{
+  width:44px;height:44px;border-radius:12px;
+  border:1px solid #ddd;background:#fff;
+  display:grid;place-items:center;cursor:pointer
+}
+#aswSend img{width:20px;height:20px}
+.aswFooter{font-size:12px;opacity:.6;margin-top:6px}
+`;
 
-  .aswClose{
-    border: 0;
-    background: transparent;
-    cursor:pointer;
-    font-size: 18px;
-    opacity: .7;
-    padding: 6px 8px;
-    border-radius: 10px;
-  }
-  .aswClose:hover{ opacity: 1; background: rgba(0,0,0,.06); }
+    const style = document.createElement("style");
+    style.textContent = css;
+    document.head.appendChild(style);
 
-  #aswMsgs{
-    flex: 1;
-    padding: 12px;
-    overflow: auto;
-    scroll-behavior: smooth;
-  }
+    /* ================= HTML ================= */
+    document.body.insertAdjacentHTML(
+        "beforeend",
+        `
+<div id="aswFlyWrap">
+  <div class="aswFly">Hello sir</div>
+  <div class="aswFly">How can I help you?</div>
+</div>
 
-  .aswMsg{
-    max-width: 85%;
-    padding: 10px 12px;
-    border-radius: 14px;
-    margin: 0 0 10px;
-    line-height: 1.25;
-    font-size: 14px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-  }
-  .aswMsg.user{
-    margin-left: auto;
-    background: rgba(0,0,0,.06);
-    border: 1px solid rgba(0,0,0,.08);
-  }
-  .aswMsg.ai{
-    margin-right: auto;
-    background: rgba(255,255,255,.92);
-    border: 1px solid rgba(0,0,0,.10);
-  }
+<div id="aswFab"><img id="aswFabImg"/></div>
 
-  .aswBottom{
-    padding: 10px 12px 12px;
-    border-top: 1px solid rgba(0,0,0,.08);
-    background: rgba(255,255,255,.92);
-  }
-  .aswInputRow{
-    display:flex;
-    gap:8px;
-    align-items:center;
-  }
-  #aswInput{
-    flex:1;
-    padding: 11px 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(0,0,0,.15);
-    outline:none;
-    background: rgba(255,255,255,.95);
-  }
-  #aswSend{
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    border: 1px solid rgba(0,0,0,.15);
-    background: rgba(255,255,255,.95);
-    cursor:pointer;
-    display:grid;
-    place-items:center;
-  }
-  #aswSend img{ width:20px; height:20px; display:block; opacity:.9; }
-  #aswSend:hover{ background: rgba(0,0,0,.04); }
+<div id="aswBox" class="aswHidden">
+  <div class="aswTop">
+    <div class="aswLogo">
+      <img id="aswMiniLogo"/>
+      <div>
+        <div class="aswTitle">Support</div>
+        <div style="font-size:12px;opacity:.6">Social Market</div>
+      </div>
+    </div>
+    <button class="aswClose" id="aswClose">✕</button>
+  </div>
 
-  .aswFooter{
-    margin-top: 8px;
-    font-size: 12px;
-    opacity: .6;
-    display:flex;
-    justify-content: space-between;
-    gap: 8px;
-  }
-  .aswFooter b{ opacity:.9; }
+  <div id="aswMsgs"></div>
 
-  @media (max-width: 480px){
-    #aswBox{ height: 70vh; }
-    #aswFlyWrap{ bottom: 70px; }
-  }
-  `;
+  <div class="aswBottom">
+    <div class="aswRow">
+      <input id="aswInput" placeholder="Write a message..."/>
+      <button id="aswSend"><img src="${TELEGRAM_ICON}"/></button>
+    </div>
+    <div class="aswFooter">@SocialMarket-AI support</div>
+  </div>
+</div>
+`
+    );
 
-    // inject style once
-    if (!document.getElementById("aswStyle")) {
-        const st = document.createElement("style");
-        st.id = "aswStyle";
-        st.textContent = css;
-        document.head.appendChild(st);
+    const fab = document.getElementById("aswFab");
+    const box = document.getElementById("aswBox");
+    const close = document.getElementById("aswClose");
+    const msgs = document.getElementById("aswMsgs");
+    const input = document.getElementById("aswInput");
+    const send = document.getElementById("aswSend");
+    const fly = document.getElementById("aswFlyWrap");
+
+    const fabImg = document.getElementById("aswFabImg");
+    const miniLogo = document.getElementById("aswMiniLogo");
+
+    const setIcon = (img) => {
+        img.src = SUPPORT_ICON_URL;
+        img.onerror = () => (img.src = FALLBACK_ICON);
+    };
+    setIcon(fabImg);
+    setIcon(miniLogo);
+
+    const openBox = () => {
+        box.classList.remove("aswHidden");
+        fly.style.display = "none";
+        input.focus();
+        if (!msgs.hasChildNodes())
+            addMsg("ai", "How can I help you?");
+    };
+
+    const closeBox = () => {
+        box.classList.add("aswHidden");
+        fly.style.display = "";
+    };
+
+    // FORCE CLOSED ON LOAD
+    closeBox();
+
+    fab.onclick = (e) => {
+        e.stopPropagation();
+        box.classList.contains("aswHidden") ? openBox() : closeBox();
+    };
+    close.onclick = closeBox;
+    miniLogo.onclick = closeBox;
+
+    function addMsg(role, text) {
+        const d = document.createElement("div");
+        d.className = "aswMsg " + role;
+        d.textContent = text;
+        msgs.appendChild(d);
+        msgs.scrollTop = msgs.scrollHeight;
     }
 
-    // inject DOM once
-    if (!document.getElementById("aswFab")) {
-        const iconUrl = SUPPORT_ICON_URL;
+    async function sendMsg() {
+        const t = input.value.trim();
+        if (!t) return;
+        addMsg("user", t);
+        input.value = "";
 
-        document.body.insertAdjacentHTML("beforeend", `
-      <div id="aswFlyWrap" aria-hidden="true">
-        <div class="aswFlyMsg">Hello sir</div>
-        <div class="aswFlyMsg">How can I help you?</div>
-      </div>
-
-      <div id="aswFab" role="button" aria-label="Open support chat" aria-expanded="false">
-        <img id="aswFabImg" alt="Support" />
-      </div>
-
-      <div id="aswBox" class="aswHidden" aria-hidden="true">
-        <div class="aswTop">
-          <div class="aswTopLeft">
-            <div class="aswMiniLogo"><img id="aswMiniLogoImg" alt="Logo" /></div>
-            <div class="aswTitleWrap">
-              <div class="aswTitle">Support</div>
-              <div class="aswSub">Social Market</div>
-            </div>
-          </div>
-          <button id="aswClose" class="aswClose" type="button" aria-label="Close">✕</button>
-        </div>
-
-        <div id="aswMsgs"></div>
-
-        <div class="aswBottom">
-          <div class="aswInputRow">
-            <input id="aswInput" placeholder="Write a message..." autocomplete="off" />
-            <button id="aswSend" type="button" aria-label="Send">
-              <img alt="Send" src="${TELEGRAM_SVG}" />
-            </button>
-          </div>
-          <div class="aswFooter">
-            <span>@SocialMarket-AI support</span>
-            <span><b>Online</b></span>
-          </div>
-        </div>
-      </div>
-    `);
-
-        // set icon with fallback
-        const fabImg = document.getElementById("aswFabImg");
-        const miniLogoImg = document.getElementById("aswMiniLogoImg");
-
-        const setIcon = (imgEl) => {
-            imgEl.src = iconUrl;
-            imgEl.onerror = () => { imgEl.src = FALLBACK_ICON_SVG; };
-        };
-        setIcon(fabImg);
-        setIcon(miniLogoImg);
-
-        const fab = document.getElementById("aswFab");
-        const box = document.getElementById("aswBox");
-        const close = document.getElementById("aswClose");
-        const msgs = document.getElementById("aswMsgs");
-        const input = document.getElementById("aswInput");
-        const send = document.getElementById("aswSend");
-        const fly = document.getElementById("aswFlyWrap");
-
-        const openBox = () => {
-            box.classList.remove("aswHidden");
-            box.setAttribute("aria-hidden", "false");
-            fab.setAttribute("aria-expanded", "true");
-            // chat açıkken uçan mesajları gizle (pro görünüm)
-            if (fly) fly.style.display = "none";
-            setTimeout(() => input && input.focus(), 60);
-        };
-
-        const closeBox = () => {
-            box.classList.add("aswHidden");
-            box.setAttribute("aria-hidden", "true");
-            fab.setAttribute("aria-expanded", "false");
-            if (fly) fly.style.display = "";
-        };
-
-        fab.addEventListener("click", () => {
-            box.classList.contains("aswHidden") ? openBox() : closeBox();
-        });
-        close.addEventListener("click", closeBox);
-
-        const addMsg = (role, text) => {
-            const div = document.createElement("div");
-            div.className = "aswMsg " + role;
-            div.textContent = text;
-            msgs.appendChild(div);
-            msgs.scrollTop = msgs.scrollHeight;
-        };
-
-        // ✅ no "Merhaba..." auto message (we keep chat clean)
-        // but first open can show a professional greeting ONCE if you want:
-        let greeted = false;
-        const ensureGreetingOnce = () => {
-            if (greeted) return;
-            greeted = true;
-            addMsg("ai", "How can I help you today?");
-        };
-
-        const sendMsg = async () => {
-            const text = (input.value || "").trim();
-            if (!text) return;
-
-            addMsg("user", text);
-            input.value = "";
-
-            const typing = document.createElement("div");
-            typing.className = "aswMsg ai";
-            typing.textContent = "…";
-            msgs.appendChild(typing);
-            msgs.scrollTop = msgs.scrollHeight;
-
-            try {
-                const r = await fetch(API_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: text }),
-                });
-
-                const data = await r.json().catch(() => ({}));
-                typing.remove();
-
-                if (!r.ok) return addMsg("ai", data.error || "Server error.");
-                addMsg("ai", data.reply || "…");
-            } catch (e) {
-                typing.remove();
-                addMsg("ai", "Network error.");
-            }
-        };
-
-        send.addEventListener("click", sendMsg);
-        input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") sendMsg();
-        });
-
-        // Show greeting when opened first time
-        fab.addEventListener("click", () => {
-            if (!box.classList.contains("aswHidden")) ensureGreetingOnce();
-        });
+        try {
+            const r = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: t }),
+            });
+            const j = await r.json();
+            addMsg("ai", j.reply || "...");
+        } catch {
+            addMsg("ai", "Network error");
+        }
     }
+
+    send.onclick = sendMsg;
+    input.onkeydown = (e) => e.key === "Enter" && sendMsg();
 })();
