@@ -1,96 +1,114 @@
-// netlify/functions/account_delete_hard.js  (CommonJS - Netlify friendly)
+// netlify/functions/account_delete_hard.js  (FULL - HARD DELETE)
+//
+// Bu function:
+// 1) JWT ile kullanıcıyı doğrular (Supabase auth.getUser)
+// 2) Kullanıcıya ait tüm tabloları SIRALI şekilde siler
+// 3) En son Supabase Auth user'ı admin ile siler
+//
+// ENV (Netlify):
+// - SUPABASE_URL
+// - SUPABASE_SERVICE_ROLE_KEY   (ŞART)
 
-const { Client, Account, Users } = require("node-appwrite");
-const { createClient } = require("@supabase/supabase-js");
+import { createClient } from "@supabase/supabase-js";
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY =
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 
 function json(statusCode, obj) {
     return {
         statusCode,
         headers: {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Cache-Control": "no-store",
         },
         body: JSON.stringify(obj),
     };
 }
 
-exports.handler = async (event) => {
+export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        const auth = event.headers.authorization || event.headers.Authorization || "";
-        const jwt = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-        if (!jwt) return json(401, { error: "Missing Bearer token" });
-
-        const {
-            APPWRITE_ENDPOINT,
-            APPWRITE_PROJECT_ID,
-            APPWRITE_API_KEY, // ✅ server admin key
-            SUPABASE_URL,
-            SUPABASE_SERVICE_ROLE_KEY, // ✅ service role
-        } = process.env;
-
-        if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !APPWRITE_API_KEY) {
-            return json(500, { error: "Missing APPWRITE env vars" });
-        }
         if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-            return json(500, { error: "Missing SUPABASE env vars" });
+            return json(500, { error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env" });
         }
 
-        // 1) JWT ile kullanıcıyı bul (Appwrite Account.get)
-        const userClient = new Client()
-            .setEndpoint(APPWRITE_ENDPOINT)
-            .setProject(APPWRITE_PROJECT_ID)
-            .setJWT(jwt);
+        const authHeader = event.headers.authorization || event.headers.Authorization || "";
+        if (!authHeader.startsWith("Bearer ")) {
+            return json(401, { error: "Missing Bearer token" });
+        }
 
-        const account = new Account(userClient);
-        const me = await account.get();
-        const userId = me && me.$id;
-        if (!userId) return json(401, { error: "Invalid token" });
+        const jwt = authHeader.replace("Bearer ", "").trim();
 
-        // 2) Supabase hard delete
-        const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        // Service role client (admin yetkisi)
+        const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+            auth: { persistSession: false },
+        });
 
-        // ⚠️ TABLO İSİMLERİN farklıysa burayı değiştir.
-        // Table yoksa hata verirse ignore ediyoruz.
-        const ops = [
-            () => sb.from("likes").delete().eq("user_id", userId),
-            () => sb.from("comments").delete().eq("user_id", userId),
-            () => sb.from("posts").delete().eq("user_id", userId),
-            () => sb.from("follows").delete().or(`from_id.eq.${userId},to_id.eq.${userId}`),
-            () => sb.from("notifications").delete().or(`user_id.eq.${userId},actor_id.eq.${userId}`),
-            () => sb.from("dm_messages").delete().or(`from_id.eq.${userId},to_id.eq.${userId}`),
-            () => sb.from("dm_inbox").delete().or(`user_id.eq.${userId},peer_id.eq.${userId}`),
-            () => sb.from("user_settings").delete().eq("user_id", userId),
-            () => sb.from("profiles").delete().eq("id", userId),
-        ];
+        // ✅ JWT ile user doğrula
+        const { data: u, error: uErr } = await sb.auth.getUser(jwt);
+        if (uErr || !u?.user?.id) {
+            return json(401, { error: "Invalid token" });
+        }
 
-        for (const run of ops) {
-            const { error } = await run();
+        const uid = u.user.id;
+
+        // ✅ helper: Supabase delete hatasını patlat
+        async function del(q, label) {
+            const { error } = await q;
             if (error) {
-                const msg = String(error.message || error);
-                // tablo yoksa ignore
-                const low = msg.toLowerCase();
-                if (!low.includes("does not exist") && !low.includes("unknown")) {
-                    return json(500, { error: "Supabase delete failed: " + msg });
-                }
+                throw new Error(`${label}: ${error.message}`);
             }
         }
 
-        // 3) Appwrite user delete (Admin)
-        const admin = new Client()
-            .setEndpoint(APPWRITE_ENDPOINT)
-            .setProject(APPWRITE_PROJECT_ID)
-            .setKey(APPWRITE_API_KEY);
+        // =============================
+        // 1) DB KAYITLARI (SIRALI)
+        // =============================
+        // messages: sender_id = uid
+        await del(sb.from("messages").delete().eq("sender_id", uid), "delete messages");
 
-        const users = new Users(admin);
-        await users.delete(userId);
+        // conversations: user1_id OR user2_id = uid
+        await del(
+            sb.from("conversations").delete().or(`user1_id.eq.${uid},user2_id.eq.${uid}`),
+            "delete conversations"
+        );
 
-        return json(200, { ok: true });
+        // follows: follower_uid OR following_uid = uid
+        await del(
+            sb.from("follows").delete().or(`follower_uid.eq.${uid},following_uid.eq.${uid}`),
+            "delete follows"
+        );
+
+        // interactions: user_uid = uid
+        await del(sb.from("interactions").delete().eq("user_uid", uid), "delete interactions");
+
+        // post_comments: user_id = uid
+        await del(sb.from("post_comments").delete().eq("user_id", uid), "delete post_comments");
+
+        // post_likes: user_id = uid
+        await del(sb.from("post_likes").delete().eq("user_id", uid), "delete post_likes");
+
+        // analyses: author_uid = uid
+        await del(sb.from("analyses").delete().eq("author_uid", uid), "delete analyses");
+
+        // profiles: appwrite_user = uid
+        // ⚠️ Sende primary column adı "appwrite_user" gibi görünüyor.
+        // Eğer sende "appwrite_user_id" vs ise burayı değiştir.
+        await del(sb.from("profiles").delete().eq("appwrite_user", uid), "delete profiles");
+
+        // =============================
+        // 2) AUTH USER (EN SON)
+        // =============================
+        const { error: delAuthErr } = await sb.auth.admin.deleteUser(uid);
+        if (delAuthErr) {
+            throw new Error(`delete auth user: ${delAuthErr.message}`);
+        }
+
+        return json(200, { ok: true, deleted_user: uid });
     } catch (e) {
-        return json(500, { error: e?.message || "Server error" });
+        console.error("account_delete_hard ERROR:", e);
+        return json(500, { error: String(e?.message || e) });
     }
 };
