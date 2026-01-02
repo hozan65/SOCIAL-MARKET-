@@ -1,31 +1,11 @@
-// /services/supabase.js
-// ✅ ONLY PUBLIC READ CLIENT
-// ❌ NO AUTH, NO getUser, NO session
+import { createClient } from "@supabase/supabase-js";
 
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+export function sbAdmin() {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
+    if (!url) throw new Error("Missing SUPABASE_URL");
+    if (!key) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
-// ⚠️ Supabase burada SADECE READ için var
-export const supabase = createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
-    {
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-        },
-    }
-);
-
-// ✅ Appwrite UID her yerde buradan okunur
-export function getAppwriteUID() {
-    return localStorage.getItem("sm_uid") || null;
-}
-
-// ✅ JWT (Netlify Functions)
-export function getJWT() {
-    return localStorage.getItem("sm_jwt") || null;
+    return createClient(url, key, { auth: { persistSession: false } });
 }
