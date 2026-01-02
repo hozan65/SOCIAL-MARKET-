@@ -13,7 +13,7 @@
 // - paddle_events: event_id primary key (for idempotency)
 
 import crypto from "crypto";
-import { sbAdmin } from "./_supabase.js";
+import { sbAdmin } from "./supabase.js";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",

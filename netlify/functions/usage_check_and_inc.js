@@ -13,7 +13,7 @@
 // Auth:
 // - For now expects header "x-user-id" (replace with real auth later)
 
-import { sbAdmin } from "./_supabase.js";
+import { sbAdmin } from "./supabase.js";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",

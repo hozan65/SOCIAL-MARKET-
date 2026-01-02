@@ -10,7 +10,7 @@
 // - OPENAI_IMAGE_MODEL (default: "gpt-image-1")
 // - FREE_DAILY_IMG_LIMIT (default: 1)
 
-import { sbAdmin } from "./_supabase.js";
+import { sbAdmin } from "./supabase.js";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
