@@ -1,94 +1,146 @@
 // netlify/functions/account_delete_hard.js
-import { Client, Account, Users } from "node-appwrite";
-import { createClient as createSupabase } from "@supabase/supabase-js";
+import { Client, Users } from "node-appwrite";
+import { createClient } from "@supabase/supabase-js";
 
-const {
-    APPWRITE_ENDPOINT,
-    APPWRITE_PROJECT_ID,
-    APPWRITE_API_KEY,
-
-    SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY,
-} = process.env;
-
-function json(statusCode, body) {
+function json(statusCode, obj) {
     return {
         statusCode,
-        headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
-            "Access-Control-Allow-Methods": "POST, OPTIONS",
-        },
-        body: JSON.stringify(body),
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(obj),
     };
 }
 
+function getBearer(event) {
+    const h = event.headers || {};
+    const auth = h.authorization || h.Authorization || "";
+    const m = String(auth).match(/^Bearer\s+(.+)$/i);
+    return m ? m[1].trim() : null;
+}
+
+/**
+ * ⚠️ ÖNEMLİ:
+ * Bu function "Bearer token" içinden user id çıkaramaz.
+ * O yüzden client tarafı, user id'yi de göndermeli:
+ * body: { confirm:true, userId: "6956..." }
+ *
+ * Çünkü senin sm_jwt token'ın custom görünüyor.
+ * Eğer token'dan userId decode ediyorsan, burada decode eklenir.
+ */
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        const auth = event.headers.authorization || event.headers.Authorization || "";
-        const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
-        if (!token) return json(401, { error: "Invalid token" });
+        const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT;
+        const APPWRITE_PROJECT_ID = process.env.APPWRITE_PROJECT_ID;
+        const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY;
 
-        if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID || !APPWRITE_API_KEY) {
-            return json(500, { error: "Missing Appwrite envs" });
-        }
-        if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-            return json(500, { error: "Missing Supabase envs" });
+        const SUPABASE_URL = process.env.SUPABASE_URL;
+        const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+        // ✅ env check (en sık hata)
+        const miss = [];
+        if (!APPWRITE_ENDPOINT) miss.push("APPWRITE_ENDPOINT");
+        if (!APPWRITE_PROJECT_ID) miss.push("APPWRITE_PROJECT_ID");
+        if (!APPWRITE_API_KEY) miss.push("APPWRITE_API_KEY");
+        if (!SUPABASE_URL) miss.push("SUPABASE_URL");
+        if (!SUPABASE_SERVICE_ROLE_KEY) miss.push("SUPABASE_SERVICE_ROLE_KEY");
+        if (miss.length) return json(500, { error: "Missing envs", missing: miss });
+
+        // auth token var mı?
+        const token = getBearer(event);
+        if (!token) return json(401, { error: "Missing Authorization Bearer token" });
+
+        let body = {};
+        try { body = event.body ? JSON.parse(event.body) : {}; } catch {}
+
+        // ✅ client buraya userId gönderecek
+        const userId = body.userId || body.uid || null;
+        if (!userId) {
+            return json(400, {
+                error: "Missing userId in body",
+                hint: "Send {confirm:true, userId: localStorage.getItem('sm_uid') }",
+            });
         }
 
-        // 1) Appwrite JWT verify -> get user
-        const aw = new Client()
+        // 1) Supabase cleanup
+        const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+        // senin tablolarına göre silme listesi (screenlerde görünenler)
+        // text alanlar: profiles.appwrite_user_id, follows.follower_uid/following_uid, conversations.user1_id/user2_id, messages.sender_id
+        // post_likes.user_id, post_comments.user_id, interactions.user_uid, analyses.author_uid
+        const deletions = [];
+
+        // profiles
+        deletions.push(sb.from("profiles").delete().eq("appwrite_user_id", userId));
+
+        // follows
+        deletions.push(sb.from("follows").delete().eq("follower_uid", userId));
+        deletions.push(sb.from("follows").delete().eq("following_uid", userId));
+
+        // conversations + messages (FK var: messages.conversation_id -> conversations.id)
+        // önce messages, sonra conversations
+        // kullanıcının dahil olduğu conversation id'leri bul
+        const convRes = await sb
+            .from("conversations")
+            .select("id")
+            .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+
+        if (convRes.error) {
+            return json(500, { error: "Supabase conversations select failed", details: convRes.error });
+        }
+
+        const convIds = (convRes.data || []).map((x) => x.id).filter(Boolean);
+
+        if (convIds.length) {
+            deletions.push(sb.from("messages").delete().in("conversation_id", convIds));
+        }
+
+        deletions.push(sb.from("messages").delete().eq("sender_id", userId));
+        deletions.push(sb.from("conversations").delete().or(`user1_id.eq.${userId},user2_id.eq.${userId}`));
+
+        // interactions
+        deletions.push(sb.from("interactions").delete().eq("user_uid", userId));
+
+        // analyses
+        deletions.push(sb.from("analyses").delete().eq("author_uid", userId));
+
+        // likes/comments
+        deletions.push(sb.from("post_likes").delete().eq("user_id", userId));
+        deletions.push(sb.from("post_comments").delete().eq("user_id", userId));
+
+        // news / news_feed user bağlı değil (sende user alanı yok gibi) -> dokunmuyoruz
+
+        const delResults = await Promise.all(deletions);
+        const supabaseErrors = delResults
+            .map((r) => r.error)
+            .filter(Boolean);
+
+        if (supabaseErrors.length) {
+            return json(500, { error: "Supabase delete failed", details: supabaseErrors });
+        }
+
+        // 2) Appwrite user hard delete
+        const client = new Client()
             .setEndpoint(APPWRITE_ENDPOINT)
             .setProject(APPWRITE_PROJECT_ID)
             .setKey(APPWRITE_API_KEY);
 
-        // JWT ile "account.get" yapabilmek için ayrı client:
-        const awJwt = new Client()
-            .setEndpoint(APPWRITE_ENDPOINT)
-            .setProject(APPWRITE_PROJECT_ID)
-            .setJWT(token);
+        const users = new Users(client);
 
-        const account = new Account(awJwt);
-        const me = await account.get(); // token valid mi?
-        const uid = me?.$id;
-        if (!uid) return json(401, { error: "Invalid token user" });
+        // Appwrite'ta user sil
+        try {
+            await users.delete(userId);
+        } catch (e) {
+            return json(500, {
+                error: "Appwrite delete user failed",
+                details: e?.message || String(e),
+            });
+        }
 
-        // 2) Supabase hard delete (service role)
-        const sb = createSupabase(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        return json(200, { ok: true, deleted: true, userId });
 
-        // Senin tablolarına göre temizliyoruz:
-        // profiles: appwrite_user_id
-        // follows: follower_uid / following_uid
-        // conversations: user1_id / user2_id
-        // messages: sender_id + conversation_id (FK)
-        // post_likes: user_id
-        // post_comments: user_id
-        // interactions: user_uid
-        // analyses: author_uid
-
-        // messages -> conversations sırası önemli (FK var)
-        await sb.from("messages").delete().or(`sender_id.eq.${uid}`);
-        await sb.from("conversations").delete().or(`user1_id.eq.${uid},user2_id.eq.${uid}`);
-
-        await sb.from("follows").delete().or(`follower_uid.eq.${uid},following_uid.eq.${uid}`);
-        await sb.from("post_likes").delete().eq("user_id", uid);
-        await sb.from("post_comments").delete().eq("user_id", uid);
-        await sb.from("interactions").delete().eq("user_uid", uid);
-        await sb.from("analyses").delete().eq("author_uid", uid);
-
-        await sb.from("profiles").delete().eq("appwrite_user_id", uid);
-
-        // 3) Appwrite user delete (hard)
-        const users = new Users(aw);
-        await users.delete(uid);
-
-        return json(200, { ok: true, deleted: uid });
     } catch (e) {
-        console.error("account_delete_hard error:", e);
-        return json(500, { error: "Server error", detail: String(e?.message || e) });
+        return json(500, { error: "Unhandled server error", details: e?.message || String(e) });
     }
 };
