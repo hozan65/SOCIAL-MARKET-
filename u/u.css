@@ -3,16 +3,18 @@
 /* safety */
 [hidden]{ display:none !important; }
 
-/* =========================
-   PROFILE HEADER
-========================= */
-.uPage{ padding-top:18px; }
+.uPage{
+    padding-top: 18px;
+}
 
+/* ---- TOP AREA ---- */
 .uTop{
     display:flex;
-    gap:16px;
+    gap:18px;
     align-items:flex-start;
 }
+
+.uAvatarWrap{ flex: 0 0 auto; }
 
 .uAvatar{
     width:92px;
@@ -20,28 +22,92 @@
     border-radius:999px;
     object-fit:cover;
     background:rgba(0,0,0,.06);
+    display:block;
+}
+
+.uMeta{ flex:1; min-width:0; }
+
+.uRow1{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
 }
 
 .uName{
-    font-size:22px;
+    font-size:24px;
     font-weight:1000;
     margin:0;
+    line-height:1.1;
 }
 
+/* actions */
+.uActions{
+    display:flex;
+    gap:10px;
+    align-items:center;
+}
+
+.uFollowBtn,
+.uMsgBtn{
+    padding:9px 14px;
+    border-radius:999px;
+    border:1px solid rgba(0,0,0,.12);
+    background:rgba(255,255,255,.92);
+    font-weight:1000;
+    cursor:pointer;
+    text-decoration:none;
+    color:inherit;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.uFollowBtn.isFollowing{
+    background:rgba(0,0,0,.06);
+}
+
+.uMsgBtn:hover,
+.uFollowBtn:hover{
+    background:rgba(0,0,0,.06);
+}
+
+/* bio */
 .uBio{
     margin-top:6px;
-    opacity:.8;
+    opacity:.85;
+    white-space:pre-wrap;
+    max-width: 680px;
 }
 
+/* stats */
 .uStats{
-    margin-top:12px;
+    margin-top:10px;
     display:flex;
-    gap:14px;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
 }
 
-.uStatNum{ font-weight:1000; }
-.uStatLbl{ opacity:.7; }
+.uStat,
+.uStatBtn{
+    display:inline-flex;
+    gap:8px;
+    align-items:center;
+}
 
+.uStatBtn{
+    border:1px solid rgba(0,0,0,.10);
+    background:rgba(255,255,255,.85);
+    padding:6px 10px;
+    border-radius:12px;
+    cursor:pointer;
+}
+
+.uStatNum{ font-weight:1100; }
+.uStatLbl{ opacity:.75; font-weight:900; }
+
+/* links */
 .uLinks{
     margin-top:10px;
     display:flex;
@@ -50,19 +116,24 @@
 }
 
 .uLink{
-    padding:7px 12px;
+    padding:7px 10px;
     border-radius:999px;
-    border:1px solid rgba(0,0,0,.1);
-    background:#fff;
-    font-weight:900;
+    border:1px solid rgba(0,0,0,.10);
+    background:rgba(255,255,255,.85);
+    font-weight:1000;
     text-decoration:none;
     color:inherit;
 }
 
-/* =========================
-   POSTS GRID
-========================= */
-.uPosts{ margin-top:20px; }
+/* page message */
+.uMsg{
+    margin-top:10px;
+    opacity:.85;
+    font-weight:900;
+}
+
+/* ---- POSTS ---- */
+.uPosts{ margin-top:18px; }
 
 .uPostsGrid{
     display:grid;
@@ -70,34 +141,29 @@
     gap:14px;
 }
 
-@media (max-width:900px){
-    .uPostsGrid{ grid-template-columns:repeat(2,1fr); }
-}
-@media (max-width:520px){
-    .uPostsGrid{ grid-template-columns:1fr; }
-}
-
-/* =========================
-   POST CARD (IMAGE + TITLE + VISIT)
-========================= */
+/* NEW CARD STYLE (fixes your screenshot) */
 .uPostCard{
-    border-radius:16px;
+    border:1px solid rgba(0,0,0,.10);
+    background:rgba(255,255,255,.92);
+    border-radius:18px;
     overflow:hidden;
-    background:#fff;
-    border:1px solid rgba(0,0,0,.08);
+    box-shadow: 0 10px 22px rgba(20,40,90,.08);
     cursor:pointer;
-    transition:box-shadow .15s ease, transform .1s ease;
+    transition: transform .08s ease, box-shadow .15s ease;
+    display:flex;
+    flex-direction:column;
+    min-height: 260px;
 }
 
 .uPostCard:hover{
-    box-shadow:0 12px 26px rgba(0,0,0,.12);
-    transform:translateY(-2px);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 28px rgba(20,40,90,.12);
 }
 
 .uPostImg{
     width:100%;
-    height:160px;
-    background:rgba(0,0,0,.04);
+    aspect-ratio: 16 / 9;
+    background: rgba(0,0,0,.04);
 }
 
 .uPostImg img{
@@ -107,35 +173,175 @@
     display:block;
 }
 
-.uPostMeta{
-    padding:12px 14px;
+.uPostBody{
+    padding:12px 12px 14px;
     display:flex;
-    align-items:center;
-    justify-content:space-between;
+    flex-direction:column;
     gap:10px;
 }
 
-.uPostTitle{
-    font-weight:1000;
-    font-size:15px;
-    line-height:1.2;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
+.uPostMeta{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:center;
 }
 
-.uPostVisit{
-    flex:0 0 auto;
-    padding:8px 14px;
+.uTag{
+    font-size:12px;
+    font-weight:1000;
+    padding:6px 10px;
     border-radius:999px;
-    border:1px solid rgba(47,109,255,.35);
-    background:#eef3ff;
-    font-weight:1000;
-    font-size:13px;
-    color:#2f6dff;
-    text-decoration:none;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(0,0,0,.03);
+    opacity:.9;
 }
 
-.uPostVisit:hover{
-    background:#e2ebff;
+/* TEXT */
+.uPostText{
+    font-size:13px;
+    line-height:1.35;
+    opacity:.88;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+.uMoreBtn{
+    align-self:flex-start;
+    border:none;
+    background:transparent;
+    padding:0;
+    font-weight:1000;
+    cursor:pointer;
+    opacity:.9;
+}
+
+.uMoreBtn:hover{ text-decoration: underline; }
+
+/* VISIT BUTTON (your request) */
+.uVisitRow{
+    margin-top:auto;
+    padding-top:6px;
+    display:flex;
+    justify-content:flex-start;
+}
+
+.uVisitBtn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 12px;
+    border-radius:999px;
+    border:1px solid rgba(0,0,0,.12);
+    background:rgba(255,255,255,.95);
+    font-weight:1000;
+    text-decoration:none;
+    color:inherit;
+}
+
+.uVisitBtn:hover{ background:rgba(0,0,0,.05); }
+
+/* ---- MOBILE ---- */
+@media (max-width: 980px){
+    .uPostsGrid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 720px){
+    .uTop{ flex-direction:column; align-items:flex-start; }
+    .uAvatar{ width:84px; height:84px; }
+}
+@media (max-width: 520px){
+    .uPostsGrid{ grid-template-columns:1fr; }
+}
+
+/* ---- RIGHT DRAWER ---- */
+.uDrawerBackdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.35);
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .18s ease;
+    z-index:9000;
+}
+
+body.uDrawerOpen .uDrawerBackdrop{
+    opacity:1;
+    pointer-events:auto;
+}
+
+.uDrawer{
+    position:fixed;
+    top:0;
+    right:0;
+    height:100vh;
+    width:min(420px,92vw);
+    background:#fff;
+    border-left:1px solid rgba(0,0,0,.08);
+    box-shadow:-12px 0 30px rgba(0,0,0,.12);
+    transform:translateX(105%);
+    transition:transform .18s ease;
+    z-index:9100;
+    display:flex;
+    flex-direction:column;
+}
+
+.uDrawer.open{ transform:translateX(0); }
+
+.uDrawerHead{
+    position:sticky;
+    top:0;
+    z-index:2;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px;
+    border-bottom:1px solid rgba(0,0,0,.08);
+    background:#fff;
+}
+
+.uDrawerTitle{ margin:0; font-weight:1100; }
+
+.uDrawerClose{
+    border:none;
+    background:transparent;
+    font-size:18px;
+    cursor:pointer;
+}
+
+.uDrawerBody{
+    padding:12px 14px;
+    overflow:auto;
+    flex:1;
+}
+
+.uUserRow{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 0;
+    border-bottom:1px solid rgba(0,0,0,.06);
+}
+
+.uUserRow:last-child{ border-bottom:none; }
+
+.uUserAva{
+    width:40px;
+    height:40px;
+    border-radius:999px;
+    object-fit:cover;
+    background:rgba(0,0,0,.06);
+}
+
+.uUserName{ font-weight:1100; }
+
+.uUserGo{
+    margin-left:auto;
+    padding:8px 10px;
+    border-radius:999px;
+    border:1px solid rgba(0,0,0,.10);
+    background:rgba(255,255,255,.9);
+    font-weight:1000;
+    text-decoration:none;
+    color:inherit;
 }
