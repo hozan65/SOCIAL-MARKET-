@@ -15,8 +15,8 @@ const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";   // POST { follow
 
 // pages
 const PROFILE_PAGE = "/u/index.html";
-const MESSAGES_PAGE = "/messages/"; // /messages/index.html
-const VIEW_PAGE = "/view/view.html"; // post detail page
+const MESSAGES_PAGE = "/messages/";      // /messages/index.html
+const VIEW_PAGE = "/view/view.html";     // post detail page
 
 const qs = (k) => new URLSearchParams(location.search).get(k);
 const $ = (id) => document.getElementById(id);
@@ -98,6 +98,8 @@ function paintFollowBtn() {
 
 // ---------- drawer ----------
 function openDrawer(title) {
+    if (!$drawer || !$drawerTitle || !$drawerBody || !$drawerBackdrop) return;
+
     $drawerTitle.textContent = title || "—";
     $drawerBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Loading...</div>`;
 
@@ -110,6 +112,8 @@ function openDrawer(title) {
 }
 
 function closeDrawer() {
+    if (!$drawer || !$drawerBody || !$drawerBackdrop) return;
+
     $drawer.classList.remove("open");
     $drawer.setAttribute("aria-hidden", "true");
     document.body.classList.remove("uDrawerOpen");
@@ -123,6 +127,8 @@ function closeDrawer() {
 }
 
 function renderUserList(list) {
+    if (!$drawerBody) return;
+
     if (!list?.length) {
         $drawerBody.innerHTML = `<div style="opacity:.7;padding:10px 0;">Empty</div>`;
         return;
@@ -180,7 +186,7 @@ function renderProfile(data) {
         });
     }
 
-    // posts grid (cards)
+    // posts grid
     if (!$grid) return;
     $grid.innerHTML = "";
 
@@ -189,9 +195,12 @@ function renderProfile(data) {
         const imgUrl = post.image_url || post.image_path || post.image || post.photo_url || "";
         if (!imgUrl) return;
 
+        // ✅ id yoksa view’e gidemez -> render etme (en temiz çözüm)
+        if (!id) return;
+
         const caption = post.caption || post.text || post.body || post.description || "";
-        const coin = post.coin || post.symbol || post.crypto || post.asset || "CRYPTO";
-        const tf = post.timeframe || post.tf || post.interval || "1M";
+        const coin = post.coin || post.symbol || post.crypto || post.asset || "";
+        const tf = post.timeframe || post.tf || post.interval || "";
 
         const t = shortText(caption, 120);
 
@@ -208,6 +217,7 @@ function renderProfile(data) {
         <div class="uPostMeta">
           ${coin ? `<span class="uTag">${esc(coin)}</span>` : ""}
           ${tf ? `<span class="uTag">${esc(tf)}</span>` : ""}
+          <a class="uVisitBtn" href="${VIEW_PAGE}?id=${encodeURIComponent(id)}">Visit →</a>
         </div>
 
         ${caption ? `
@@ -220,10 +230,14 @@ function renderProfile(data) {
       </div>
     `;
 
-        // click -> view page (unless show more)
+        // ✅ card click -> view (ama button/link gibi şeylere basınca değil)
         card.addEventListener("click", (e) => {
-            if (e.target?.classList?.contains("uMoreBtn")) return;
+            const el = e.target;
             if (!id) return;
+
+            // eğer kullanıcı button / link / input tıklıyorsa card yönlendirmesin
+            if (el && el.closest && el.closest("a,button,input,textarea,select,label")) return;
+
             location.href = `${VIEW_PAGE}?id=${encodeURIComponent(id)}`;
         });
 
@@ -339,9 +353,9 @@ async function toggleFollow(targetUid) {
         method: "POST",
         headers,
         body: JSON.stringify({
-            following_uid: targetUid, // main
-            id: targetUid,            // fallback
-            target_uid: targetUid     // fallback
+            following_uid: targetUid,
+            id: targetUid,
+            target_uid: targetUid
         })
     });
     const out = await r.json().catch(() => ({}));
@@ -349,7 +363,6 @@ async function toggleFollow(targetUid) {
 
     if (typeof out?.is_following === "boolean") return out.is_following;
     if (typeof out?.following === "boolean") return out.following;
-
     return await loadFollowStatus(targetUid);
 }
 
@@ -358,34 +371,22 @@ async function toggleFollow(targetUid) {
     // 1) resolve profile uid
     let uid = qs("id");
 
-    // me=1 => show my own profile explicitly
+    // me=1 => my profile
     if (!uid && qs("me") === "1") {
-        try {
-            uid = await getViewerIdStrict();
-        } catch {
-            location.href = "/auth/login.html";
-            return;
-        }
+        try { uid = await getViewerIdStrict(); }
+        catch { location.href = "/auth/login.html"; return; }
     }
 
-    // if still no uid => default to my profile
+    // default to my profile
     if (!uid) {
-        try {
-            uid = await getViewerIdStrict();
-        } catch {
-            location.href = "/auth/login.html";
-            return;
-        }
+        try { uid = await getViewerIdStrict(); }
+        catch { location.href = "/auth/login.html"; return; }
     }
 
-    // 2) viewer id (strict)
+    // 2) viewer id
     let viewerId = "";
-    try {
-        viewerId = await getViewerIdStrict();
-    } catch {
-        location.href = "/auth/login.html";
-        return;
-    }
+    try { viewerId = await getViewerIdStrict(); }
+    catch { location.href = "/auth/login.html"; return; }
 
     const isMe = String(viewerId) === String(uid);
 
@@ -409,12 +410,16 @@ async function toggleFollow(targetUid) {
                 $followBtn.disabled = true;
 
                 const newVal = await toggleFollow(uid);
+                const prev = _isFollowing;
                 _isFollowing = !!newVal;
                 paintFollowBtn();
 
-                // local UI followers count update
+                // UI followers count (safe)
                 const cur = parseInt($followers?.textContent || "0", 10) || 0;
-                $followers.textContent = String(_isFollowing ? cur + 1 : Math.max(0, cur - 1));
+                if (prev !== _isFollowing) {
+                    $followers.textContent = String(_isFollowing ? cur + 1 : Math.max(0, cur - 1));
+                }
+                setMsg("");
             } catch (e) {
                 console.error(e);
                 setMsg("❌ " + (e?.message || e));
@@ -431,7 +436,7 @@ async function toggleFollow(targetUid) {
         try { renderProfile(JSON.parse(cachedRaw)); } catch {}
     }
 
-    // load fresh (with ensure fallback)
+    // load fresh (ensure fallback)
     try {
         const data = await fetchProfile(uid);
         renderProfile(data);
@@ -458,7 +463,9 @@ async function toggleFollow(targetUid) {
             const list = await loadList(`${FN_LIST_FOLLOWERS}?id=${encodeURIComponent(uid)}`);
             renderUserList(list);
         } catch (e) {
-            $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
+            if ($drawerBody) {
+                $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
+            }
         }
     });
 
@@ -468,7 +475,9 @@ async function toggleFollow(targetUid) {
             const list = await loadList(`${FN_LIST_FOLLOWING}?id=${encodeURIComponent(uid)}`);
             renderUserList(list);
         } catch (e) {
-            $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
+            if ($drawerBody) {
+                $drawerBody.innerHTML = `<div style="color:#ff6b6b;padding:10px 0;">❌ ${esc(e?.message || e)}</div>`;
+            }
         }
     });
 
@@ -477,6 +486,6 @@ async function toggleFollow(targetUid) {
     $drawerBackdrop?.addEventListener("click", closeDrawer);
 
     document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && $drawer.classList.contains("open")) closeDrawer();
+        if (e.key === "Escape" && $drawer?.classList?.contains("open")) closeDrawer();
     });
 })();
