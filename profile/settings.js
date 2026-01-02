@@ -1,9 +1,5 @@
-// /profile/settings.js
+// /profile/settings.js (FULL)
 (() => {
-
-    /* ===============================
-       HELPERS
-    =============================== */
     const $ = (id) => document.getElementById(id);
 
     function setMsg(id, text, type) {
@@ -13,10 +9,8 @@
         el.className = "pMsg" + (type ? " " + type : "");
     }
 
-    /* ===============================
-       TAB SWITCH (LEFT MENU)
-    =============================== */
-    const tabButtons = document.querySelectorAll(".pNavItem[data-tab]");
+    // ===== Tabs (same page) =====
+    const btns = document.querySelectorAll(".pNavItem[data-tab]");
     const panels = {
         public: $("tab-public"),
         security: $("tab-security"),
@@ -25,52 +19,32 @@
     };
 
     function openTab(key) {
-        tabButtons.forEach((btn) =>
-            btn.classList.toggle("active", btn.dataset.tab === key)
-        );
-
-        Object.entries(panels).forEach(([k, panel]) => {
-            if (!panel) return;
-            panel.classList.toggle("show", k === key);
+        btns.forEach((b) => b.classList.toggle("active", b.dataset.tab === key));
+        Object.entries(panels).forEach(([k, el]) => {
+            if (!el) return;
+            el.classList.toggle("show", k === key);
         });
-
         history.replaceState(null, "", "#" + key);
     }
 
-    tabButtons.forEach((btn) => {
-        btn.addEventListener("click", () => openTab(btn.dataset.tab));
-    });
-
-    // First load
+    btns.forEach((b) => b.addEventListener("click", () => openTab(b.dataset.tab)));
     const hash = (location.hash || "").replace("#", "");
     openTab(panels[hash] ? hash : "public");
 
-    /* ===============================
-       DELETE MODAL OPEN / CLOSE
-    =============================== */
+    // ===== Delete modal =====
     const modal = $("deleteModal");
+    const openM = () => { if (modal) modal.hidden = false; };
+    const closeM = () => { if (modal) modal.hidden = true; };
 
-    function openDeleteModal() {
-        if (modal) modal.hidden = false;
-    }
-
-    function closeDeleteModal() {
-        if (modal) modal.hidden = true;
-    }
-
-    $("deleteAccountBtn")?.addEventListener("click", openDeleteModal);
-    $("cancelDeleteBtn")?.addEventListener("click", closeDeleteModal);
-
+    $("deleteAccountBtn")?.addEventListener("click", openM);
+    $("cancelDeleteBtn")?.addEventListener("click", closeM);
     modal?.addEventListener("click", (e) => {
-        if (e.target?.dataset?.close) closeDeleteModal();
+        if (e.target?.dataset?.close) closeM();
     });
 
-    /* ===============================
-       HARD DELETE ACCOUNT (REAL)
-    =============================== */
-    async function deleteAccountHard() {
+    // ===== HARD DELETE =====
+    $("confirmDeleteBtn")?.addEventListener("click", async () => {
         const btn = $("confirmDeleteBtn");
-
         try {
             if (btn) btn.disabled = true;
             setMsg("secMsg", "Deleting account...", "");
@@ -88,25 +62,21 @@
             });
 
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) {
-                throw new Error(data?.error || "Delete failed");
-            }
+            if (!res.ok) throw new Error(data?.error || "Delete failed");
 
-            // ✅ temizle + ana sayfaya at
+            // cleanup + redirect
             localStorage.removeItem("sm_jwt");
             localStorage.removeItem("sm_uid");
 
-            closeDeleteModal();
+            closeM();
             location.href = "/";
 
-        } catch (err) {
-            closeDeleteModal();
-            setMsg("secMsg", err?.message || "Delete failed", "err");
+        } catch (e) {
+            closeM();
+            setMsg("secMsg", e?.message || "Delete failed", "err");
+            alert(e?.message || "Delete failed");
         } finally {
             if (btn) btn.disabled = false;
         }
-    }
-
-    $("confirmDeleteBtn")?.addEventListener("click", deleteAccountHard);
-
+    });
 })();
