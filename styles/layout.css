@@ -287,3 +287,19 @@
     right: 18px;
     z-index: 60;
 }
+/* Mobilde tıklayınca çıkan mavi highlight'ı kapat */
+*{
+    -webkit-tap-highlight-color: transparent;
+    tap-highlight-color: transparent; /* bazı tarayıcılar */
+}
+
+/* Buton/link/input focus mavi çerçevesini kontrol et */
+:where(a, button, input, select, textarea){
+    outline: none;
+}
+
+/* iOS'ta ekstra dokunma davranışlarını sadeleştirir */
+html, body{
+    -webkit-touch-callout: none;
+    -webkit-text-size-adjust: 100%;
+}

@@ -74,3 +74,15 @@ input{
 .authBack{margin-top:14px;}
 .authBack a{color:#9bd1ff;text-decoration:none}
 .authBack a:hover{text-decoration:underline}
+
+
+/* Klavye ile gezince odak görünsün */
+:focus-visible{
+    outline: 2px solid rgba(47,109,255,.55);
+    outline-offset: 2px;
+}
+
+/* Touch/mouse ile basınca gelen focus çizgisini gizle */
+:focus:not(:focus-visible){
+    outline: none;
+}
