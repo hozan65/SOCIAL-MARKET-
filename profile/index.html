@@ -24,88 +24,289 @@
 <main class="pWrap">
     <section class="pShell">
 
-        <aside class="pNav">
+        <!-- LEFT NAV (same page switch) -->
+        <aside class="pNav" id="pNav">
             <div class="pNavTitle">Settings</div>
-            <button class="pNavItem active" type="button">Public profile</button>
+
+            <div class="pNavGroup">
+                <div class="pNavGroupTitle">Profile and privacy</div>
+                <button class="pNavItem active" type="button" data-tab="public">Public profile</button>
+            </div>
+
+            <div class="pNavGroup">
+                <div class="pNavGroupTitle">Account and security</div>
+                <button class="pNavItem" type="button" data-tab="security">Account and security</button>
+            </div>
+
+            <div class="pNavGroup">
+                <div class="pNavGroupTitle">Social notifications</div>
+                <button class="pNavItem" type="button" data-tab="social">Social notifications</button>
+            </div>
+
+            <div class="pNavGroup">
+                <div class="pNavGroupTitle">Email subscriptions</div>
+                <button class="pNavItem" type="button" data-tab="email">Email subscriptions</button>
+            </div>
         </aside>
 
+        <!-- RIGHT CONTENT (panels on same page) -->
         <section class="pContent">
 
-            <div class="pTop">
-                <div class="pTitle">Public profile</div>
-            </div>
+            <!-- ========== TAB: PUBLIC PROFILE ========== -->
+            <section class="pPanel show" id="tab-public">
 
-            <!-- AVATAR -->
-            <div class="pBlock">
-                <div class="pBlockHead">
-                    <div>
-                        <div class="pBlockTitle">Picture and username</div>
-                        <div class="pBlockHint">JPG, PNG,</div>
-                    </div>
+                <div class="pTop">
+                    <div class="pTitle">Public profile</div>
+                    <div class="pSub">Manage how your profile appears.</div>
                 </div>
 
-                <div class="pAvatarRow">
-                    <div class="pAvatar">
-                        <img id="pAvatarImg" alt="avatar" style="display:none" />
-                        <div id="pAvatarTxt" class="pAvatarTxt">SM</div>
-                    </div>
-
-                    <div class="pAvatarActions">
-                        <div class="pNameLine">
-                            <div id="pName" class="pName">User</div>
-                        </div>
-
-                        <div class="pBtnRow">
-                            <input id="avatarInput" type="file" accept="image/*" hidden />
-                            <button id="uploadBtn" class="btn" type="button">Upload photo</button>
-                            <button id="deleteBtn" class="btn danger" type="button">Delete photo</button>
+                <!-- AVATAR -->
+                <div class="pBlock">
+                    <div class="pBlockHead">
+                        <div>
+                            <div class="pBlockTitle">Picture and username</div>
+                            <div class="pBlockHint">JPG, PNG</div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <!-- BIO -->
-            <div class="pBlock">
-                <div class="pBlockHead">
-                    <div class="pBlockTitle">Bio</div>
-                </div>
-                <textarea id="bioInput" class="pTextarea" rows="4" placeholder="Write something about you..."></textarea>
-            </div>
+                    <div class="pAvatarRow">
+                        <div class="pAvatar">
+                            <img id="pAvatarImg" alt="avatar" style="display:none" />
+                            <div id="pAvatarTxt" class="pAvatarTxt">SM</div>
+                        </div>
 
-            <!-- LINKS -->
-            <div class="pBlock">
-                <div class="pBlockHead">
-                    <div>
-                        <div class="pBlockTitle">Social and website links</div>
+                        <div class="pAvatarActions">
+                            <div class="pNameLine">
+                                <div id="pName" class="pName">User</div>
+                            </div>
+
+                            <div class="pBtnRow">
+                                <input id="avatarInput" type="file" accept="image/*" hidden />
+                                <button id="uploadBtn" class="btn" type="button">Upload photo</button>
+                                <button id="deleteBtn" class="btn danger" type="button">Delete photo</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="pGrid2">
+                <!-- BIO -->
+                <div class="pBlock">
+                    <div class="pBlockHead">
+                        <div class="pBlockTitle">Bio</div>
+                    </div>
+                    <textarea id="bioInput" class="pTextarea" rows="4" placeholder="Write something about you..."></textarea>
+                </div>
+
+                <!-- LINKS -->
+                <div class="pBlock">
+                    <div class="pBlockHead">
+                        <div>
+                            <div class="pBlockTitle">Social and website links</div>
+                            <div class="pBlockHint">Add links to your socials or website.</div>
+                        </div>
+                    </div>
+
+                    <div class="pGrid2">
+                        <div class="pField">
+                            <label class="pLabel">Link 1</label>
+                            <input id="link1Input" class="pInput" placeholder="https://..." />
+                        </div>
+
+                        <div class="pField">
+                            <label class="pLabel">Link 2</label>
+                            <input id="link2Input" class="pInput" placeholder="https://..." />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ACTIONS -->
+                <div class="pActions">
+                    <button id="cancelBtn" class="btn ghost" type="button">Cancel</button>
+                    <button id="saveBtn" class="btn primary" type="button">Save changes</button>
+                </div>
+
+                <div id="pMsg" class="pMsg"></div>
+            </section>
+
+            <!-- ========== TAB: ACCOUNT & SECURITY ========== -->
+            <section class="pPanel" id="tab-security">
+                <div class="pTop">
+                    <div class="pTitle">Account and security</div>
+                    <div class="pSub">Password, sessions and account removal.</div>
+                </div>
+
+                <!-- CHANGE PASSWORD -->
+                <div class="pBlock">
+                    <div class="pBlockHead">
+                        <div>
+                            <div class="pBlockTitle">Change password</div>
+                            <div class="pBlockHint">Password, sessions, 2FA</div>
+                        </div>
+                    </div>
+
                     <div class="pField">
-                        <label class="pLabel">Link 1</label>
-                        <input id="link1Input" class="pInput" placeholder="https://..." />
+                        <label class="pLabel">Current password</label>
+                        <input id="curPass" class="pInput" type="password" placeholder="••••••••" autocomplete="current-password">
                     </div>
 
-                    <div class="pField">
-                        <label class="pLabel">Link 2</label>
-                        <input id="link2Input" class="pInput" placeholder="https://..." />
+                    <div class="pGrid2">
+                        <div class="pField">
+                            <label class="pLabel">New password</label>
+                            <input id="newPass" class="pInput" type="password" placeholder="New password" autocomplete="new-password">
+                        </div>
+                        <div class="pField">
+                            <label class="pLabel">Confirm new password</label>
+                            <input id="newPass2" class="pInput" type="password" placeholder="Confirm" autocomplete="new-password">
+                        </div>
                     </div>
+
+                    <div class="pActions" style="border-top:none;padding-top:12px;">
+                        <button id="updatePasswordBtn" class="btn primary" type="button">Update password</button>
+                    </div>
+
+                    <div id="secMsg" class="pMsg"></div>
                 </div>
 
-            </div>
+                <!-- DELETE ACCOUNT -->
+                <div class="pBlock">
+                    <div class="pBlockHead">
+                        <div>
+                            <div class="pBlockTitle">Delete account</div>
+                            <div class="pBlockHint">This action is permanent.</div>
+                        </div>
+                    </div>
 
-            <!-- ACTIONS -->
-            <div class="pActions">
-                <button id="cancelBtn" class="btn ghost" type="button">Cancel</button>
-                <button id="saveBtn" class="btn primary" type="button">Save changes</button>
-            </div>
+                    <div class="pNote">
+                        Hesabını silersen profilin ve ayarların kaldırılır. Mesajları istersen “anon” bırakabiliriz.
+                    </div>
 
-            <div id="pMsg" class="pMsg"></div>
+                    <div class="pActions" style="justify-content:flex-start;border-top:none;padding-top:12px;">
+                        <button id="deleteAccountBtn" class="btn danger" type="button">Delete account</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========== TAB: SOCIAL NOTIFICATIONS ========== -->
+            <section class="pPanel" id="tab-social">
+                <div class="pTop">
+                    <div class="pTitle">Social notifications</div>
+                    <div class="pSub">Choose what you want to receive.</div>
+                </div>
+
+                <div class="pBlock">
+                    <div class="pBlockHead">
+                        <div>
+                            <div class="pBlockTitle">Notifications</div>
+                            <div class="pBlockHint">These are in-app settings.</div>
+                        </div>
+                    </div>
+
+                    <label class="pToggle"><input id="nFollow" type="checkbox" checked> <span>New followers</span></label>
+                    <label class="pToggle"><input id="nLike" type="checkbox" checked> <span>Likes and comments</span></label>
+                    <label class="pToggle"><input id="nDm" type="checkbox" checked> <span>Direct messages</span></label>
+
+                    <div class="pActions" style="border-top:none;padding-top:12px;">
+                        <button id="saveNotifBtn" class="btn primary" type="button">Save notifications</button>
+                    </div>
+
+                    <div id="notifMsg" class="pMsg"></div>
+                </div>
+            </section>
+
+            <!-- ========== TAB: EMAIL SUBSCRIPTIONS ========== -->
+            <section class="pPanel" id="tab-email">
+                <div class="pTop">
+                    <div class="pTitle">Email subscriptions</div>
+                    <div class="pSub">Choose which emails you want to receive.</div>
+                </div>
+
+                <div class="pBlock">
+                    <div class="pBlockHead">
+                        <div>
+                            <div class="pBlockTitle">Email</div>
+                            <div class="pBlockHint">Marketing / updates (not premium billing).</div>
+                        </div>
+                    </div>
+
+                    <label class="pToggle"><input id="eUpdates" type="checkbox"> <span>Product updates</span></label>
+                    <label class="pToggle"><input id="eDigest" type="checkbox"> <span>Weekly digest</span></label>
+                    <label class="pToggle"><input id="eSecurity" type="checkbox" checked> <span>Security alerts</span></label>
+
+                    <div class="pActions" style="border-top:none;padding-top:12px;">
+                        <button id="saveEmailBtn" class="btn primary" type="button">Save email settings</button>
+                    </div>
+
+                    <div id="emailMsg" class="pMsg"></div>
+                </div>
+            </section>
 
         </section>
     </section>
 </main>
 
+<!-- DELETE CONFIRM MODAL (same page) -->
+<div class="pModal" id="deleteModal" hidden>
+    <div class="pModalBackdrop" data-close="1"></div>
+    <div class="pModalCard" role="dialog" aria-modal="true" aria-labelledby="delTitle">
+        <div class="pModalTitle" id="delTitle">Are you sure?</div>
+        <div class="pModalText">
+            This will permanently delete your account. This cannot be undone.
+        </div>
+        <div class="pModalBtns">
+            <button class="btn ghost" type="button" id="cancelDeleteBtn">Cancel</button>
+            <button class="btn danger" type="button" id="confirmDeleteBtn">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ SWITCH + MODAL JS (inline, same file) -->
+<script>
+    (() => {
+        // Tabs
+        const btns = document.querySelectorAll(".pNavItem[data-tab]");
+        const panels = {
+            public: document.getElementById("tab-public"),
+            security: document.getElementById("tab-security"),
+            social: document.getElementById("tab-social"),
+            email: document.getElementById("tab-email"),
+        };
+
+        function openTab(key){
+            btns.forEach(b => b.classList.toggle("active", b.dataset.tab === key));
+            Object.entries(panels).forEach(([k, el]) => {
+                if (!el) return;
+                el.classList.toggle("show", k === key);
+            });
+            history.replaceState(null, "", "#" + key);
+        }
+
+        btns.forEach(b => b.addEventListener("click", () => openTab(b.dataset.tab)));
+
+        const hash = (location.hash || "").replace("#","");
+        if (hash && panels[hash]) openTab(hash);
+        else openTab("public");
+
+        // Delete modal open/close
+        const modal = document.getElementById("deleteModal");
+        const openM = () => { if(modal) modal.hidden = false; };
+        const closeM = () => { if(modal) modal.hidden = true; };
+
+        document.getElementById("deleteAccountBtn")?.addEventListener("click", openM);
+        document.getElementById("cancelDeleteBtn")?.addEventListener("click", closeM);
+        modal?.addEventListener("click", (e) => {
+            if (e.target && e.target.dataset && e.target.dataset.close) closeM();
+        });
+
+        // Confirm delete (placeholder)
+        document.getElementById("confirmDeleteBtn")?.addEventListener("click", () => {
+            closeM();
+            alert("Delete account backend not connected yet.");
+        });
+    })();
+</script>
+
+<!-- Your existing logic (public profile save/upload etc.) -->
 <script type="module" src="/profile/profile.js"></script>
+
 </body>
 </html>

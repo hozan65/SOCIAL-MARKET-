@@ -1,231 +1,364 @@
-/* ===============================
-   FLAT PROFILE SETTINGS (NO BOX)
-=============================== */
+/* /profile/profile.css  (FULL + updated: left menu groups + same-page panels switch) */
+/* FLAT PROFILE SETTINGS (NO BOX) */
 
-* {
-    box-sizing: border-box;
-}
+*{ box-sizing:border-box; }
 
-body {
-    margin: 0;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    background: #f5f7fb;
-    color: #0f172a;
+body{
+    margin:0;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:#f5f7fb;
+    color:#0f172a;
 }
 
 /* MAIN WRAP */
-.pWrap {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 24px 16px;
+.pWrap{
+    max-width:1100px;
+    margin:0 auto;
+    padding:24px 16px;
 }
 
 /* LAYOUT */
-.pShell {
-    display: grid;
-    grid-template-columns: 260px 1fr;
-    gap: 32px;
+.pShell{
+    display:grid;
+    grid-template-columns:260px 1fr;
+    gap:32px;
+    align-items:start;
 }
 
 /* LEFT MENU */
-.pNav {
-    padding-top: 8px;
+.pNav{ padding-top:8px; }
+
+.pNavTitle{
+    font-size:14px;
+    font-weight:700;
+    margin-bottom:12px;
+    color:#111827;
 }
 
-.pNavTitle {
-    font-size: 14px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    color: #111827;
+/* ✅ group headings */
+.pNavGroup{ margin-top:14px; }
+
+.pNavGroupTitle{
+    font-size:12px;
+    font-weight:700;
+    color:#6b7280;
+    margin:10px 0 6px;
+    letter-spacing:.2px;
 }
 
-.pNavItem {
-    width: 100%;
-    text-align: left;
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: none;
-    border: none;
-    font-size: 14px;
-    cursor: pointer;
-    color: #111827;
+/* items */
+.pNavItem{
+    width:100%;
+    text-align:left;
+    padding:10px 12px;
+    border-radius:8px;
+    background:none;
+    border:none;
+    font-size:14px;
+    cursor:pointer;
+    color:#111827;
+    display:flex;
+    align-items:center;
+    gap:10px;
 }
 
-.pNavItem:hover {
-    background: #eef2ff;
+.pNavItem:hover{ background:#eef2ff; }
+
+.pNavItem.active{
+    background:#e0e7ff;
+    color:#1d4ed8;
+    font-weight:600;
 }
 
-.pNavItem.active {
-    background: #e0e7ff;
-    color: #1d4ed8;
-    font-weight: 600;
-}
-
-.pNavItem:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+.pNavItem:disabled{
+    opacity:.4;
+    cursor:not-allowed;
 }
 
 /* RIGHT CONTENT */
-.pContent {
-    background: #fff;
-    padding: 24px 28px;
+.pContent{
+    background:#fff;
+    padding:24px 28px;
+    border-radius:12px; /* flat ama hafif yumuşak */
+    border:1px solid #e5e7eb;
+    min-width:0;
 }
+
+/* ✅ same-page panels */
+.pPanel{ display:none; }
+.pPanel.show{ display:block; }
 
 /* HEADER */
-.pTop {
-    margin-bottom: 24px;
+.pTop{ margin-bottom:24px; }
+
+.pTitle{
+    font-size:22px;
+    font-weight:700;
 }
 
-.pTitle {
-    font-size: 22px;
-    font-weight: 700;
-}
-
-.pSub {
-    font-size: 13px;
-    color: #6b7280;
-    margin-top: 4px;
+.pSub{
+    font-size:13px;
+    color:#6b7280;
+    margin-top:4px;
 }
 
 /* SECTIONS */
-.pBlock {
-    padding: 20px 0;
-    border-top: 1px solid #e5e7eb;
+.pBlock{
+    padding:20px 0;
+    border-top:1px solid #e5e7eb;
 }
 
-.pBlock:first-of-type {
-    border-top: none;
+.pBlock:first-of-type{ border-top:none; }
+
+/* (opsiyonel) head satırı varsa */
+.pBlockHead{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
 }
 
-.pBlockTitle {
-    font-size: 14px;
-    font-weight: 600;
+.pBlockTitle{
+    font-size:14px;
+    font-weight:600;
 }
 
-.pBlockHint {
-    font-size: 12px;
-    color: #6b7280;
-    margin-top: 2px;
+.pBlockHint{
+    font-size:12px;
+    color:#6b7280;
+    margin-top:2px;
 }
 
 /* AVATAR */
-.pAvatarRow {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-top: 14px;
+.pAvatarRow{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    margin-top:14px;
+    flex-wrap:wrap;
 }
 
-.pAvatar {
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    overflow: hidden;
-    background: #e5e7eb;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
+.pAvatar{
+    width:56px;
+    height:56px;
+    border-radius:50%;
+    overflow:hidden;
+    background:#e5e7eb;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    flex:0 0 auto;
 }
 
-.pAvatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+.pAvatar img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
 }
 
-.pAvatarTxt {
-    font-size: 18px;
-}
+.pAvatarTxt{ font-size:18px; }
 
-.pName {
-    font-weight: 600;
+.pAvatarActions{ min-width:0; }
+
+.pNameLine{ margin-bottom:10px; }
+.pName{
+    font-weight:600;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
 }
 
 /* BUTTONS */
-.btn {
-    padding: 8px 14px;
-    border-radius: 8px;
-    font-size: 13px;
-    border: 1px solid #d1d5db;
-    background: #fff;
-    cursor: pointer;
+.btn{
+    padding:8px 14px;
+    border-radius:8px;
+    font-size:13px;
+    border:1px solid #d1d5db;
+    background:#fff;
+    cursor:pointer;
 }
 
-.btn:hover {
-    background: #f9fafb;
-}
+.btn:hover{ background:#f9fafb; }
 
-.btn.primary {
-    background: #2563eb;
-    border-color: #2563eb;
-    color: #fff;
+.btn.primary{
+    background:#2563eb;
+    border-color:#2563eb;
+    color:#fff;
 }
+.btn.primary:hover{ background:#1d4ed8; }
 
-.btn.primary:hover {
-    background: #1d4ed8;
+.btn.ghost{ background:transparent; }
+
+.btn.danger{
+    border-color:#ef4444;
+    color:#ef4444;
 }
+.btn.danger:hover{ background:#fee2e2; }
 
-.btn.ghost {
-    background: transparent;
-}
-
-.btn.danger {
-    border-color: #ef4444;
-    color: #ef4444;
-}
-
-.btn.danger:hover {
-    background: #fee2e2;
+.pBtnRow{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
 }
 
 /* TEXTAREA & INPUT */
 .pTextarea,
-.pInput {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #d1d5db;
-    font-size: 14px;
-    margin-top: 10px;
+.pInput{
+    width:100%;
+    padding:10px 12px;
+    border-radius:8px;
+    border:1px solid #d1d5db;
+    font-size:14px;
+    margin-top:10px;
+    outline:none;
+    background:#fff;
 }
 
-.pTextarea {
-    resize: vertical;
-    min-height: 90px;
+.pTextarea:focus,
+.pInput:focus{
+    border-color:#93c5fd;
+    box-shadow:0 0 0 3px rgba(59,130,246,.15);
+}
+
+.pTextarea{
+    resize:vertical;
+    min-height:90px;
 }
 
 /* LINKS GRID */
-.pGrid2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-top: 12px;
+.pGrid2{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-top:12px;
 }
 
-.pLabel {
-    font-size: 12px;
-    color: #6b7280;
+.pField{ min-width:0; }
+
+.pLabel{
+    font-size:12px;
+    color:#6b7280;
 }
 
 /* ACTIONS */
-.pActions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 24px;
-    border-top: 1px solid #e5e7eb;
-    padding-top: 16px;
+.pActions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:24px;
+    border-top:1px solid #e5e7eb;
+    padding-top:16px;
+}
+
+/* MESSAGE AREA */
+.pMsg{
+    margin-top:12px;
+    font-size:13px;
+    color:#111827;
+}
+.pMsg.ok{ color:#166534; }
+.pMsg.err{ color:#b91c1c; }
+
+/* TOGGLES (for social/email tabs) */
+.pToggle{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 0;
+    font-size:14px;
+    color:#111827;
+}
+.pToggle input{ transform:scale(1.05); }
+
+/* NOTE / helper */
+.pNote{
+    margin-top:10px;
+    font-size:13px;
+    color:#6b7280;
+    line-height:1.4;
 }
 
 /* MOBILE */
-@media (max-width: 900px) {
-    .pShell {
-        grid-template-columns: 1fr;
-    }
+@media (max-width:900px){
+    .pShell{ grid-template-columns:1fr; }
+    .pGrid2{ grid-template-columns:1fr; }
+    .pContent{ padding:18px 16px; }
+}
 
-    .pGrid2 {
-        grid-template-columns: 1fr;
+/* ===============================
+   DELETE ACCOUNT CONFIRM MODAL
+=============================== */
+
+/* modal wrapper */
+.pModal{
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+}
+
+/* hidden state */
+.pModal[hidden]{
+    display: none !important;
+}
+
+/* dark background */
+.pModalBackdrop{
+    position: absolute;
+    inset: 0;
+    background: rgba(15,23,42,.45);
+    backdrop-filter: blur(2px);
+}
+
+/* modal card */
+.pModalCard{
+    position: relative;
+    width: min(520px, calc(100% - 32px));
+    margin: 14vh auto 0;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 20px 22px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 25px 80px rgba(0,0,0,.25);
+}
+
+/* title */
+.pModalTitle{
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 8px;
+}
+
+/* text */
+.pModalText{
+    font-size: 14px;
+    color: #475569;
+    line-height: 1.45;
+}
+
+/* buttons */
+.pModalBtns{
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 18px;
+}
+
+/* danger emphasis */
+.pModalBtns .btn.danger{
+    background: #ef4444;
+    border-color: #ef4444;
+    color: #fff;
+}
+.pModalBtns .btn.danger:hover{
+    background: #dc2626;
+}
+
+/* mobile fix */
+@media (max-width: 480px){
+    .pModalCard{
+        margin-top: 10vh;
+        padding: 18px 16px;
     }
 }
