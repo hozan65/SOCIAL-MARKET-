@@ -1,5 +1,5 @@
 // /news/news.js
-import { supabase } from "../services/supabase.js";
+import { supabase } from "../netlify/functions/supabase.js";
 
 /* =========================
    NEWS.JS (SUPABASE TABLE: news)

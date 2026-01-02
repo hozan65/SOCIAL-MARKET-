@@ -1,6 +1,6 @@
 // /textnews/textnews-list.js  (MODULE)
 
-import { supabase as sb } from "/services/supabase.js";
+import { supabase as sb } from "/netlify/functions/supabase.js";
 
 (() => {
     const list = document.getElementById("tnList");
