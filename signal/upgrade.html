@@ -6,84 +6,157 @@
     <title>Upgrade</title>
     <link rel="stylesheet" href="/signal/upgrade.css" />
 </head>
+
 <body class="is-page">
 
-<header class="topbarWrap">
-    <div class="topbar">
-        <div class="brand">Social Market</div>
-        <nav class="menu">
-            <a href="/feed/feed.html">Feed</a>
-            <a href="/post/post.html">Post</a>
-            <a class="active" href="/signal/signal.html">Signal</a>
-            <a href="/news/news.html">News</a>
-            <a href="/tools/tools.html">Tools</a>
-            <a href="/marketplace/marketplace.html">Market Place</a>
-        </nav>
-        <div class="rightSlot"></div>
-    </div>
-</header>
+<main class="uWrap">
 
-<main class="wrap">
-    <section class="page">
-        <div class="pageTop">
-            <button class="backBtn" id="backBtn" type="button">← Back</button>
-            <div class="pageTitle">
-                <h2>Upgrade your plan</h2>
-                <p>Choose the plan that fits you best.</p>
-            </div>
+    <!-- TOP -->
+    <header class="uTop">
+        <a class="uBack" href="/signal/signal.html">Back</a>
+
+        <div class="uTopCenter">
+            <h1 class="uTitle">Upgrade your plan</h1>
+            <p class="uSub">Pick the plan that matches your trading style.</p>
         </div>
 
-        <div class="pageBody">
-            <div class="planGrid">
-                <div class="planCard">
-                    <div class="planTop">
-                        <div class="planName">Free</div>
-                        <div class="planPrice">$0 <span>/ month</span></div>
-                    </div>
-                    <ul class="planList">
-                        <li>10 messages / day</li>
-                        <li>Basic finance assistant</li>
-                        <li>No live market data</li>
-                    </ul>
-                    <button class="planBtn ghost" type="button" data-plan="free">Current</button>
-                </div>
+        <div class="uTopRight"></div>
+    </header>
 
-                <div class="planCard popular">
-                    <div class="ribbon">POPULAR</div>
-                    <div class="planTop">
-                        <div class="planName">Normal</div>
-                        <div class="planPrice">$9.99 <span>/ month</span></div>
-                    </div>
-                    <ul class="planList">
-                        <li>100 messages / day</li>
-                        <li>Better answers (finance only)</li>
-                        <li>Crypto live data</li>
-                        <li>Basic forex / stocks data (provider)</li>
-                    </ul>
-                    <button class="planBtn" type="button" data-plan="normal">Buy now</button>
-                </div>
+    <!-- PLANS -->
+    <section class="uPlans">
 
-                <div class="planCard pro">
-                    <div class="ribbon gold">BEST VALUE</div>
-                    <div class="planTop">
-                        <div class="planName">Pro</div>
-                        <div class="planPrice">$19.99 <span>/ month</span></div>
-                    </div>
-                    <ul class="planList">
-                        <li>Unlimited messages</li>
-                        <li>Best answers (finance only)</li>
-                        <li>Crypto + Forex + Stocks live</li>
-                        <li>Priority support</li>
-                    </ul>
-                    <button class="planBtn" type="button" data-plan="pro">Buy now</button>
-                </div>
+        <!-- GO -->
+        <article class="uCard">
+            <div class="uCardHead">
+                <div class="uName">Go</div>
+                <div class="uBadge">Starter</div>
             </div>
 
-            <div class="pageFoot">Cancel anytime • Secure payment</div>
-        </div>
+            <div class="uPrice">
+                <div class="uAmount">$0</div>
+                <div class="uPer">/ month</div>
+            </div>
+
+            <div class="uLine"></div>
+
+            <!-- ✅ 3 features -->
+            <ul class="uList">
+                <li>10 messages / day</li>
+                <li>Basic market Q&A</li>
+                <li>Standard speed</li>
+            </ul>
+
+            <p class="uMini">
+                Best for trying the app before you upgrade.
+            </p>
+
+            <button class="uBtn isDisabled" disabled>Current</button>
+        </article>
+
+        <!-- PLUS -->
+        <article class="uCard isPopular">
+            <div class="uRibbon">POPULAR</div>
+
+            <div class="uCardHead">
+                <div class="uName">Plus</div>
+                <div class="uBadge">Best balance</div>
+            </div>
+
+            <div class="uPrice">
+                <div class="uAmount">$9.99</div>
+                <div class="uPer">/ month</div>
+            </div>
+
+            <div class="uLine"></div>
+
+            <!-- ✅ 7 features -->
+            <ul class="uList">
+                <li>100 messages / day</li>
+                <li>Live crypto prices</li>
+                <li>Clearer, longer answers</li>
+                <li>Better follow-up replies</li>
+                <li>Faster processing vs Go</li>
+                <li>More stable daily usage</li>
+                <li>Designed for daily traders</li>
+            </ul>
+
+            <p class="uMini">
+                Perfect for daily use — more freedom without overpaying.
+            </p>
+
+            <button class="uBtn" id="buyPlus">Buy Plus</button>
+        </article>
+
+        <!-- PRO -->
+        <article class="uCard isBest">
+            <div class="uRibbon isBestRibbon">BEST VALUE</div>
+
+            <div class="uCardHead">
+                <div class="uName">Pro</div>
+                <div class="uBadge">Power users</div>
+            </div>
+
+            <div class="uPrice">
+                <div class="uAmount">$19.99</div>
+                <div class="uPer">/ month</div>
+            </div>
+
+            <div class="uLine"></div>
+
+            <!-- ✅ 10 features -->
+            <ul class="uList">
+                <li>Unlimited messages</li>
+                <li>Live crypto + forex + stocks</li>
+                <li>Deeper trade reasoning</li>
+                <li>Extended explanations</li>
+                <li>Advanced scenario breakdowns</li>
+                <li>Priority processing</li>
+                <li>Priority support</li>
+                <li>Best overall response quality</li>
+                <li>Built for heavy daily usage</li>
+                <li>Complete experience (no limits)</li>
+            </ul>
+
+            <p class="uMini">
+                Full access for serious traders — no limits, maximum control.
+            </p>
+
+            <button class="uBtn" id="buyPro">Buy Pro</button>
+        </article>
+
     </section>
+
+    <!-- BELOW CARDS: SHORT INFO -->
+    <section class="uAbout">
+        <h2>Quick note</h2>
+        <p>
+            Your plan activates instantly after checkout. Cancel anytime — access stays active until the end of the billing period.
+        </p>
+    </section>
+
+    <!-- TEXT LINKS (ONLY HERE) -->
+    <footer class="uFooterLinks">
+        <a href="/support/index.html">Support</a>
+        <span class="dot">•</span>
+        <a href="/legal/privacy.html">Privacy Policy</a>
+        <span class="dot">•</span>
+        <a href="/legal/terms.html">Terms of Use</a>
+    </footer>
+
 </main>
 
-<script src="/signal/upgrade.js" defer></script>
+<script>
+    document.getElementById("buyPlus")?.addEventListener("click", () => {
+        console.log("Plus checkout");
+        // Paddle checkout later
+    });
+
+    document.getElementById("buyPro")?.addEventListener("click", () => {
+        console.log("Pro checkout");
+        // Paddle checkout later
+    });
+</script>
+
 </body>
 </html>
