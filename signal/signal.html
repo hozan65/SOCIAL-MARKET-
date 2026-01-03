@@ -1,20 +1,17 @@
-<!-- /signal/signal.html -->
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Signal</title>
-
     <link rel="stylesheet" href="/signal/signal.css" />
 </head>
 
 <body class="is-signal">
-<!-- TOP BAR -->
+
 <header class="topbarWrap">
     <div class="topbar">
         <div class="brand">Social Market</div>
-
         <nav class="menu">
             <a href="/feed/feed.html">Feed</a>
             <a href="/post/post.html">Post</a>
@@ -23,28 +20,22 @@
             <a href="/tools/tools.html">Tools</a>
             <a href="/marketplace/marketplace.html">Market Place</a>
         </nav>
-
         <div class="rightSlot"></div>
     </div>
 </header>
 
-<!-- MAIN GRID -->
 <main class="wrap">
     <section class="panel">
+
         <!-- LEFT -->
         <aside class="left">
             <div class="leftHeader">
-                <div class="leftTitle">Social Market</div>
-
                 <button class="btnNew" type="button">
-                    <span class="plus">+</span>
-                    New chat
+                    <span class="plus">+</span> New chat
                 </button>
-
                 <div class="searchWrap">
                     <input class="search" placeholder="Search chats" />
                 </div>
-
                 <div class="label">Your chats</div>
             </div>
 
@@ -52,30 +43,38 @@
 
             <div class="leftFooter">
                 <div class="profileCard">
-                    <div class="avatar">HB</div>
+                    <div class="avatar" id="pfAvatar">SM</div>
                     <div class="pMeta">
-                        <div class="pName">Hozan Bilaloglu</div>
-                        <div class="pPlan">free</div>
+                        <div class="pName" id="pfName">—</div>
+                        <div class="pEmail" id="pfEmail">—</div>
+
+                        <div class="pRow">
+                            <div class="pPlanBadge" id="pfPlan">free</div>
+                            <button class="btnSoft" id="btnProfile" type="button">Profile</button>
+                            <button class="btnUpgrade" id="btnUpgrade" type="button">Upgrade</button>
+                        </div>
                     </div>
                 </div>
             </div>
         </aside>
 
-        <!-- RIGHT -->
+        <!-- RIGHT (CHAT) -->
         <section class="right">
-            <div class="messages"></div>
+            <div class="messages" id="messages"></div>
 
             <div class="composerWrap">
                 <div class="composer">
-                    <button class="btnCircle" type="button">+</button>
-                    <input class="input" placeholder="Ask anything" />
-                    <button class="btnSend" type="button">▶</button>
+                    <button class="btnCircle" id="btnImage" type="button" title="Upload image">+</button>
+                    <input class="input" id="chatInput" placeholder="Ask anything" />
+                    <button class="btnSend" id="btnSend" type="button" aria-label="Send">▶</button>
                 </div>
             </div>
         </section>
+
     </section>
 
     <script src="/signal/signal.js" defer></script>
 </main>
+
 </body>
 </html>

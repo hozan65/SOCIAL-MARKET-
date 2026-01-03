@@ -1,4 +1,3 @@
-/* /signal/signal.css  (FULL - CHATGPT STYLE) */
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
 
@@ -15,7 +14,7 @@ html,body{height:100%}
     --primary:#4f82ff;
     --primarySoft:rgba(79,130,255,.12);
 
-    --r16:16px;
+    --r14:14px;
     --r22:22px;
     --r999:999px;
 
@@ -23,8 +22,7 @@ html,body{height:100%}
     --gap:18px;
     --leftW:340px;
 
-    /* chat typography */
-    --chatMax: 820px;
+    --chatMax:820px;
 }
 
 body.is-signal{
@@ -43,18 +41,17 @@ body.is-signal{
     border:1px solid rgba(0,0,0,.05);
     border-radius:var(--r22);
     box-shadow:var(--shadow);
-
     display:grid;
-    grid-template-columns: 220px 1fr 220px;
+    grid-template-columns:220px 1fr 220px;
     align-items:center;
     padding:0 22px;
 }
-.brand{font-weight:1000;font-size:22px;letter-spacing:.2px}
+.brand{font-weight:1000;font-size:22px}
 .menu{display:flex;justify-content:center;gap:34px}
 .menu a{
     text-decoration:none;color:var(--muted);
     font-weight:900;font-size:14px;
-    padding:10px 12px;border-radius:var(--r999);
+    padding:10px 12px;border-radius:999px;
 }
 .menu a:hover{background:rgba(79,130,255,.08);color:#284275}
 .menu a.active{color:#284275;background:rgba(79,130,255,.10)}
@@ -66,7 +63,7 @@ body.is-signal{
     max-width:var(--container);
     margin:18px auto 0;
     display:grid;
-    grid-template-columns: var(--leftW) 1fr;
+    grid-template-columns:var(--leftW) 1fr;
     gap:var(--gap);
 }
 
@@ -85,11 +82,10 @@ body.is-signal{
     border-bottom:1px solid var(--line);
     background:linear-gradient(180deg,#ffffff,#f8fbff);
 }
-.leftTitle{font-weight:1000;font-size:18px;margin-bottom:14px}
 .btnNew{
     width:100%;
     display:flex;align-items:center;justify-content:center;gap:8px;
-    padding:14px 14px;border-radius:14px;
+    padding:14px;border-radius:var(--r14);
     border:1px solid rgba(79,130,255,.22);
     background:var(--primarySoft);
     color:#2f57d8;
@@ -105,37 +101,59 @@ body.is-signal{
 .searchWrap{margin-top:12px}
 .search{
     width:100%;
-    padding:14px 14px;
-    border-radius:14px;
+    padding:14px;
+    border-radius:var(--r14);
     border:1px solid var(--line);
-    outline:none;
-    background:#fff;
-    font-weight:900;
-    color:var(--text);
+    outline:none;background:#fff;
+    font-weight:900;color:var(--text);
 }
 .search::placeholder{color:var(--muted)}
 .label{margin-top:12px;font-size:12px;font-weight:1000;color:var(--muted)}
 .chatList{flex:1;padding:14px 18px}
 
+/* LEFT FOOTER */
 .leftFooter{
     padding:14px;border-top:1px solid var(--line);
     background:linear-gradient(180deg,#f8fbff,#ffffff);
 }
 .profileCard{
-    display:flex;align-items:center;gap:12px;
+    display:flex;gap:12px;align-items:flex-start;
     padding:12px;border-radius:14px;
     background:var(--soft);
     border:1px solid var(--line);
 }
 .avatar{
-    width:40px;height:40px;border-radius:var(--r999);
+    width:40px;height:40px;border-radius:999px;
     background:rgba(79,130,255,.20);
     color:#2f57d8;display:grid;place-items:center;font-weight:1000;
 }
-.pName{font-weight:1000;font-size:14px}
-.pPlan{font-weight:900;font-size:12px;color:var(--muted);margin-top:2px}
+.pMeta{flex:1;min-width:0}
+.pName{font-weight:1000;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pEmail{font-weight:800;font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pRow{display:flex;align-items:center;gap:10px;margin-top:10px}
+.pPlanBadge{
+    font-weight:1000;font-size:11px;
+    padding:6px 10px;border-radius:999px;
+    border:1px solid rgba(79,130,255,.22);
+    background:#fff;text-transform:lowercase;
+}
+.btnSoft{
+    padding:8px 12px;border-radius:999px;
+    border:1px solid rgba(79,130,255,.22);
+    background:#fff;color:#284275;
+    font-weight:1000;cursor:pointer;
+}
+.btnSoft:hover{background:rgba(79,130,255,.08)}
+.btnUpgrade{
+    margin-left:auto;
+    padding:8px 12px;border-radius:999px;
+    border:1px solid rgba(79,130,255,.22);
+    background:rgba(79,130,255,.14);
+    color:#2f57d8;font-weight:1000;cursor:pointer;
+}
+.btnUpgrade:hover{background:rgba(79,130,255,.20)}
 
-/* RIGHT */
+/* RIGHT (CHAT) */
 .right{
     background:var(--panel);
     border:1px solid var(--line);
@@ -143,99 +161,30 @@ body.is-signal{
     box-shadow:var(--shadow);
     overflow:hidden;
     min-height:calc(100vh - 170px);
-    display:flex;flex-direction:column;
+    display:flex;
+    flex-direction:column;
 }
 
-/* ✅ CHAT AREA: scroll fixed */
 .messages{
     flex:1;
     background:#fff;
-    overflow:auto;              /* IMPORTANT */
+    overflow:auto;
     padding:18px 18px 8px;
 }
-
-/* --- CHATGPT-like rows (no bubble) --- */
 .msg{
     width:100%;
     padding:14px 0;
-    border-bottom:1px solid rgba(20,35,70,.06); /* hafif çizgi */
+    border-bottom:1px solid rgba(20,35,70,.06);
 }
-
-/* last one no border */
-.messages .msg:last-child{border-bottom:none}
-
-/* inner content centered like ChatGPT */
 .msgInner{
     max-width:var(--chatMax);
     margin:0 auto;
-    padding:0;                 /* no box */
-    background:transparent;     /* no box */
-    border:none;               /* no box */
-    border-radius:0;
-    box-shadow:none;
-    line-height:1.55;
+    line-height:1.6;
     font-size:15px;
     color:var(--text);
-    white-space:normal;
     word-break:break-word;
 }
 
-/* subtle difference for user vs ai (no box, only slight color) */
-.msg.user .msgInner{color:#17305c}
-.msg.ai .msgInner{color:#0b1b3a}
-
-/* typing row */
-.msg.typing .msgInner{color:var(--muted);font-weight:900}
-
-/* typing dots */
-.dot{
-    display:inline-block;
-    width:4px;height:4px;border-radius:999px;
-    background:currentColor;
-    margin-left:6px;
-    opacity:.35;
-    animation: blink 1s infinite;
-}
-.dot:nth-child(2){animation-delay:.15s}
-.dot:nth-child(3){animation-delay:.30s}
-@keyframes blink{0%,100%{opacity:.2}50%{opacity:.8}}
-
-/* Markdown styles */
-.msgInner h1{font-size:20px;margin:10px 0 6px;font-weight:1000}
-.msgInner h2{font-size:18px;margin:10px 0 6px;font-weight:1000}
-.msgInner h3{font-size:16px;margin:10px 0 6px;font-weight:1000}
-.msgInner p{margin:8px 0}
-.msgInner ul{margin:8px 0 8px 20px}
-.msgInner li{margin:4px 0}
-.msgInner blockquote{
-    margin:10px 0;
-    padding:10px 12px;
-    border-left:3px solid rgba(79,130,255,.35);
-    background:rgba(79,130,255,.06);
-    border-radius:12px;
-    color:#213a6a;
-}
-.msgInner code{
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    background:rgba(0,0,0,.05);
-    padding:2px 6px;
-    border-radius:8px;
-    font-size:13px;
-}
-.msgInner pre{
-    margin:10px 0;
-    padding:12px 14px;
-    border-radius:14px;
-    background:rgba(0,0,0,.04);
-    overflow:auto;
-}
-.msgInner pre code{
-    background:transparent;
-    padding:0;
-    border-radius:0;
-}
-
-/* Composer */
 .composerWrap{
     border-top:1px solid var(--line);
     background:linear-gradient(180deg,#ffffff,#f8fbff);
@@ -248,30 +197,24 @@ body.is-signal{
     border:1px solid rgba(79,130,255,.22);
 }
 .btnCircle{
-    width:42px;height:42px;border-radius:var(--r999);
+    width:42px;height:42px;border-radius:999px;
     border:1px solid rgba(79,130,255,.22);
-    background:#fff;cursor:pointer;
-    font-weight:1000;color:var(--text);
+    background:#fff;cursor:pointer;font-weight:1000;
 }
-.btnCircle:hover{background:rgba(79,130,255,.10)}
 .input{
     flex:1;border:none;outline:none;background:transparent;
     font-size:15px;font-weight:900;color:var(--text);
 }
 .input::placeholder{color:var(--muted)}
 .btnSend{
-    width:46px;height:46px;border-radius:var(--r999);
+    width:46px;height:46px;border-radius:999px;
     border:none;background:var(--primary);color:#fff;
     cursor:pointer;font-weight:1000;
 }
 .btnSend:hover{background:#3f73ff}
 
-/* Responsive */
-@media (max-width: 1000px){
-    .topbar{grid-template-columns: 1fr}
+@media (max-width:1000px){
+    .topbar{grid-template-columns:1fr}
     .menu{display:none}
     .panel{grid-template-columns:1fr}
-    .left{min-height:auto}
-    .right{min-height:60vh}
-    .msgInner{max-width:100%}
 }

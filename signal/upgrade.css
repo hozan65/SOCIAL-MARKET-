@@ -1,0 +1,120 @@
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+
+:root{
+    --bg:#eef5ff;
+    --panel:#ffffff;
+    --line:rgba(90,130,255,.14);
+    --shadow:0 14px 34px rgba(70,110,230,.12);
+    --text:#0b1b3a;
+    --muted:#6a7896;
+    --primary:#4f82ff;
+    --r22:22px;
+    --container:1180px;
+}
+
+body.is-page{
+    background:var(--bg);
+    color:var(--text);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+/* topbar */
+.topbarWrap{width:100%;padding:18px 18px 0}
+.topbar{
+    max-width:var(--container);
+    margin:0 auto;
+    height:74px;
+    background:var(--panel);
+    border:1px solid rgba(0,0,0,.05);
+    border-radius:var(--r22);
+    box-shadow:var(--shadow);
+    display:grid;
+    grid-template-columns:220px 1fr 220px;
+    align-items:center;
+    padding:0 22px;
+}
+.brand{font-weight:1000;font-size:22px}
+.menu{display:flex;justify-content:center;gap:34px}
+.menu a{
+    text-decoration:none;color:var(--muted);
+    font-weight:900;font-size:14px;
+    padding:10px 12px;border-radius:999px;
+}
+.menu a:hover{background:rgba(79,130,255,.08);color:#284275}
+.menu a.active{color:#284275;background:rgba(79,130,255,.10)}
+.rightSlot{height:1px}
+
+.wrap{padding:18px}
+.page{
+    max-width:var(--container);
+    margin:18px auto 0;
+    background:#fff;
+    border:1px solid rgba(20,35,70,.06);
+    border-radius:var(--r22);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+}
+
+.pageTop{
+    background:linear-gradient(180deg, rgba(79,130,255,.12), rgba(255,255,255,.95));
+    border-bottom:1px solid rgba(20,35,70,.06);
+    padding:22px 22px 14px;
+    display:flex;gap:14px;align-items:flex-start;
+}
+.backBtn{
+    padding:10px 12px;border-radius:999px;
+    border:1px solid rgba(79,130,255,.22);
+    background:#fff;cursor:pointer;font-weight:1100;
+}
+.pageTitle h2{font-size:22px;font-weight:1200}
+.pageTitle p{margin-top:6px;color:var(--muted);font-weight:900}
+
+.pageBody{padding:16px 22px 22px}
+.pageFoot{margin-top:14px;color:var(--muted);font-weight:900;font-size:12px}
+
+/* plans */
+.planGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.planCard{
+    background:#fff;
+    border:1px solid rgba(90,130,255,.18);
+    border-radius:18px;
+    padding:16px;
+    position:relative;
+    overflow:hidden;
+}
+.planCard.popular{border:1px solid rgba(79,130,255,.35)}
+.planCard.pro{border:1px solid rgba(255,196,60,.45)}
+.ribbon{
+    position:absolute;top:12px;right:-42px;
+    transform:rotate(35deg);
+    background:rgba(79,130,255,.95);
+    color:#fff;
+    font-weight:1100;
+    font-size:11px;
+    padding:6px 52px;
+}
+.ribbon.gold{background:rgba(255,185,40,.95);color:#3a2a00}
+.planTop{padding-bottom:10px;border-bottom:1px solid rgba(20,35,70,.06)}
+.planName{font-weight:1100;font-size:16px}
+.planPrice{margin-top:10px;font-weight:1200;font-size:26px}
+.planPrice span{font-size:12px;font-weight:900;color:var(--muted)}
+.planList{margin-top:12px;padding-left:18px}
+.planList li{margin:8px 0;font-weight:800;font-size:13px;color:#1b2e55}
+.planBtn{
+    width:100%;margin-top:14px;
+    padding:12px 14px;border-radius:14px;
+    border:none;background:var(--primary);
+    color:#fff;font-weight:1100;cursor:pointer;
+}
+.planBtn.ghost{
+    background:rgba(0,0,0,.06);
+    color:#20325a;
+    border:1px solid rgba(0,0,0,.08);
+}
+
+@media (max-width:1000px){
+    .topbar{grid-template-columns:1fr}
+    .menu{display:none}
+    .planGrid{grid-template-columns:1fr}
+}
