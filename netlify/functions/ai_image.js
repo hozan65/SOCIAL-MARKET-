@@ -12,6 +12,7 @@
 
 import { sbAdmin } from "./supabase.js";
 
+
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "content-type, x-user-id, authorization",
