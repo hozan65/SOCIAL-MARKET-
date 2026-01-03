@@ -1,49 +1,67 @@
+/* /signal/signal.css (FULL) */
+
+/* =========================
+   RESET + ROOT
+========================= */
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
 
 :root{
-    --bg:#f6f7f8;
+    --bg:#eef5ff;
     --panel:#ffffff;
-    --line:rgba(0,0,0,.08);
-    --text:#0b0f14;
-    --muted:#6b7280;
+    --soft:#f3f7ff;
+    --line:rgba(20,35,70,.10);
+    --shadow:0 14px 34px rgba(70,110,230,.12);
+
+    --text:#0b1b3a;
+    --muted:#6a7896;
+
+    --primary:#111;            /* 👈 siyah-beyaz */
+    --primarySoft:rgba(0,0,0,.06);
 
     --r14:14px;
     --r18:18px;
     --r22:22px;
+    --r999:999px;
 
     --container:1180px;
-    --gap:16px;
+    --gap:18px;
     --leftW:340px;
-    --chatMax:820px;
 
-    --shadow: 0 14px 30px rgba(0,0,0,.06);
+    --chatMax:860px;
 }
 
-/* Page */
+/* =========================
+   PAGE (SCROLL FIX)
+   ✅ sayfa uzamaz, sadece chat içi scroll
+========================= */
 body.is-signal{
+    height:100vh;
+    overflow:hidden;                 /* ✅ sayfa scroll kapalı */
     background:var(--bg);
     color:var(--text);
     font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
 }
 
-/* If sidebar adds padding via body.hasSidebar, respect it */
 .wrap{
+    height:100vh;                    /* ✅ sabit viewport */
+    overflow:hidden;
     padding:18px;
 }
 
-/* Layout */
 .panel{
     max-width:var(--container);
     margin:0 auto;
+    height:calc(100vh - 36px);       /* wrap padding (18+18) */
+    overflow:hidden;                 /* ✅ panel taşmasın */
     display:grid;
     grid-template-columns:var(--leftW) 1fr;
     gap:var(--gap);
-    /* ✅ Full height minus page padding */
-    min-height: calc(100vh - 36px);
 }
 
-/* LEFT */
+/* =========================
+   LEFT
+========================= */
 .left{
     background:var(--panel);
     border:1px solid var(--line);
@@ -52,209 +70,237 @@ body.is-signal{
     display:flex;
     flex-direction:column;
     overflow:hidden;
-    min-height: calc(100vh - 36px);
+    height:100%;
+    min-height:0;                    /* ✅ scroll fix */
 }
 
 .leftHeader{
-    padding:16px;
+    padding:18px 18px 12px;
     border-bottom:1px solid var(--line);
-    background:#fff;
+    background:linear-gradient(180deg,#ffffff,#f8fbff);
 }
 
 .btnNew{
     width:100%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:8px;
-    padding:12px;
-    border-radius:var(--r14);
-    border:1px solid var(--line);
-    background:#fff;
-    color:var(--text);
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    padding:14px;border-radius:var(--r14);
+    border:1px solid rgba(0,0,0,.14);
+    background:var(--primarySoft);
+    color:var(--primary);
     font-weight:900;
     cursor:pointer;
 }
-.btnNew:hover{ background:rgba(0,0,0,.03); }
-
+.btnNew:hover{background:rgba(0,0,0,.08)}
 .plus{
-    width:18px;height:18px;
-    display:grid;place-items:center;
-    border-radius:6px;
-    border:1px solid var(--line);
-    font-weight:1000;
+    width:18px;height:18px;display:grid;place-items:center;
+    border-radius:6px;background:#fff;
+    border:1px solid rgba(0,0,0,.14);
+    font-weight:900;
 }
 
-.searchWrap{margin-top:10px}
+.searchWrap{margin-top:12px}
 .search{
     width:100%;
-    padding:12px 12px;
+    padding:14px;
     border-radius:var(--r14);
     border:1px solid var(--line);
-    outline:none;
-    background:#fff;
-    font-weight:800;
-    color:var(--text);
+    outline:none;background:#fff;
+    font-weight:800;color:var(--text);
 }
 .search::placeholder{color:var(--muted)}
 
 .label{
-    margin-top:10px;
+    margin-top:12px;
     font-size:12px;
-    font-weight:1000;
-    color:var(--muted)
+    font-weight:900;
+    color:var(--muted);
 }
 
+/* ✅ sol liste kendi içinde scroll */
 .chatList{
     flex:1;
+    min-height:0;         /* ✅ important */
+    overflow:auto;        /* ✅ */
     padding:12px 10px;
-    overflow:auto;
 }
 
-/* Chat list items */
+/* chat items */
 .chatItem{
     width:100%;
     text-align:left;
-    border:0;
+    border:1px solid transparent;
     background:transparent;
-    padding:10px 12px;
-    border-radius:12px;
+    padding:12px 12px;
+    border-radius:14px;
     cursor:pointer;
 }
 .chatItem:hover{ background: rgba(0,0,0,.04); }
-.chatItem.active{ background: rgba(0,0,0,.07); }
-
-.chatTitle{ font-weight:900; font-size:13px; color:var(--text); }
-.chatMeta{ font-size:11px; color:var(--muted); margin-top:2px; }
-
-/* Footer card */
-.leftFooter{
-    padding:12px;
-    border-top:1px solid var(--line);
-    background:#fff;
+.chatItem.active{
+    background: rgba(0,0,0,.06);
+    border-color: rgba(0,0,0,.10);
 }
+.chatTitle{ font-weight:900; font-size:13px; color:var(--text); }
+.chatMeta{ font-size:11px; color:var(--muted); margin-top:4px; }
 
+/* footer profile card */
+.leftFooter{
+    padding:14px;
+    border-top:1px solid var(--line);
+    background:linear-gradient(180deg,#f8fbff,#ffffff);
+}
 .profileCard{
     display:flex;
     gap:12px;
     align-items:flex-start;
     padding:12px;
     border-radius:14px;
+    background:var(--soft);
     border:1px solid var(--line);
-    background:#fafafa;
 }
-
 .avatar{
     width:40px;height:40px;border-radius:999px;
-    background:#111827;
-    color:#fff;
+    background:rgba(0,0,0,.08);
+    color:#111;
     display:grid;place-items:center;
-    font-weight:1000;
-    flex:0 0 auto;
+    font-weight:900;
 }
-
 .pMeta{flex:1;min-width:0}
-.pName{
-    font-weight:1000;font-size:14px;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
-}
-.pEmail{
-    margin-top:2px;
-    font-weight:800;font-size:12px;
-    color:var(--muted);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
-}
-.pRow{ display:flex; align-items:center; gap:10px; margin-top:10px; }
-
+.pName{font-weight:900;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pEmail{font-weight:700;font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pRow{display:flex;align-items:center;gap:10px;margin-top:10px}
 .pPlanBadge{
-    font-weight:1000;font-size:11px;
+    font-weight:900;font-size:11px;
     padding:6px 10px;border-radius:999px;
-    border:1px solid var(--line);
+    border:1px solid rgba(0,0,0,.14);
     background:#fff;
     text-transform:lowercase;
 }
-
-.btnSoft, .btnUpgrade{
-    padding:8px 12px;
-    border-radius:999px;
-    border:1px solid var(--line);
-    background:#fff;
-    color:var(--text);
-    font-weight:1000;
-    cursor:pointer;
+.btnSoft{
+    padding:8px 12px;border-radius:999px;
+    border:1px solid rgba(0,0,0,.14);
+    background:#fff;color:#111;
+    font-weight:900;cursor:pointer;
 }
-.btnSoft:hover,.btnUpgrade:hover{ background:rgba(0,0,0,.04); }
-.btnUpgrade{ margin-left:auto; }
+.btnSoft:hover{background:rgba(0,0,0,.06)}
+.btnUpgrade{
+    margin-left:auto;
+    padding:8px 12px;border-radius:999px;
+    border:1px solid rgba(0,0,0,.14);
+    background:rgba(0,0,0,.08);
+    color:#111;
+    font-weight:900;cursor:pointer;
+}
+.btnUpgrade:hover{background:rgba(0,0,0,.10)}
 
-/* RIGHT (CHAT) */
+/* =========================
+   RIGHT (CHAT)
+========================= */
 .right{
     background:var(--panel);
     border:1px solid var(--line);
     border-radius:var(--r22);
     box-shadow:var(--shadow);
     overflow:hidden;
-    min-height: calc(100vh - 36px);
+    height:100%;
+    min-height:0;                    /* ✅ important */
     display:flex;
     flex-direction:column;
 }
 
-/* ✅ ChatGPT-like scroll area */
+/* ✅ chat scroll container */
 .messages{
     flex:1;
-    background:#fff;
-    overflow:auto;              /* ✅ scroll burada */
+    min-height:0;                    /* ✅ important */
+    overflow:auto;                   /* ✅ scroll burada */
     padding:18px 18px 8px;
+    background:#fff;
 }
 
-/* Message rows */
-.msg{
-    border-bottom:1px solid rgba(0,0,0,.06);  /* ✅ soft çizgi */
+/* system line */
+.sysMsg{
+    opacity:.75;
+    padding:10px 0;
+    font-weight:700;
+    color:var(--muted);
+}
+
+/* =========================
+   MESSAGE STYLE (ChatGPT-like)
+   - arada soft çizgi
+   - you/ai başlığı
+========================= */
+.msgRow{
+    width:100%;
     padding:14px 0;
+    border-bottom:1px solid rgba(20,35,70,.06); /* soft çizgi */
 }
 
-.msgInner{
+.msgRow .msgBubble{
     max-width:var(--chatMax);
     margin:0 auto;
+    white-space:pre-wrap;
     line-height:1.65;
     font-size:15px;
     color:var(--text);
     word-break:break-word;
-    white-space:pre-wrap;
 }
 
-/* user / assistant look */
-.msg.user .msgInner{
-    background:#f3f4f6;
-    border:1px solid rgba(0,0,0,.06);
-    border-radius:16px;
-    padding:12px 14px;
-}
-.msg.assistant .msgInner{
-    background:#fff;
+.msgRow.user .msgBubble::before{
+    content:"You";
+    display:block;
+    font-size:12px;
+    font-weight:900;
+    color:var(--muted);
+    margin-bottom:6px;
+    text-transform:none;
 }
 
-/* Composer pinned bottom */
+.msgRow.assistant .msgBubble::before{
+    content:"AI";
+    display:block;
+    font-size:12px;
+    font-weight:900;
+    color:var(--muted);
+    margin-bottom:6px;
+}
+
+/* user mesajı biraz daha koyu */
+.msgRow.user .msgBubble{
+    color:#0b1b3a;
+}
+
+/* assistant mesajı normal */
+.msgRow.assistant .msgBubble{
+    color:#0b1b3a;
+}
+
+/* =========================
+   COMPOSER (alt sabit)
+========================= */
 .composerWrap{
+    flex:0 0 auto;
     border-top:1px solid var(--line);
-    background:#fff;
-    padding:14px;
+    background:linear-gradient(180deg,#ffffff,#f8fbff);
+    padding:16px;
 }
 
 .composer{
-    display:flex;align-items:center;gap:10px;
-    padding:12px;
-    border-radius:16px;
-    border:1px solid var(--line);
-    background:#fafafa;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 12px;
+    border-radius:18px;
+    background:var(--soft);
+    border:1px solid rgba(0,0,0,.14);
 }
 
 .btnCircle{
-    width:40px;height:40px;border-radius:999px;
-    border:1px solid var(--line);
+    width:42px;height:42px;border-radius:999px;
+    border:1px solid rgba(0,0,0,.14);
     background:#fff;
     cursor:pointer;
-    font-weight:1000;
-    color:var(--text);
+    font-weight:900;
+    color:#111;
 }
 
 .input{
@@ -266,34 +312,59 @@ body.is-signal{
     font-weight:800;
     color:var(--text);
 }
-.input::placeholder{ color:var(--muted); }
+.input::placeholder{color:var(--muted)}
 
 .btnSend{
-    width:44px;height:44px;border-radius:999px;
-    border:1px solid var(--line);
-    background:#111827; /* ✅ siyah */
+    width:46px;height:46px;border-radius:999px;
+    border:none;
+    background:#111;         /* siyah */
     color:#fff;
     cursor:pointer;
-    font-weight:1000;
+    font-weight:900;
 }
-.btnSend:hover{ filter:brightness(0.95); }
+.btnSend:hover{opacity:.9}
 
-/* System messages */
-.sysMsg{
-    max-width:var(--chatMax);
-    margin:10px auto;
-    padding:10px 12px;
-    border:1px dashed rgba(0,0,0,.15);
-    border-radius:12px;
-    color:var(--muted);
-    background:#fafafa;
+/* =========================
+   SCROLLBAR (ince, gizli gibi)
+========================= */
+.messages::-webkit-scrollbar,
+.chatList::-webkit-scrollbar{
+    width:10px;
+}
+.messages::-webkit-scrollbar-thumb,
+.chatList::-webkit-scrollbar-thumb{
+    background:rgba(0,0,0,.12);
+    border-radius:999px;
+    border:3px solid transparent;
+    background-clip:content-box;
+}
+.messages::-webkit-scrollbar-track,
+.chatList::-webkit-scrollbar-track{
+    background:transparent;
 }
 
-/* Mobile */
-@media (max-width: 980px){
-    .panel{ grid-template-columns: 1fr; }
-    .left{ min-height:auto; }
-    .right{ min-height: calc(100vh - 36px); }
-    .messages{ padding:14px; }
+/* =========================
+   MOBILE
+========================= */
+@media (max-width: 1000px){
+    .panel{
+        grid-template-columns:1fr;
+        height:calc(100vh - 36px);
+    }
+    .left{
+        height:42vh;                  /* üstte chat list */
+    }
+    .right{
+        height:calc(58vh - var(--gap));
+    }
+}
+
+@media (max-width: 520px){
+    .wrap{ padding:12px; }
+    .panel{ height:calc(100vh - 24px); gap:12px; }
+    .leftHeader{ padding:14px 14px 10px; }
+    .messages{ padding:14px 14px 8px; }
     .composerWrap{ padding:12px; }
+    .composer{ padding:10px; }
+    .btnSend{ width:44px; height:44px; }
 }
