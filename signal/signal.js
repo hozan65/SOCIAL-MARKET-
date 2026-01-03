@@ -1,4 +1,4 @@
-// /signal/signal.js (FULL) - works with your HTML
+// /signal/signal.js (FULL) - stable sessions (uuid) + loads old messages
 (() => {
     console.log("✅ signal.js loaded");
 
@@ -28,7 +28,7 @@
         return;
     }
 
-    // optional profile bits (if you store them)
+    // profile bits (opsiyonel)
     const fullName = localStorage.getItem("sm_name") || "—";
     const email = localStorage.getItem("sm_email") || "—";
     const plan = localStorage.getItem("sm_plan") || localStorage.getItem("plan") || "free";
@@ -39,12 +39,18 @@
     if ($btnProfile) $btnProfile.onclick = () => (location.href = "/u/index.html");
     if ($btnUpgrade) $btnUpgrade.onclick = () => (location.href = "/u/index.html#upgrade");
 
+    // ✅ Session (sid) must be uuid because Supabase column is sid uuid
     const SESSION_KEY = `signal_session_${uid}`;
     let sessionId = localStorage.getItem(SESSION_KEY);
+
     if (!sessionId) {
-        sessionId = `sig_${uid}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        // requires secure context (https). chriontoken.com is https so ok.
+        sessionId = crypto.randomUUID();
         localStorage.setItem(SESSION_KEY, sessionId);
     }
+
+    console.log("🧩 uid:", uid);
+    console.log("🧩 session_id(uuid):", sessionId);
 
     const esc = (s) =>
         String(s ?? "")
@@ -57,10 +63,7 @@
     function addMsg(role, text) {
         const row = document.createElement("div");
         row.className = `msgRow ${role}`;
-
-        row.innerHTML = `
-      <div class="msgBubble">${esc(text)}</div>
-    `;
+        row.innerHTML = `<div class="msgBubble">${esc(text)}</div>`;
         $messages.appendChild(row);
         $messages.scrollTop = $messages.scrollHeight;
         return row;
@@ -133,7 +136,8 @@
 
             if (!r.ok) {
                 console.error("❌ sendMessage", r.status, data || t);
-                typingRow.querySelector(".msgBubble").textContent = `Hata: ${data?.error || "send failed"}`;
+                typingRow.querySelector(".msgBubble").textContent =
+                    `Hata: ${data?.error || "send failed"}`;
                 return;
             }
 
@@ -144,7 +148,6 @@
         }
     }
 
-    // events
     $send.addEventListener("click", sendMessage);
     $input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -153,13 +156,11 @@
         }
     });
 
-    // initial
     loadMessages();
 
-    // payment success hint (optional)
+    // pay=success temizle (opsiyonel)
     const pay = new URLSearchParams(location.search).get("pay");
     if (pay === "success") {
-        console.log("✅ payment success on signal");
         history.replaceState({}, "", location.pathname);
     }
 })();
