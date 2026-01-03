@@ -1,225 +1,165 @@
-// /signal/signal.js (AI CONNECTED - FULL)
+// /signal/signal.js (FULL) - works with your HTML
 (() => {
-    const $ = (q) => document.querySelector(q);
+    console.log("✅ signal.js loaded");
 
-    const FN_AI = "/.netlify/functions/ai_chat"; // gerekirse ai_support yap
+    const FN_GET = "/.netlify/functions/ai_get_messages";
+    const FN_SEND = "/.netlify/functions/ai_send_message";
 
-    const el = {
-        btnUpgrade: $("#btnUpgrade"),
-        btnProfile: $("#btnProfile"),
+    const $messages = document.getElementById("messages");
+    const $input = document.getElementById("chatInput");
+    const $send = document.getElementById("btnSend");
 
-        pfAvatar: $("#pfAvatar"),
-        pfName: $("#pfName"),
-        pfEmail: $("#pfEmail"),
-        pfPlan: $("#pfPlan"),
+    const $pfName = document.getElementById("pfName");
+    const $pfEmail = document.getElementById("pfEmail");
+    const $pfPlan = document.getElementById("pfPlan");
+    const $btnProfile = document.getElementById("btnProfile");
+    const $btnUpgrade = document.getElementById("btnUpgrade");
 
-        messages: $("#messages"),
-        input: $("#chatInput"),
-        send: $("#btnSend"),
-        btnImage: $("#btnImage"),
-        newChat: document.querySelector(".btnNew"),
-    };
-
-    // ---------- helpers ----------
-    const esc = (s = "") =>
-        String(s).replace(/[&<>"']/g, (c) => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;",
-        }[c]));
-
-    function getSid() {
-        let sid = localStorage.getItem("ai_sid");
-        if (!sid) {
-            sid = crypto.randomUUID();
-            localStorage.setItem("ai_sid", sid);
-        }
-        return sid;
+    if (!$messages || !$input || !$send) {
+        console.warn("❌ Missing required elements: #messages #chatInput #btnSend");
+        return;
     }
 
-    function getUserId() {
-        // senin sistemde sm_uid varsa onu kullan
-        return localStorage.getItem("sm_uid") || "demo_user";
+    const uid = (localStorage.getItem("sm_uid") || "").trim();
+    if (!uid) {
+        $messages.innerHTML = `<div class="sysMsg">Giriş bulunamadı (sm_uid yok). Lütfen giriş yap.</div>`;
+        $input.disabled = true;
+        $send.disabled = true;
+        return;
     }
 
-    function initProfile() {
-        const name = (localStorage.getItem("sm_name") || "Hozan").trim();
-        const surname = (localStorage.getItem("sm_surname") || "Bilaloglu").trim();
-        const email = (localStorage.getItem("sm_email") || "—").trim();
-        const plan = (localStorage.getItem("sm_plan") || "free").toLowerCase();
+    // optional profile bits (if you store them)
+    const fullName = localStorage.getItem("sm_name") || "—";
+    const email = localStorage.getItem("sm_email") || "—";
+    const plan = localStorage.getItem("sm_plan") || localStorage.getItem("plan") || "free";
+    if ($pfName) $pfName.textContent = fullName;
+    if ($pfEmail) $pfEmail.textContent = email;
+    if ($pfPlan) $pfPlan.textContent = plan;
 
-        el.pfName.textContent = `${name} ${surname}`.trim();
-        el.pfEmail.textContent = email;
-        el.pfPlan.textContent = plan;
-        el.pfAvatar.textContent = `${(name[0] || "S")}${(surname[0] || "M")}`.toUpperCase();
+    if ($btnProfile) $btnProfile.onclick = () => (location.href = "/u/index.html");
+    if ($btnUpgrade) $btnUpgrade.onclick = () => (location.href = "/u/index.html#upgrade");
+
+    const SESSION_KEY = `signal_session_${uid}`;
+    let sessionId = localStorage.getItem(SESSION_KEY);
+    if (!sessionId) {
+        sessionId = `sig_${uid}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        localStorage.setItem(SESSION_KEY, sessionId);
     }
 
-    function addRow(role, text) {
+    const esc = (s) =>
+        String(s ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+
+    function addMsg(role, text) {
         const row = document.createElement("div");
-        row.className = `msg ${role}`;
-        row.innerHTML = `<div class="msgInner">${esc(text)}</div>`;
-        el.messages.appendChild(row);
-        el.messages.scrollTop = el.messages.scrollHeight;
+        row.className = `msgRow ${role}`;
+
+        row.innerHTML = `
+      <div class="msgBubble">${esc(text)}</div>
+    `;
+        $messages.appendChild(row);
+        $messages.scrollTop = $messages.scrollHeight;
         return row;
     }
 
-    // typing row
-    let typingRow = null;
-    function showTyping() {
-        if (typingRow) return;
-        typingRow = addRow("ai", "Answering...");
-    }
-    function hideTyping() {
-        typingRow?.remove();
-        typingRow = null;
+    function setBusy(isBusy) {
+        $input.disabled = isBusy;
+        $send.disabled = isBusy;
     }
 
-    async function fileToDataUrl(file) {
-        return new Promise((resolve, reject) => {
-            const r = new FileReader();
-            r.onload = () => resolve(String(r.result));
-            r.onerror = reject;
-            r.readAsDataURL(file);
-        });
-    }
-
-    // ---------- AI call ----------
-    async function callAI({ text, imageDataUrl }) {
-        const payload = {
-            sid: getSid(),
-            message: text || "",
-            text: text || "",
-            imageDataUrl: imageDataUrl || null,
-        };
-
-        let res;
+    async function loadMessages() {
+        $messages.innerHTML = `<div class="sysMsg">Loading…</div>`;
         try {
-            res = await fetch(FN_AI, {
+            const url = `${FN_GET}?session_id=${encodeURIComponent(sessionId)}`;
+            const r = await fetch(url, {
+                method: "GET",
+                headers: { "x-user-id": uid },
+                cache: "no-store",
+            });
+
+            const t = await r.text();
+            let data = {};
+            try { data = JSON.parse(t); } catch {}
+
+            if (!r.ok) {
+                console.error("❌ loadMessages", r.status, data || t);
+                $messages.innerHTML = `<div class="sysMsg">Mesajlar yüklenemedi (${r.status}).</div>`;
+                return;
+            }
+
+            const msgs = data.messages || [];
+            $messages.innerHTML = "";
+            if (msgs.length === 0) {
+                $messages.innerHTML = `<div class="sysMsg">Henüz mesaj yok. Bir şey yaz 👇</div>`;
+                return;
+            }
+
+            for (const m of msgs) {
+                addMsg(m.role === "assistant" ? "assistant" : "user", m.content || "");
+            }
+        } catch (e) {
+            console.error(e);
+            $messages.innerHTML = `<div class="sysMsg">Hata: ${esc(e.message)}</div>`;
+        }
+    }
+
+    async function sendMessage() {
+        const text = $input.value.trim();
+        if (!text) return;
+
+        $input.value = "";
+        addMsg("user", text);
+
+        const typingRow = addMsg("assistant", "…");
+        setBusy(true);
+
+        try {
+            const r = await fetch(FN_SEND, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-user-id": getUserId(), // backend bunu okuyorsa kullan
+                    "x-user-id": uid,
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify({ session_id: sessionId, text }),
             });
-        } catch {
-            return { ok: false, error: "network_error" };
-        }
 
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) return { ok: false, error: data?.error || `http_${res.status}`, data };
-
-        if (data?.allowed === false) {
-            return { ok: false, error: data?.reason || "not_allowed", data };
-        }
-
-        return { ok: true, data };
-    }
-
-    // ---------- send text ----------
-    async function handleSend() {
-        const raw = (el.input.value || "").trim();
-        if (!raw) return;
-
-        el.input.value = "";
-        addRow("user", raw);
-
-        showTyping();
-        const r = await callAI({ text: raw });
-        hideTyping();
-
-        if (!r.ok) {
-            if (r.error === "msg_limit_reached") {
-                addRow("ai", "Free limit reached. Please upgrade to continue.");
-            } else {
-                addRow("ai", `Error: ${r.error}`);
-            }
-            return;
-        }
-
-        // plan update (optional)
-        if (r.data?.plan) {
-            const plan = String(r.data.plan).toLowerCase();
-            localStorage.setItem("sm_plan", plan);
-            el.pfPlan.textContent = plan;
-        }
-
-        const answer = String(r.data?.text || "").trim();
-        addRow("ai", answer || "No response.");
-    }
-
-    // ---------- send image ----------
-    async function handleImagePick() {
-        const inp = document.createElement("input");
-        inp.type = "file";
-        inp.accept = "image/*";
-        inp.click();
-
-        inp.onchange = async () => {
-            const file = inp.files?.[0];
-            if (!file) return;
-
-            addRow("user", "[image]");
-
-            showTyping();
-            const dataUrl = await fileToDataUrl(file).catch(() => null);
-            if (!dataUrl) {
-                hideTyping();
-                addRow("ai", "Could not read the image.");
-                return;
-            }
-
-            const r = await callAI({ text: "Analyze this image.", imageDataUrl: dataUrl });
-            hideTyping();
+            const t = await r.text();
+            let data = {};
+            try { data = JSON.parse(t); } catch {}
 
             if (!r.ok) {
-                if (r.error === "img_limit_reached") {
-                    addRow("ai", "Daily image limit reached. Please upgrade.");
-                } else {
-                    addRow("ai", `Error: ${r.error}`);
-                }
+                console.error("❌ sendMessage", r.status, data || t);
+                typingRow.querySelector(".msgBubble").textContent = `Hata: ${data?.error || "send failed"}`;
                 return;
             }
 
-            if (r.data?.plan) {
-                const plan = String(r.data.plan).toLowerCase();
-                localStorage.setItem("sm_plan", plan);
-                el.pfPlan.textContent = plan;
-            }
-
-            addRow("ai", String(r.data?.text || "No response.").trim());
-        };
+            typingRow.querySelector(".msgBubble").textContent = data.reply || "(no reply)";
+        } finally {
+            setBusy(false);
+            $input.focus();
+        }
     }
 
-    // ---------- new chat ----------
-    function newChat() {
-        el.messages.innerHTML = "";
-        localStorage.setItem("ai_sid", crypto.randomUUID());
-    }
-
-    // ---------- navigation ----------
-    el.btnUpgrade?.addEventListener("click", () => {
-        location.href = "/signal/upgrade.html";
-    });
-
-    el.btnProfile?.addEventListener("click", () => {
-        location.href = "/signal/profile.html";
-    });
-
-    // ---------- events ----------
-    el.send?.addEventListener("click", handleSend);
-    el.input?.addEventListener("keydown", (e) => {
+    // events
+    $send.addEventListener("click", sendMessage);
+    $input.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            handleSend();
+            sendMessage();
         }
     });
 
-    el.btnImage?.addEventListener("click", handleImagePick);
-    el.newChat?.addEventListener("click", newChat);
+    // initial
+    loadMessages();
 
-    // init
-    initProfile();
+    // payment success hint (optional)
+    const pay = new URLSearchParams(location.search).get("pay");
+    if (pay === "success") {
+        console.log("✅ payment success on signal");
+        history.replaceState({}, "", location.pathname);
+    }
 })();
