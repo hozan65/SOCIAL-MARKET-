@@ -1,5 +1,5 @@
 // /assets1/sidebar.js
-console.log("✅ sidebar.js loaded");
+console.log("✅ sidebar.js loaded (pinned + fixed items)");
 
 document.addEventListener("DOMContentLoaded", async () => {
     const mount = document.getElementById("sidebarMount");
@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.head.appendChild(fa);
         }
 
-        // Sidebar css once
+        // CSS once
         if (!document.getElementById("smSidebarCss")) {
             const css = document.createElement("link");
             css.id = "smSidebarCss";
@@ -24,22 +24,56 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.head.appendChild(css);
         }
 
-        // Load sidebar html
+        // Load html
         const res = await fetch("/components/sidebar.html", { cache: "no-store" });
-        if (!res.ok) throw new Error("sidebar.html bulunamadı");
+        if (!res.ok) throw new Error("sidebar.html not found");
         mount.innerHTML = await res.text();
 
         document.body.classList.add("hasSidebar");
 
         const sidebar = document.getElementById("smSidebar");
+        const pinBtn = document.getElementById("smSbPinBtn");
+
         const backdrop = document.getElementById("smSbBackdrop");
         const closeBtn = document.getElementById("smSbClose");
         const hamb = document.getElementById("smSbMobileHamb");
 
-        // dropdown
         const profileBtn = document.getElementById("smSbProfileBtn");
         const menu = document.getElementById("smSbMenu");
 
+        // ===== PIN restore
+        const pinned = localStorage.getItem("sm_sidebar_pinned") === "1";
+        sidebar.classList.toggle("isPinned", pinned);
+        document.body.classList.toggle("sidebarPinned", pinned);
+        pinBtn?.setAttribute("aria-pressed", pinned ? "true" : "false");
+
+        // pin toggle
+        pinBtn?.addEventListener("click", (e) => {
+            e.preventDefault();
+            const next = !sidebar.classList.contains("isPinned");
+            sidebar.classList.toggle("isPinned", next);
+            document.body.classList.toggle("sidebarPinned", next);
+            localStorage.setItem("sm_sidebar_pinned", next ? "1" : "0");
+            pinBtn.setAttribute("aria-pressed", next ? "true" : "false");
+
+            // dropdown kapat
+            menu?.classList.remove("open");
+            profileBtn?.setAttribute("aria-expanded", "false");
+            menu?.setAttribute("aria-hidden", "true");
+        });
+
+        // ===== Active item
+        const path = location.pathname.replace(/\/+$/, "");
+        const seg = path.split("/")[1] || "feed";
+        const page = seg.endsWith(".html") ? seg.replace(".html","") : seg;
+
+        document.querySelectorAll("#smSidebar [data-page]").forEach((a) => {
+            if ((a.dataset.page || "").trim().toLowerCase() === page.toLowerCase()) {
+                a.classList.add("active");
+            }
+        });
+
+        // ===== Dropdown
         const toggleMenu = (force) => {
             if (!menu) return;
             const open = force ?? !menu.classList.contains("open");
@@ -52,21 +86,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             e.stopPropagation();
             toggleMenu();
         });
+
         menu?.addEventListener("click", (e) => e.stopPropagation());
         document.addEventListener("click", () => toggleMenu(false));
 
-        // Active menu: folder name -> data-page
-        const path = location.pathname.replace(/\/+$/, "");
-        const seg = path.split("/")[1] || "feed";
-        const page = seg.endsWith(".html") ? seg.replace(".html","") : seg;
-
-        document.querySelectorAll("#smSidebar [data-page]").forEach((a) => {
-            if ((a.dataset.page || "").trim().toLowerCase() === page.toLowerCase()) {
-                a.classList.add("active");
-            }
-        });
-
-        // MOBILE open/close
+        // ===== Mobile open/close
         const openMobile = () => {
             sidebar.classList.add("mobileOpen");
             backdrop.classList.add("open");
@@ -100,13 +124,13 @@ document.addEventListener("DOMContentLoaded", async () => {
             a.addEventListener("click", () => closeMobile());
         });
 
-        console.log("✅ sidebar ok (content always safe gap)");
+        console.log("✅ sidebar ready (pinned stable, no moving items)");
     } catch (err) {
         console.error("❌ sidebar error:", err);
     }
 });
 
-// AI support widget loader stays
+// AI support loader
 (() => {
     if (document.getElementById("smSupportLoader")) return;
     const s = document.createElement("script");

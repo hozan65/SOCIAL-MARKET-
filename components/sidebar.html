@@ -6,6 +6,11 @@
       <div class="smSbLogo">SM</div>
       <div class="smSbBrandText">Social Market</div>
     </a>
+
+    <!-- ✅ PIN (sabit açık) -->
+    <button class="smSbPinBtn" id="smSbPinBtn" type="button" aria-pressed="false" title="Pin sidebar">
+      <i class="fa-solid fa-thumbtack"></i>
+    </button>
   </div>
 
   <nav class="smSbNav">
@@ -38,7 +43,9 @@
     </a>
   </nav>
 
+  <!-- ✅ EN ALT -->
   <div class="smSbBottom">
+
     <button class="smSbProfile" id="smSbProfileBtn" type="button" aria-expanded="false">
       <div class="smSbAvatar" id="smSbAvatar">H</div>
       <div class="smSbMeta">
@@ -46,29 +53,27 @@
         <div class="smSbMail" id="smSbMail">hozanblglu65@gmail.com</div>
       </div>
       <i class="fa-solid fa-chevron-up smSbCaret"></i>
-
-      <div class="smSbMenu" id="smSbMenu" role="menu" aria-hidden="true">
-        <div class="smSbMenuHead">
-          <div class="smSbMenuTitle">Social Market</div>
-          <div class="smSbMenuSub">Signed in</div>
-        </div>
-
-        <div class="smSbMenuDiv"></div>
-
-        <a class="smSbMenuItem" href="/u/index.html"><i class="fa-solid fa-user"></i><span>Profile</span></a>
-        <a class="smSbMenuItem" href="/settings/"><i class="fa-solid fa-gear"></i><span>Settings</span></a>
-
-        <div class="smSbMenuDiv"></div>
-
-        <button class="smSbMenuItem smSbMenuBtn" id="smSbLogout" type="button">
-          <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
-        </button>
-      </div>
     </button>
+
+    <!-- ✅ Profile dropdown: Social Market kutusu yok, items en altta -->
+    <div class="smSbMenu" id="smSbMenu" role="menu" aria-hidden="true">
+      <a class="smSbMenuItem" href="/u/index.html"><i class="fa-solid fa-user"></i><span>Profile</span></a>
+      <a class="smSbMenuItem" href="/settings/"><i class="fa-solid fa-gear"></i><span>Settings</span></a>
+
+      <div class="smSbMenuDiv"></div>
+
+      <button class="smSbMenuItem smSbMenuBtn" id="smSbLogout" type="button">
+        <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+      </button>
+    </div>
+
   </div>
 
 </aside>
 
+<!-- Mobile drawer -->
 <div class="smSbBackdrop" id="smSbBackdrop" aria-hidden="true"></div>
 <button class="smSbClose" id="smSbClose" type="button" aria-label="Close">✕</button>
+
+<!-- ✅ Hamburger sağ üstte -->
 <button class="smSbMobileHamb" id="smSbMobileHamb" type="button" aria-label="Open menu">☰</button>
