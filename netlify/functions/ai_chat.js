@@ -1,9 +1,8 @@
-// netlify/functions/ai_chat.js  (FULL - FIXED)
+// netlify/functions/ai_chat.js
 // ✅ Accepts: body.message OR body.text
-// ✅ Returns: { allowed, plan, text } (unchanged from your design)
-// ✅ Keeps: free daily msg limit logic
-// ✅ Safer CORS headers
-// ✅ If OpenAI fails -> 500 with message
+// ✅ Returns: { allowed, plan, text }
+// ✅ Free daily msg limit
+// ✅ ChatGPT-like formatting prompt (no LaTeX)
 
 import { sbAdmin } from "./supabase.js";
 
@@ -83,7 +82,6 @@ export const handler = async (event) => {
         const userId = String(event.headers["x-user-id"] || "").trim();
         if (!userId) return json(401, { error: "Missing x-user-id" });
 
-        // ✅ tolerate missing/invalid body
         let body = {};
         try {
             body = event.body ? JSON.parse(event.body) : {};
@@ -91,23 +89,20 @@ export const handler = async (event) => {
             body = {};
         }
 
-        // ✅ FIX: accept message OR text
         const userText = String(body.message || body.text || "").trim();
         if (!userText) return json(400, { error: "Missing message" });
 
-        const model = process.env.OPENAI_MODEL || "gpt-5";
+        const model = (process.env.OPENAI_MODEL || "gpt-4o-mini").trim();
         const maxOut = toInt(process.env.OPENAI_MAX_OUTPUT_TOKENS, 700);
         const FREE_MSG_LIMIT = toInt(process.env.FREE_DAILY_MSG_LIMIT, 10);
 
         const sb = sbAdmin();
 
-        // Ensure ai_user exists
         await sb.from("ai_users").upsert(
             { user_id: userId },
             { onConflict: "user_id", ignoreDuplicates: true }
         );
 
-        // Plan check
         const profRes = await sb
             .from("ai_users")
             .select("plan, pro_active")
@@ -119,7 +114,6 @@ export const handler = async (event) => {
         const plan = profRes.data?.plan || "free";
         const proActive = Boolean(profRes.data?.pro_active);
 
-        // Free daily msg limit
         if (!(proActive || String(plan).startsWith("pro"))) {
             const day = todayISODateUTC();
 
@@ -158,11 +152,26 @@ export const handler = async (event) => {
             if (upd.error) return json(500, { error: upd.error.message });
         }
 
-        // OpenAI call
+        // ✅ ChatGPT-like system prompt
+        const system = `
+You are Social Market AI.
+Reply in the SAME language as the user.
+Write clean, readable answers:
+- Use short paragraphs
+- Use bullet points where helpful
+- Use simple headings like "1) ..." or "Steps"
+Never output LaTeX. If you need a formula, write it in plain text like:
+Profit = (exit - entry) * size
+Do not ask follow-up questions unless absolutely necessary. If needed, ask at most 1.
+`.trim();
+
         const resp = await openaiResponses({
             model,
             max_output_tokens: maxOut,
-            input: [{ role: "user", content: [{ type: "input_text", text: userText }] }],
+            input: [
+                { role: "system", content: [{ type: "input_text", text: system }] },
+                { role: "user", content: [{ type: "input_text", text: userText }] },
+            ],
         });
 
         const answer = extractOutputText(resp);

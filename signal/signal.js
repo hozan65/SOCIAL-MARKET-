@@ -1,8 +1,8 @@
-// /signal/signal.js  (FULL - FIXED)
-// ✅ Sends: message (and still works if backend accepts text too)
+// /signal/signal.js
+// ✅ ChatGPT-like UX: typing bubble ("answering…"), better rendering, English UI strings
+// ✅ Sends: message (+ text for compatibility)
 // ✅ Handles: allowed:false (free limit)
-// ✅ Reads: data.text (backend returns text)
-// ✅ Keeps: image upload flow
+// ✅ Reads: data.text
 
 (() => {
     const $ = (q) => document.querySelector(q);
@@ -17,10 +17,8 @@
         planText: $(".pPlan"),
     };
 
-    // ✅ user id: localStorage (later you can use Appwrite)
     const getUserId = () => localStorage.getItem("sm_uid") || "demo_user";
 
-    // Session id
     const getSid = () => {
         let sid = localStorage.getItem("ai_sid");
         if (!sid) {
@@ -30,22 +28,44 @@
         return sid;
     };
 
-    function esc(s = "") {
-        return String(s).replace(/[&<>"']/g, (c) => ({
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#39;",
-        }[c]));
+    function normalizeAIText(raw = "") {
+        let t = String(raw || "");
+
+        // Remove common LaTeX wrappers if they sneak in
+        t = t.replace(/\\\(|\\\)|\\\[|\\\]/g, "");
+        t = t.replace(/\\text\{([^}]+)\}/g, "$1");
+        t = t.replace(/\\times/g, "×");
+
+        // Trim extra whitespace
+        return t.trim();
     }
 
     function addBubble(role, text) {
         const d = document.createElement("div");
         d.className = `msg ${role === "user" ? "user" : "ai"}`;
-        d.innerHTML = esc(text || "");
+
+        const out = role === "ai" ? normalizeAIText(text) : String(text || "").trim();
+        d.textContent = out;
+
         el.messages.appendChild(d);
         el.messages.scrollTop = el.messages.scrollHeight;
+        return d;
+    }
+
+    // Typing bubble
+    let typingEl = null;
+    function showTyping() {
+        if (typingEl) return;
+        typingEl = document.createElement("div");
+        typingEl.className = "msg ai typing";
+        typingEl.textContent = "answering…";
+        el.messages.appendChild(typingEl);
+        el.messages.scrollTop = el.messages.scrollHeight;
+    }
+    function hideTyping() {
+        if (!typingEl) return;
+        typingEl.remove();
+        typingEl = null;
     }
 
     async function fileToDataUrl(file) {
@@ -60,7 +80,6 @@
     async function sendToAI({ text, imageDataUrl }) {
         const payload = {
             sid: getSid(),
-            // ✅ backend expects message, also keep text for backward compatibility
             message: text || "",
             text: text || "",
             imageDataUrl: imageDataUrl || null,
@@ -76,52 +95,33 @@
                 },
                 body: JSON.stringify(payload),
             });
-        } catch (e) {
-            addBubble("ai", "Network error: bağlantı kurulamadı.");
+        } catch {
+            addBubble("ai", "Network error: could not connect.");
             return null;
         }
 
         const data = await res.json().catch(() => ({}));
 
-        // HTTP error
         if (!res.ok) {
             const err = data?.error || `http_${res.status}`;
-            const retry = data?.retry_after_ms;
-
-            if (err === "daily_message_limit") {
-                addBubble("ai", "Free limit doldu: bugün 10 mesaj hakkın bitti. Upgrade yapabilirsin.");
-                return null;
-            }
-            if (err === "daily_image_limit") {
-                addBubble("ai", "Free limit doldu: bugün 1 görsel hakkın bitti. Upgrade yapabilirsin.");
-                return null;
-            }
-            if (err === "rate_limited") {
-                addBubble("ai", `Yavaşla kanka 😄 Rate-limit. ${Math.ceil((retry || 1000) / 1000)} sn sonra dene.`);
-                return null;
-            }
-
-            addBubble("ai", `Hata: ${err}`);
+            addBubble("ai", `Server error: ${err}`);
             return null;
         }
 
-        // ✅ Plan text update
         if (el.planText && data.plan) el.planText.textContent = data.plan;
 
-        // ✅ Free limit case is 200 but allowed:false
         if (data.allowed === false) {
             const reason = data.reason || "not_allowed";
             if (reason === "msg_limit_reached") {
-                addBubble("ai", "Free limit doldu: bugün 10 mesaj hakkın bitti. Upgrade yapabilirsin.");
+                addBubble("ai", "Free limit reached: you used all 10 messages for today. Upgrade to continue.");
             } else {
-                addBubble("ai", `İstek reddedildi: ${reason}`);
+                addBubble("ai", `Request blocked: ${reason}`);
             }
             return null;
         }
 
-        // ✅ backend returns text (not answer)
-        const answer = data.text || "";
-        return answer.trim() ? answer : null;
+        const answer = (data.text || "").trim();
+        return answer ? answer : null;
     }
 
     async function handleSend() {
@@ -131,7 +131,10 @@
         el.input.value = "";
         addBubble("user", text);
 
+        showTyping();
         const answer = await sendToAI({ text });
+        hideTyping();
+
         if (answer) addBubble("ai", answer);
     }
 
@@ -148,8 +151,10 @@
             addBubble("user", "[image]");
             const dataUrl = await fileToDataUrl(file);
 
-            // image-only request: still includes message text (backend requires message)
+            showTyping();
             const answer = await sendToAI({ text: "Analyze this image.", imageDataUrl: dataUrl });
+            hideTyping();
+
             if (answer) addBubble("ai", answer);
         };
     }
@@ -160,7 +165,6 @@
         if (el.messages) el.messages.innerHTML = "";
     }
 
-    // events
     el.send?.addEventListener("click", handleSend);
     el.input?.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -171,6 +175,5 @@
     el.plus?.addEventListener("click", handleImagePick);
     el.newChat?.addEventListener("click", newChat);
 
-    // init
     if (el.planText) el.planText.textContent = "free";
 })();

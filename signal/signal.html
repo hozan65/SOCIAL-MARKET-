@@ -1,15 +1,10 @@
 <!-- /signal/signal.html -->
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Signal</title>
-
-    <!-- Senin base dosyaların varsa bırak -->
-    <!-- <link rel="stylesheet" href="/styles/variables.css"> -->
-    <!-- <link rel="stylesheet" href="/styles/base.css"> -->
-    <!-- <link rel="stylesheet" href="/styles/layout.css"> -->
 
     <link rel="stylesheet" href="/signal/signal.css" />
 </head>
@@ -41,16 +36,16 @@
             <div class="leftHeader">
                 <div class="leftTitle">Social Market</div>
 
-                <button class="btnNew">
+                <button class="btnNew" type="button">
                     <span class="plus">+</span>
-                    Yeni sohbet
+                    New chat
                 </button>
 
                 <div class="searchWrap">
-                    <input class="search" placeholder="Sohbetleri ara" />
+                    <input class="search" placeholder="Search chats" />
                 </div>
 
-                <div class="label">Sohbetlerin</div>
+                <div class="label">Your chats</div>
             </div>
 
             <div class="chatList"></div>
@@ -60,7 +55,7 @@
                     <div class="avatar">HB</div>
                     <div class="pMeta">
                         <div class="pName">Hozan Bilaloglu</div>
-                        <div class="pPlan">Free</div>
+                        <div class="pPlan">free</div>
                     </div>
                 </div>
             </div>
@@ -73,7 +68,7 @@
             <div class="composerWrap">
                 <div class="composer">
                     <button class="btnCircle" type="button">+</button>
-                    <input class="input" placeholder="Herhangi bir şey sor" />
+                    <input class="input" placeholder="Ask anything" />
                     <button class="btnSend" type="button">▶</button>
                 </div>
             </div>
@@ -81,7 +76,6 @@
     </section>
 
     <script src="/signal/signal.js" defer></script>
-
 </main>
 </body>
 </html>
