@@ -1,123 +1,73 @@
 // netlify/functions/ai_support.js
-// ✅ AI SUPPORT ONLY
-// ✅ Same-language replies
-// ✅ No 400 spam (empty message safe)
-// ✅ Uses OpenAI Chat Completions
-// ENV REQUIRED:
-// - OPENAI_API_KEY
-// OPTIONAL:
-// - OPENAI_SUPPORT_MODEL (default: gpt-4o-mini)
+// ONLY AI SUPPORT BOT
 
-export async function handler(event) {
-    if (event.httpMethod === "OPTIONS") {
-        return {
-            statusCode: 200,
-            headers: cors(event),
-            body: "ok",
-        };
-    }
+const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
-    if (event.httpMethod !== "POST") {
-        return {
-            statusCode: 405,
-            headers: cors(event),
-            body: JSON.stringify({ error: "Method not allowed" }),
-        };
-    }
+function json(statusCode, body) {
+    return {
+        statusCode,
+        headers: { "Content-Type": "application/json; charset=utf-8", ...corsHeaders },
+        body: JSON.stringify(body),
+    };
+}
+
+export const handler = async (event) => {
+    if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+    if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
     try {
-        const apiKey = process.env.OPENAI_API_KEY;
+        const apiKey = process.env.OPENAI_API_KEY_SUPPORT;
         if (!apiKey) {
-            return {
-                statusCode: 500,
-                headers: cors(event),
-                body: JSON.stringify({ error: "Missing OPENAI_API_KEY" }),
-            };
+            return json(500, { error: "Missing OPENAI_API_KEY_SUPPORT" });
         }
 
-        const body = JSON.parse(event.body || "{}");
-        const message =
-            typeof body.message === "string" ? body.message.trim() : "";
-
-        // ✅ IMPORTANT: empty / welcome / auto messages → silently ignore
-        if (!message) {
-            return {
-                statusCode: 200,
-                headers: cors(event),
-                body: JSON.stringify({ reply: "", skipped: true }),
-            };
+        const { message } = JSON.parse(event.body || "{}");
+        if (!message || typeof message !== "string") {
+            return json(400, { error: "Missing message" });
         }
 
         const systemPrompt = `
-You are the official customer support assistant for "Social Market".
-
-Your job:
-- Help users use the website
-- Explain features clearly
-- Guide troubleshooting step-by-step
-
+You are the official support assistant for Social Market.
 Rules:
-- Always reply in the SAME language as the user's message
-- Be concise, practical, and friendly
-- Ask clarifying questions if needed (which page, what action, what error)
-- NEVER request passwords, private keys, or sensitive data
+- Reply in the SAME language as the user.
+- Be short, clear, and helpful.
+- Guide users step by step.
+- Never ask for passwords or private keys.
 `.trim();
 
-        const payload = {
-            model: process.env.OPENAI_SUPPORT_MODEL || "gpt-4o-mini",
-            temperature: 0.3,
-            max_tokens: 450,
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: message },
-            ],
-        };
-
-        const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
-                Authorization: `Bearer ${apiKey}`,
+                "Authorization": `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({
+                model: "gpt-4o-mini",
+                temperature: 0.3,
+                max_tokens: 400,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: message },
+                ],
+            }),
         });
 
-        const data = await r.json().catch(() => ({}));
+        const data = await res.json();
 
-        if (!r.ok) {
-            console.error("OpenAI support error:", r.status, data);
-            return {
-                statusCode: 500,
-                headers: cors(event),
-                body: JSON.stringify({ error: "AI provider error" }),
-            };
+        if (!res.ok) {
+            console.error("OpenAI error:", data);
+            return json(500, { error: "AI provider error" });
         }
 
-        const reply =
-            data?.choices?.[0]?.message?.content?.trim() || "";
-
-        return {
-            statusCode: 200,
-            headers: cors(event),
-            body: JSON.stringify({ reply }),
-        };
+        return json(200, {
+            reply: data.choices?.[0]?.message?.content || "",
+        });
     } catch (e) {
-        console.error("ai_support crash:", e);
-        return {
-            statusCode: 500,
-            headers: cors(event),
-            body: JSON.stringify({ error: "Server error" }),
-        };
+        console.error("ai_support error:", e);
+        return json(500, { error: "Server error" });
     }
-}
-
-function cors(event) {
-    const origin = event.headers?.origin || "*";
-    return {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Headers":
-            "Content-Type, Authorization, x-user-id",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Content-Type": "application/json; charset=utf-8",
-    };
-}
+};
