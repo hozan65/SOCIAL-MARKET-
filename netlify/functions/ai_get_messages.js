@@ -1,4 +1,3 @@
-// netlify/functions/ai_get_messages.js (FULL) - uses ai_messages.sid (uuid)
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -21,13 +20,10 @@ const json = (statusCode, body) => ({
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-        if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
+        if (event.httpMethod !== "GET") return json(405, { error: "method_not_allowed" });
 
         const uid = (event.headers["x-user-id"] || event.headers["X-User-Id"] || "").trim();
-        const sid = (event.queryStringParameters?.session_id || "").trim(); // frontend still sends session_id
-
-        console.log("DEBUG uid:", uid);
-        console.log("DEBUG sid:", sid);
+        const sid = (event.queryStringParameters?.session_id || "").trim();
 
         if (!uid) return json(401, { error: "missing_uid" });
         if (!sid) return json(400, { error: "missing_session_id" });
@@ -42,15 +38,15 @@ export const handler = async (event) => {
             .from("ai_messages")
             .select("role, content, created_at")
             .eq("user_id", uid)
-            .eq("sid", sid) // ✅ session filter uses sid
+            .eq("sid", sid)
             .order("created_at", { ascending: true })
-            .limit(200);
+            .limit(300);
 
         if (error) return json(500, { error: "db_error", details: error });
 
         return json(200, { messages: data || [] });
     } catch (e) {
-        console.log("SERVER error:", e);
+        console.log("ai_get_messages server_error:", e);
         return json(500, { error: "server_error", message: e.message });
     }
 };

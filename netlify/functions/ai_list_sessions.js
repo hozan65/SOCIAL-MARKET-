@@ -4,22 +4,30 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE =
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
 
-const headers = {
+const corsHeaders = {
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type,x-user-id",
     "Access-Control-Allow-Methods": "GET,OPTIONS",
 };
 
-const json = (statusCode, body) => ({ statusCode, headers, body: JSON.stringify(body) });
+const json = (statusCode, body) => ({
+    statusCode,
+    headers: corsHeaders,
+    body: JSON.stringify(body),
+});
 
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-        if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
+        if (event.httpMethod !== "GET") return json(405, { error: "method_not_allowed" });
 
         const uid = (event.headers["x-user-id"] || event.headers["X-User-Id"] || "").trim();
         if (!uid) return json(401, { error: "missing_uid" });
+
+        if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
+            return json(500, { error: "missing_supabase_env" });
+        }
 
         const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE);
 
@@ -28,11 +36,13 @@ export const handler = async (event) => {
             .select("sid, title, created_at")
             .eq("user_id", uid)
             .order("created_at", { ascending: false })
-            .limit(50);
+            .limit(100);
 
         if (error) return json(500, { error: "db_error", details: error });
+
         return json(200, { sessions: data || [] });
     } catch (e) {
+        console.log("ai_list_sessions server_error:", e);
         return json(500, { error: "server_error", message: e.message });
     }
 };
