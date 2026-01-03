@@ -1,40 +1,59 @@
 // /signal/upgrade.js
 (() => {
-    const FN_CHECKOUT = "/.netlify/functions/create_checkout";
+    // ✅ Paddle function endpoint (dosya adı = endpoint adı)
+    const FN_CHECKOUT = "/.netlify/functions/paddle_create_checkout";
     const $ = (q) => document.querySelector(q);
 
     const userId = () => localStorage.getItem("sm_uid") || "demo_user";
 
     async function startCheckout(plan) {
-        const res = await fetch(FN_CHECKOUT, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-id": userId(),
-            },
-            body: JSON.stringify({ plan }),
-        }).catch(() => null);
+        try {
+            // küçük loading (opsiyonel)
+            const btn = document.querySelector(`[data-plan="${plan}"]`);
+            const oldText = btn?.textContent;
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = "Opening...";
+            }
 
-        if (!res) {
+            const res = await fetch(FN_CHECKOUT, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-user-id": userId(),
+                },
+                body: JSON.stringify({ plan }),
+            });
+
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                alert(data?.error || `HTTP ${res.status}`);
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = oldText || "Buy now";
+                }
+                return;
+            }
+
+            if (!data?.url) {
+                alert("Missing checkout url");
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = oldText || "Buy now";
+                }
+                return;
+            }
+
+            // ✅ Paddle checkout redirect
+            location.href = data.url;
+        } catch (e) {
             alert("Network error");
-            return;
+            console.error(e);
         }
-
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            alert(data?.error || `HTTP ${res.status}`);
-            return;
-        }
-
-        if (!data?.url) {
-            alert("Missing checkout url");
-            return;
-        }
-
-        location.href = data.url; // Stripe Checkout redirect :contentReference[oaicite:6]{index=6}
     }
 
-    // Plan buttons: add data-plan="normal" / "pro"
+    // Plan buttons: data-plan="normal" / "pro"
     document.querySelectorAll("[data-plan]").forEach((btn) => {
         btn.addEventListener("click", () => {
             const plan = String(btn.getAttribute("data-plan") || "").toLowerCase();
