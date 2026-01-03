@@ -1,301 +1,296 @@
-// /signal/signal.js (FULL)
-(() => {
-    console.log("✅ signal.js loaded");
+// /signal/signal.js
+const FN_LIST   = "/.netlify/functions/ai_list_sessions";
+const FN_CREATE = "/.netlify/functions/ai_create_session";
+const FN_GET    = "/.netlify/functions/ai_get_messages";
+const FN_SEND   = "/.netlify/functions/ai_send_message";
 
-    const FN_LIST   = "/.netlify/functions/ai_list_sessions";
-    const FN_CREATE = "/.netlify/functions/ai_create_session";
-    const FN_GET    = "/.netlify/functions/ai_get_messages";
-    const FN_SEND   = "/.netlify/functions/ai_send_message";
+const PROFILE_URL = "/signal/profile.html";
+const UPGRADE_URL = "/signal/upgrade.html";
 
-    // DOM
-    const $messages   = document.getElementById("messages");
-    const $input      = document.getElementById("chatInput");
-    const $send       = document.getElementById("btnSend");
-    const $chatList   = document.getElementById("chatList");
-    const $btnNew     = document.getElementById("btnNewChat");
-    const $mobileNew  = document.getElementById("mobileNewChat");
-    const $search     = document.getElementById("chatSearch");
-    const $topTitle   = document.getElementById("chatTopTitle");
+const uid = (localStorage.getItem("sm_uid") || "").trim();
 
-    const $btnProfile = document.getElementById("btnProfile");
-    const $btnUpgrade = document.getElementById("btnUpgrade");
+const $messages = document.getElementById("messages");
+const $input = document.getElementById("chatInput");
+const $send = document.getElementById("btnSend");
 
-    const $openDrawer = document.getElementById("openDrawer");
+const $chatList = document.getElementById("chatList");
+const $btnNew = document.getElementById("btnNewChat");
+const $search = document.getElementById("chatSearch");
 
-    const uid = (localStorage.getItem("sm_uid") || "").trim();
+const $chatTitle = document.getElementById("chatTitle");
 
-    // ✅ routes
-    const ROUTE_PROFILE = "/u/index.html";
-    const ROUTE_UPGRADE = "/upgrade/"; // senin upgrade sayfan hangisiyse burayı sabitle
+const $drawer = document.getElementById("chatDrawer");
+const $backdrop = document.getElementById("drawerBackdrop");
+const $btnOpenChats = document.getElementById("btnOpenChats");
 
-    // Buttons (fix)
-    $btnProfile?.addEventListener("click", () => location.href = ROUTE_PROFILE);
-    $btnUpgrade?.addEventListener("click", () => location.href = ROUTE_UPGRADE);
+const $pfName = document.getElementById("pfName");
+const $pfEmail = document.getElementById("pfEmail");
+const $pfPlan = document.getElementById("pfPlan");
+const $btnProfile = document.getElementById("btnProfile");
+const $btnUpgrade = document.getElementById("btnUpgrade");
 
-    // Mobile drawer open => sidebar.js’in hamburger’ını tetikle
-    $openDrawer?.addEventListener("click", () => {
-        document.getElementById("smSbMobileHamb")?.click();
-    });
+if (!uid) {
+    if ($messages) $messages.innerHTML = `<div class="intro"><div><h2>Login required</h2><p>sm_uid bulunamadı</p></div></div>`;
+    if ($input) $input.disabled = true;
+    if ($send) $send.disabled = true;
+    throw new Error("Missing sm_uid");
+}
 
-    function esc(s){
-        return String(s ?? "")
-            .replaceAll("&","&amp;")
-            .replaceAll("<","&lt;")
-            .replaceAll(">","&gt;")
-            .replaceAll('"',"&quot;")
-            .replaceAll("'","&#039;");
-    }
+const ACTIVE_KEY = `signal_active_sid_${uid}`;
+let activeSid = localStorage.getItem(ACTIVE_KEY) || "";
 
-    function setBusy(b){
-        if ($input) $input.disabled = b;
-        if ($send)  $send.disabled  = b;
-    }
+let allSessions = [];
 
-    function renderEmpty(){
-        if (!$messages) return;
-        $messages.innerHTML = `
-      <div class="emptyState">
-        <div>
-          <div class="big">HEY 👋 I’m your Finance Assistant</div>
-          <div class="small">Ask me anything about crypto, stocks, or markets.</div>
-        </div>
+const esc = (s) =>
+    String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+function setIntro() {
+    $messages.innerHTML = `
+    <div class="intro">
+      <div>
+        <h2>HEY 👋 I’m your Finance Assistant</h2>
+        <p>Ask me anything about crypto, stocks, or markets.</p>
       </div>
-    `;
-    }
+    </div>
+  `;
+}
 
-    function addMsg(role, text){
-        const row = document.createElement("div");
-        row.className = `msgRow ${role}`;
+function setBusy(b) {
+    $input.disabled = b;
+    $send.disabled = b;
+}
 
-        row.innerHTML = `
-      <div class="msgInner">
-        <div class="bubble">${esc(text)}</div>
-      </div>
-    `;
+function openDrawer() {
+    $drawer.classList.add("open");
+    $backdrop.classList.add("open");
+    $backdrop.setAttribute("aria-hidden", "false");
+}
+function closeDrawer() {
+    $drawer.classList.remove("open");
+    $backdrop.classList.remove("open");
+    $backdrop.setAttribute("aria-hidden", "true");
+}
 
-        $messages.appendChild(row);
-        $messages.scrollTop = $messages.scrollHeight;
-        return row;
-    }
+$btnOpenChats?.addEventListener("click", () => openDrawer());
+$backdrop?.addEventListener("click", () => closeDrawer());
 
-    if (!uid){
-        renderEmpty();
-        if ($input) $input.disabled = true;
-        if ($send)  $send.disabled  = true;
+function addMsg(role, text) {
+    const row = document.createElement("div");
+    row.className = `msgRow ${role}`;
+    row.innerHTML = `
+    <div class="bubbleWrap">
+      <div class="bubble">${esc(text)}</div>
+    </div>
+  `;
+    $messages.appendChild(row);
+    $messages.scrollTop = $messages.scrollHeight;
+    return row;
+}
+
+function renderSessions(list) {
+    $chatList.innerHTML = "";
+    if (!list.length) {
+        $chatList.innerHTML = `<div style="padding:10px;opacity:.7;font-weight:900;">No chats yet</div>`;
         return;
     }
 
-    // active session stored
-    const ACTIVE_KEY = `signal_active_sid_${uid}`;
-    let activeSid = localStorage.getItem(ACTIVE_KEY) || "";
+    for (const s of list) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "chatItem";
+        btn.dataset.sid = s.sid;
+        btn.dataset.title = s.title || "New chat";
 
-    // cache sessions list
-    let sessionsCache = [];
+        const created = s.created_at ? new Date(s.created_at).toLocaleString() : "";
+        btn.innerHTML = `
+      <div class="chatTitleMini">${esc(s.title || "New chat")}</div>
+      <div class="chatMeta">${esc(created)}</div>
+    `;
 
-    function highlightActive(){
-        if (!$chatList) return;
-        $chatList.querySelectorAll(".chatItem").forEach(x => {
-            x.classList.toggle("active", x.dataset.sid === activeSid);
-        });
-    }
+        if (s.sid === activeSid) btn.classList.add("active");
 
-    function renderSessions(items){
-        if (!$chatList) return;
-        $chatList.innerHTML = "";
-
-        if (!items.length){
-            $chatList.innerHTML = `<div style="padding:10px;color:#6b7280;font-weight:800;">No chats yet</div>`;
-            return;
-        }
-
-        for (const s of items){
-            const el = document.createElement("button");
-            el.type = "button";
-            el.className = "chatItem";
-            el.dataset.sid = s.sid;
-
-            el.innerHTML = `
-        <div class="chatTitle">${esc(s.title || "New chat")}</div>
-        <div class="chatMeta">${esc(new Date(s.created_at).toLocaleString())}</div>
-      `;
-
-            el.addEventListener("click", async () => {
-                activeSid = s.sid;
-                localStorage.setItem(ACTIVE_KEY, activeSid);
-                highlightActive();
-                $topTitle && ($topTitle.textContent = s.title || "Chats");
-                await loadMessages();
-            });
-
-            $chatList.appendChild(el);
-        }
-
-        highlightActive();
-    }
-
-    async function loadSessions(){
-        const r = await fetch(FN_LIST, {
-            headers: { "x-user-id": uid },
-            cache: "no-store",
-        });
-
-        const t = await r.text();
-        let data = {};
-        try { data = JSON.parse(t); } catch {}
-
-        if (!r.ok){
-            console.error("❌ list sessions", r.status, data || t);
-            sessionsCache = [];
-            renderSessions([]);
-            return [];
-        }
-
-        sessionsCache = data.sessions || [];
-
-        if (!activeSid && sessionsCache[0]?.sid){
-            activeSid = sessionsCache[0].sid;
+        btn.addEventListener("click", async () => {
+            activeSid = s.sid;
             localStorage.setItem(ACTIVE_KEY, activeSid);
-        }
+            $chatList.querySelectorAll(".chatItem").forEach(x => x.classList.remove("active"));
+            btn.classList.add("active");
 
-        // set header title
-        const cur = sessionsCache.find(x => x.sid === activeSid);
-        $topTitle && ($topTitle.textContent = cur?.title || "Chats");
-
-        renderSessions(sessionsCache);
-        return sessionsCache;
-    }
-
-    async function createSession(){
-        const r = await fetch(FN_CREATE, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-id": uid,
-            },
-            body: JSON.stringify({ title: "New chat" }),
+            $chatTitle.textContent = s.title || "New chat";
+            await loadMessages();
+            closeDrawer(); // mobile
         });
 
-        const t = await r.text();
-        let data = {};
-        try { data = JSON.parse(t); } catch {}
+        $chatList.appendChild(btn);
+    }
+}
 
-        if (!r.ok){
-            console.error("❌ create session", r.status, data || t);
-            return null;
-        }
+function applySearchFilter() {
+    const q = ($search.value || "").trim().toLowerCase();
+    if (!q) {
+        renderSessions(allSessions);
+        return;
+    }
+    const filtered = allSessions.filter(s => (s.title || "").toLowerCase().includes(q));
+    renderSessions(filtered);
+}
 
-        activeSid = data.session.sid;
+$search?.addEventListener("input", applySearchFilter);
+
+async function apiJSON(url, opts) {
+    const r = await fetch(url, {
+        cache: "no-store",
+        ...opts,
+        headers: {
+            ...(opts?.headers || {}),
+            "x-user-id": uid,
+        },
+    });
+    const t = await r.text();
+    let data = {};
+    try { data = JSON.parse(t); } catch { data = { raw: t }; }
+    return { ok: r.ok, status: r.status, data };
+}
+
+async function loadProfileBadge() {
+    // Basit: ai_users tablosu zaten var. İstersen netlify fn ile çekersin.
+    // Şimdilik localStorage üzerinden dolduruyoruz (yoksa — kalır).
+    $pfName.textContent = localStorage.getItem("sm_name") || "—";
+    $pfEmail.textContent = localStorage.getItem("sm_email") || "—";
+    $pfPlan.textContent = (localStorage.getItem("sm_plan") || "free").toLowerCase();
+
+    $btnProfile?.addEventListener("click", () => (location.href = PROFILE_URL));
+    $btnUpgrade?.addEventListener("click", () => (location.href = UPGRADE_URL));
+}
+
+async function loadSessions() {
+    const res = await apiJSON(FN_LIST, { method: "GET" });
+    if (!res.ok) {
+        console.error("list sessions failed", res.status, res.data);
+        allSessions = [];
+        renderSessions([]);
+        return [];
+    }
+
+    allSessions = res.data.sessions || [];
+
+    if (!activeSid && allSessions[0]?.sid) {
+        activeSid = allSessions[0].sid;
         localStorage.setItem(ACTIVE_KEY, activeSid);
-
-        await loadSessions();
-        await loadMessages();
-        return data.session;
     }
 
-    async function loadMessages(){
-        if (!$messages) return;
+    // title bar
+    const active = allSessions.find(s => s.sid === activeSid);
+    $chatTitle.textContent = active?.title || "New chat";
 
-        if (!activeSid){
-            renderEmpty();
-            return;
-        }
+    renderSessions(allSessions);
+    return allSessions;
+}
 
-        // loading
-        $messages.innerHTML = `<div style="padding:14px;color:#6b7280;font-weight:800;">Loading…</div>`;
+async function createSession() {
+    const res = await apiJSON(FN_CREATE, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "New chat" }),
+    });
 
-        const url = `${FN_GET}?session_id=${encodeURIComponent(activeSid)}`;
-        const r = await fetch(url, {
-            headers: { "x-user-id": uid },
-            cache: "no-store",
-        });
-
-        const t = await r.text();
-        let data = {};
-        try { data = JSON.parse(t); } catch {}
-
-        if (!r.ok){
-            console.error("❌ load messages", r.status, data || t);
-            $messages.innerHTML = `<div style="padding:14px;color:#6b7280;font-weight:800;">Messages load failed (${r.status})</div>`;
-            return;
-        }
-
-        const msgs = data.messages || [];
-        $messages.innerHTML = "";
-
-        if (!msgs.length){
-            renderEmpty();
-            return;
-        }
-
-        for (const m of msgs){
-            addMsg(m.role === "assistant" ? "assistant" : "user", m.content || "");
-        }
+    if (!res.ok) {
+        console.error("create session failed", res.status, res.data);
+        return null;
     }
 
-    async function sendMessage(){
-        const text = ($input?.value || "").trim();
-        if (!text) return;
+    activeSid = res.data.session.sid;
+    localStorage.setItem(ACTIVE_KEY, activeSid);
 
-        if (!activeSid){
-            await createSession();
-            if (!activeSid) return;
-        }
+    await loadSessions();
+    await loadMessages();
+    return res.data.session;
+}
 
-        $input.value = "";
-        addMsg("user", text);
+async function loadMessages() {
+    if (!activeSid) {
+        setIntro();
+        return;
+    }
 
-        // typing placeholder
-        const typing = addMsg("assistant", "…");
-        setBusy(true);
+    // ✅ Loading yazısı göstermiyoruz; sadece içeriği güncelliyoruz
+    const res = await apiJSON(`${FN_GET}?session_id=${encodeURIComponent(activeSid)}`, { method: "GET" });
 
-        const r = await fetch(FN_SEND, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-id": uid,
-            },
-            body: JSON.stringify({ session_id: activeSid, text }),
-        });
+    if (!res.ok) {
+        console.error("get messages failed", res.status, res.data);
+        setIntro();
+        return;
+    }
 
-        const t = await r.text();
-        let data = {};
-        try { data = JSON.parse(t); } catch {}
+    const msgs = res.data.messages || [];
+    $messages.innerHTML = "";
 
-        if (!r.ok){
-            console.error("❌ send", r.status, data || t);
-            typing.querySelector(".bubble").textContent = `Hata: ${data?.error || "send failed"}`;
-            setBusy(false);
-            return;
-        }
+    if (!msgs.length) {
+        setIntro();
+        return;
+    }
 
-        typing.querySelector(".bubble").textContent = data.reply || "(no reply)";
+    for (const m of msgs) {
+        addMsg(m.role === "assistant" ? "assistant" : "user", m.content || "");
+    }
+
+    $messages.scrollTop = $messages.scrollHeight;
+}
+
+async function sendMessage() {
+    const text = ($input.value || "").trim();
+    if (!text) return;
+
+    if (!activeSid) {
+        await createSession();
+    }
+
+    // intro varsa kaldır
+    if ($messages.querySelector(".intro")) $messages.innerHTML = "";
+
+    $input.value = "";
+    addMsg("user", text);
+
+    const typing = addMsg("assistant", "…");
+    setBusy(true);
+
+    const res = await apiJSON(FN_SEND, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: activeSid, text }),
+    });
+
+    if (!res.ok) {
+        console.error("send failed", res.status, res.data);
+        typing.querySelector(".bubble").textContent = `Hata: ${res.data?.error || "send failed"}`;
         setBusy(false);
+        return;
     }
 
-    // search filter (left list)
-    $search?.addEventListener("input", () => {
-        const q = ($search.value || "").trim().toLowerCase();
-        const filtered = sessionsCache.filter(s =>
-            (s.title || "").toLowerCase().includes(q)
-        );
-        renderSessions(filtered);
-    });
+    typing.querySelector(".bubble").textContent = res.data.reply || "(no reply)";
+    setBusy(false);
 
-    // bind
-    $btnNew?.addEventListener("click", createSession);
-    $mobileNew?.addEventListener("click", createSession);
+    // ✅ Başlık güncellemesi server’da olduysa, listeyi tazele
+    await loadSessions();
+}
 
-    $send?.addEventListener("click", sendMessage);
-    $input?.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey){
-            e.preventDefault();
-            sendMessage();
-        }
-    });
+$btnNew?.addEventListener("click", createSession);
+$send?.addEventListener("click", sendMessage);
 
-    // init
-    (async () => {
-        await loadSessions();
-        await loadMessages();
-    })();
+$input?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+(async function init() {
+    await loadProfileBadge();
+    await loadSessions();
+    await loadMessages();
+    setIntro(); // aktifSid yoksa; varsa loadMessages zaten doldurur
 })();

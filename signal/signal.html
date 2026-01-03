@@ -5,28 +5,30 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Signal</title>
 
+    <!-- Sidebar (site nav) -->
+    <link rel="stylesheet" href="/styles/sidebar.css" />
+    <script src="/assets1/sidebar.js" defer></script>
+
+    <!-- Signal UI -->
     <link rel="stylesheet" href="/signal/signal.css" />
 </head>
 
 <body class="is-signal">
-
-<!-- ✅ Sidebar mount (global) -->
+<!-- Site sidebar mount -->
 <div id="sidebarMount"></div>
-<script src="/assets1/sidebar.js" defer></script>
 
-<!-- ✅ App -->
-<main class="app">
-    <section class="panel">
+<main class="sigWrap">
+    <section class="sigPanel">
 
-        <!-- LEFT (desktop chats list) -->
-        <aside class="left" id="leftPane">
-            <div class="leftHeader">
+        <!-- LEFT (Chats) -->
+        <aside class="sigLeft" id="chatDrawer">
+            <div class="sigLeftHeader">
                 <button class="btnNew" id="btnNewChat" type="button">
                     <span class="plus">+</span> New chat
                 </button>
 
                 <div class="searchWrap">
-                    <input class="search" id="chatSearch" placeholder="Search chats" />
+                    <input class="search" id="chatSearch" placeholder="Search chats" autocomplete="off" />
                 </div>
 
                 <div class="label">Your chats</div>
@@ -34,10 +36,8 @@
 
             <div class="chatList" id="chatList"></div>
 
-            <div class="leftFooter">
+            <div class="sigLeftFooter">
                 <div class="profileCard">
-                    <div class="avatar" id="pfAvatar">SM</div>
-
                     <div class="pMeta">
                         <div class="pName" id="pfName">—</div>
                         <div class="pEmail" id="pfEmail">—</div>
@@ -52,24 +52,42 @@
             </div>
         </aside>
 
-        <!-- RIGHT (chat) -->
-        <section class="right">
-            <!-- mobile top bar -->
+        <!-- MOBILE Drawer backdrop -->
+        <div class="drawerBackdrop" id="drawerBackdrop" aria-hidden="true"></div>
+
+        <!-- RIGHT (Chat) -->
+        <section class="sigRight">
+            <!-- Chat header (top) -->
             <div class="chatTop">
-                <button class="hambBtn" id="openDrawer" type="button" aria-label="Open chats">☰</button>
-                <div class="chatTopTitle" id="chatTopTitle">Chats</div>
-                <button class="ghostBtn" id="mobileNewChat" type="button">New</button>
+                <!-- Mobile: open chat list -->
+                <button class="iconBtn mobileOnly" id="btnOpenChats" type="button" aria-label="Open chats">
+                    <!-- message icon -->
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z"
+                              stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+
+                <div class="chatTitle" id="chatTitle">New chat</div>
+
+                <!-- (PC’de görünmeyecek, mobilde de “New” yazısı yok) -->
+                <div class="chatTopRight"></div>
             </div>
 
-            <div class="messages" id="messages"></div>
+            <!-- Messages -->
+            <div class="messages" id="messages">
+                <!-- JS burada intro koyacak -->
+            </div>
 
+            <!-- Composer -->
             <div class="composerWrap">
                 <div class="composer">
-                    <button class="btnCircle" id="btnImage" type="button" title="Upload image">＋</button>
-                    <input class="input" id="chatInput" placeholder="Message…" />
-                    <button class="btnSend" id="btnSend" type="button" aria-label="Send">➤</button>
+                    <button class="btnCircle" id="btnImage" type="button" title="Upload image">+</button>
+                    <input class="input" id="chatInput" placeholder="Message…" autocomplete="off" />
+                    <button class="btnSend" id="btnSend" type="button" aria-label="Send">
+                        ▶
+                    </button>
                 </div>
-                <div class="composerHint">Shift+Enter yeni satır • Enter gönder</div>
             </div>
         </section>
 
@@ -77,6 +95,5 @@
 
     <script type="module" src="/signal/signal.js"></script>
 </main>
-
 </body>
 </html>
