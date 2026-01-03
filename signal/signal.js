@@ -1,9 +1,10 @@
-// /signal/signal.js  (FULL - CHATGPT-LIKE)
+// /signal/signal.js  (FULL - CHATGPT-LIKE + UPGRADE MODAL)
 // - scroll fixed (messages scroll, page doesn't grow)
 // - typing indicator: "Answering..."
 // - basic markdown renderer (no external libs)
 // - sends { sid, message, text, imageDataUrl }
 // - reads { allowed, reason, plan, text }
+// - ✅ upgrade modal open/close + plan pick
 
 (() => {
     const $ = (q) => document.querySelector(q);
@@ -17,6 +18,11 @@
         plus: $(".btnCircle"),
         planText: $(".pPlan"),
         search: $(".search"),
+
+        // ✅ Upgrade UI
+        upgradeBtn: $(".btnUpgrade"),
+        upgradeModal: $("#upgradeModal"),
+        upgradeClose: $("#upgradeClose"),
     };
 
     // ---------- IDs ----------
@@ -43,17 +49,9 @@
     }
 
     // ---------- tiny markdown -> html ----------
-    // Supports:
-    // # ## ### headings
-    // **bold** *italic* `inline`
-    // ``` code fences
-    // - lists
-    // > blockquote
-    // links: https://...
     function mdToHtml(md = "") {
         const s = String(md || "");
 
-        // code fences first
         const fences = [];
         let tmp = s.replace(/```([\s\S]*?)```/g, (_, code) => {
             const id = fences.length;
@@ -61,40 +59,29 @@
             return `@@FENCE_${id}@@`;
         });
 
-        // escape (so user can't inject)
         tmp = esc(tmp);
 
-        // headings
         tmp = tmp.replace(/^###\s+(.*)$/gm, "<h3>$1</h3>");
         tmp = tmp.replace(/^##\s+(.*)$/gm, "<h2>$1</h2>");
         tmp = tmp.replace(/^#\s+(.*)$/gm, "<h1>$1</h1>");
 
-        // blockquote
         tmp = tmp.replace(/^\>\s?(.*)$/gm, "<blockquote>$1</blockquote>");
 
-        // unordered lists: group consecutive "- "
-        // convert lines to list items first
         tmp = tmp.replace(/^\-\s+(.*)$/gm, "<li>$1</li>");
-        // wrap consecutive <li> blocks into <ul>
         tmp = tmp.replace(/(?:<li>[\s\S]*?<\/li>\s*)+/g, (m) => {
-            // only wrap if it contains <li>
             if (!m.includes("<li>")) return m;
             return `<ul>${m}</ul>`;
         });
 
-        // bold / italic / inline code
         tmp = tmp.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
         tmp = tmp.replace(/\*(.+?)\*/g, "<em>$1</em>");
         tmp = tmp.replace(/`(.+?)`/g, "<code>$1</code>");
 
-        // auto-link http(s)
         tmp = tmp.replace(
             /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g,
             `<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>`
         );
 
-        // paragraphs: split by blank lines
-        // but keep headings/ul/blockquote/pre as block elements
         const lines = tmp.split(/\n/);
         let out = [];
         let buf = [];
@@ -113,12 +100,10 @@
                 continue;
             }
 
-            // if line starts with block html tag, flush paragraph and push raw
             if (
                 line.startsWith("<h1>") ||
                 line.startsWith("<h2>") ||
                 line.startsWith("<h3>") ||
-                line.startsWith("<ուլ>") || // (won't happen, safe)
                 line.startsWith("<ul>") ||
                 line.startsWith("<blockquote>")
             ) {
@@ -127,28 +112,24 @@
                 continue;
             }
 
-            // If this line is a full <ul>...</ul> block created by regex, treat as block
             if (line.startsWith("<ul>") && line.endsWith("</ul>")) {
                 flushP();
                 out.push(line);
                 continue;
             }
 
-            // If it's a lone <li> (edge), keep as block list
             if (line.startsWith("<li>") && line.endsWith("</li>")) {
                 flushP();
                 out.push(`<ul>${line}</ul>`);
                 continue;
             }
 
-            // Otherwise accumulate into paragraph
             buf.push(line);
         }
         flushP();
 
         tmp = out.join("\n");
 
-        // restore code fences (as <pre><code>)
         tmp = tmp.replace(/@@FENCE_(\d+)@@/g, (_, idStr) => {
             const code = fences[Number(idStr)] ?? "";
             return `<pre><code>${esc(code)}</code></pre>`;
@@ -169,7 +150,6 @@
         row.appendChild(inner);
         el.messages.appendChild(row);
 
-        // keep scroll pinned to bottom
         el.messages.scrollTop = el.messages.scrollHeight;
     }
 
@@ -194,6 +174,19 @@
 
     function hideTyping() {
         document.getElementById(TYPING_ID)?.remove();
+    }
+
+    // ---------- Upgrade modal helpers ----------
+    function openUpgrade() {
+        if (!el.upgradeModal) return;
+        el.upgradeModal.classList.add("open");
+        el.upgradeModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeUpgrade() {
+        if (!el.upgradeModal) return;
+        el.upgradeModal.classList.remove("open");
+        el.upgradeModal.setAttribute("aria-hidden", "true");
     }
 
     // ---------- file to data url ----------
@@ -249,26 +242,24 @@
         if (!raw) return;
 
         el.input.value = "";
-
-        // user message (no bubble, just clean line)
         addRow("user", mdToHtml(raw));
 
         showTyping();
-
         const r = await sendToAI({ text: raw });
-
         hideTyping();
 
         if (!r.ok) {
-            // free limit / errors
             const err = r.error;
 
+            // ✅ daily limit -> show upgrade modal too
             if (err === "msg_limit_reached" || err === "daily_message_limit") {
-                addRow("ai", mdToHtml("Free limit reached: You used your daily 10 messages. Upgrade to continue."));
+                addRow("ai", mdToHtml("Daily limit reached. Upgrade to continue."));
+                openUpgrade();
                 return;
             }
             if (err === "daily_image_limit") {
-                addRow("ai", mdToHtml("Free limit reached: You used your daily 1 image. Upgrade to continue."));
+                addRow("ai", mdToHtml("Daily image limit reached. Upgrade to continue."));
+                openUpgrade();
                 return;
             }
             if (err === "rate_limited") {
@@ -300,7 +291,6 @@
             const file = inp.files?.[0];
             if (!file) return;
 
-            // show user "sent image"
             addRow("user", mdToHtml("[image]"));
 
             showTyping();
@@ -317,6 +307,11 @@
             hideTyping();
 
             if (!r.ok) {
+                if (r.error === "msg_limit_reached" || r.error === "daily_message_limit" || r.error === "daily_image_limit") {
+                    addRow("ai", mdToHtml("Limit reached. Upgrade to continue."));
+                    openUpgrade();
+                    return;
+                }
                 addRow("ai", mdToHtml(`Error: ${r.error}`));
                 return;
             }
@@ -333,18 +328,14 @@
 
     // ---------- init UI text (EN) ----------
     function setEnglishUI() {
-        // placeholders / labels
         if (el.search) el.search.placeholder = "Search chats";
-        if (el.input) el.input.placeholder = "Ask anything";
+        if (el.input) el.input.placeholder = "Ask anything about finance…";
 
-        // button labels
         if (el.newChat) {
-            // keep plus icon span if exists
             const plus = el.newChat.querySelector(".plus");
             el.newChat.innerHTML = "";
             if (plus) el.newChat.appendChild(plus);
-            const t = document.createTextNode(" New chat");
-            el.newChat.appendChild(t);
+            el.newChat.appendChild(document.createTextNode(" New chat"));
         }
         if (el.planText) el.planText.textContent = "free";
     }
@@ -361,6 +352,33 @@
 
     el.plus?.addEventListener("click", handleImagePick);
     el.newChat?.addEventListener("click", newChat);
+
+    // ✅ Upgrade open/close events
+    el.upgradeBtn?.addEventListener("click", openUpgrade);
+    el.upgradeClose?.addEventListener("click", closeUpgrade);
+
+    // click outside card closes
+    el.upgradeModal?.addEventListener("click", (e) => {
+        if (e.target === el.upgradeModal) closeUpgrade();
+    });
+
+    // ESC closes
+    window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeUpgrade();
+    });
+
+    // Plan button click (for now: just show message; checkout later)
+    document.addEventListener("click", (e) => {
+        const btn = e.target?.closest?.(".planBtn");
+        if (!btn) return;
+
+        const plan = btn.getAttribute("data-plan");
+        if (!plan) return;
+
+        // Payment wiring later
+        addRow("ai", mdToHtml(`Selected **${plan.toUpperCase()}**. Checkout will be enabled next step.`));
+        closeUpgrade();
+    });
 
     // init
     setEnglishUI();
