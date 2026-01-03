@@ -84,7 +84,7 @@ export const handler = async (event) => {
         const userText = String(body.message || "").trim();
         if (!userText) return json(400, { error: "Missing message" });
 
-        const model = process.env.OPENAI_MODEL || "gpt-5";
+        const model = "gpt-5";
         const maxOut = toInt(process.env.OPENAI_MAX_OUTPUT_TOKENS, 700);
         const FREE_MSG_LIMIT = toInt(process.env.FREE_DAILY_MSG_LIMIT, 10);
 
