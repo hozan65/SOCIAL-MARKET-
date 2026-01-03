@@ -2,33 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover" />
     <title>Signal</title>
-
-    <!-- Sidebar (site nav) -->
-    <link rel="stylesheet" href="/styles/sidebar.css" />
-    <script src="/assets1/sidebar.js" defer></script>
-
-    <!-- Signal UI -->
     <link rel="stylesheet" href="/signal/signal.css" />
 </head>
 
 <body class="is-signal">
-<!-- Site sidebar mount -->
+<!-- ✅ GLOBAL SIDEBAR -->
 <div id="sidebarMount"></div>
+<script src="/assets1/sidebar.js" defer></script>
+
+<!-- ✅ MOBILE CHAT LIST BACKDROP -->
+<div class="sigBackdrop" id="sigBackdrop" aria-hidden="true"></div>
 
 <main class="sigWrap">
     <section class="sigPanel">
 
-        <!-- LEFT (Chats) -->
-        <aside class="sigLeft" id="chatDrawer">
+        <!-- LEFT (CHAT LIST) -->
+        <aside class="sigLeft" id="sigLeft" aria-label="Chat list">
             <div class="sigLeftHeader">
                 <button class="btnNew" id="btnNewChat" type="button">
                     <span class="plus">+</span> New chat
                 </button>
 
                 <div class="searchWrap">
-                    <input class="search" id="chatSearch" placeholder="Search chats" autocomplete="off" />
+                    <input class="search" id="chatSearch" placeholder="Search chats" />
                 </div>
 
                 <div class="label">Your chats</div>
@@ -37,53 +35,38 @@
             <div class="chatList" id="chatList"></div>
 
             <div class="sigLeftFooter">
-                <div class="profileCard">
-                    <div class="pMeta">
-                        <div class="pName" id="pfName">—</div>
-                        <div class="pEmail" id="pfEmail">—</div>
-
-                        <div class="pRow">
-                            <div class="pPlanBadge" id="pfPlan">free</div>
-                            <button class="btnSoft" id="btnProfile" type="button">Profile</button>
-                            <button class="btnUpgrade" id="btnUpgrade" type="button">Upgrade</button>
-                        </div>
-                    </div>
+                <div class="profileBar">
+                    <span class="planBadge" id="pfPlan">free</span>
+                    <button class="btnGhost" id="btnProfile" type="button">Profile</button>
+                    <button class="btnPrimary" id="btnUpgrade" type="button">Upgrade</button>
                 </div>
             </div>
         </aside>
 
-        <!-- MOBILE Drawer backdrop -->
-        <div class="drawerBackdrop" id="drawerBackdrop" aria-hidden="true"></div>
-
-        <!-- RIGHT (Chat) -->
-        <section class="sigRight">
-            <!-- Chat header (top) -->
-            <div class="chatTop">
-                <!-- Mobile: open chat list -->
-                <button class="iconBtn mobileOnly" id="btnOpenChats" type="button" aria-label="Open chats">
-                    <!-- message icon -->
+        <!-- RIGHT (CHAT) -->
+        <section class="sigRight" aria-label="Chat">
+            <!-- ✅ Mobile top header (only mobile) -->
+            <div class="sigMobileTop">
+                <button class="iconBtn" id="btnChatDrawer" type="button" aria-label="Chats">
+                    <!-- chat icon -->
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                        <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z"
+                        <path d="M21 12c0 4.418-4.03 8-9 8a10.5 10.5 0 0 1-3.5-.6L3 21l1.7-4.2A7.6 7.6 0 0 1 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8Z"
                               stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
                     </svg>
                 </button>
 
-                <div class="chatTitle" id="chatTitle">New chat</div>
-
-                <!-- (PC’de görünmeyecek, mobilde de “New” yazısı yok) -->
-                <div class="chatTopRight"></div>
+                <div class="sigTitle" id="sigTitle">New chat</div>
+                <div class="sigTopSpacer"></div>
             </div>
 
-            <!-- Messages -->
             <div class="messages" id="messages">
-                <!-- JS burada intro koyacak -->
+                <!-- boşsa JS “HEY I’m your Finance Assistant” hero basacak -->
             </div>
 
-            <!-- Composer -->
             <div class="composerWrap">
                 <div class="composer">
                     <button class="btnCircle" id="btnImage" type="button" title="Upload image">+</button>
-                    <input class="input" id="chatInput" placeholder="Message…" autocomplete="off" />
+                    <input class="input" id="chatInput" placeholder="Message..." />
                     <button class="btnSend" id="btnSend" type="button" aria-label="Send">
                         ▶
                     </button>
@@ -92,8 +75,8 @@
         </section>
 
     </section>
-
-    <script type="module" src="/signal/signal.js"></script>
 </main>
+
+<script type="module" src="/signal/signal.js"></script>
 </body>
 </html>
