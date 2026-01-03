@@ -1,15 +1,12 @@
 // /assets1/sidebar.js
-console.log("✅ sidebar.js loaded (loader + behavior)");
+console.log("✅ sidebar.js loaded");
 
 document.addEventListener("DOMContentLoaded", async () => {
     const mount = document.getElementById("sidebarMount");
-    if (!mount) {
-        console.warn("sidebarMount yok → sidebar yüklenmedi");
-        return;
-    }
+    if (!mount) return;
 
     try {
-        // Font Awesome (tek kez)
+        // Font Awesome once
         if (!document.getElementById("faCDN")) {
             const fa = document.createElement("link");
             fa.id = "faCDN";
@@ -18,7 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.head.appendChild(fa);
         }
 
-        // Sidebar CSS (tek kez)
+        // Sidebar css once
         if (!document.getElementById("smSidebarCss")) {
             const css = document.createElement("link");
             css.id = "smSidebarCss";
@@ -27,55 +24,22 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.head.appendChild(css);
         }
 
-        // Sidebar HTML load
+        // Load sidebar html
         const res = await fetch("/components/sidebar.html", { cache: "no-store" });
         if (!res.ok) throw new Error("sidebar.html bulunamadı");
         mount.innerHTML = await res.text();
 
-        const sidebar = document.getElementById("smSidebar");
-        const burger = document.getElementById("smSbBurger");
-        const closeBtn = document.getElementById("smSbClose");
-        const backdrop = document.getElementById("smSbBackdrop");
-
-        const pinBtn = document.getElementById("smSbPin");
-        const profileBtn = document.getElementById("smSbProfileBtn");
-        const menu = document.getElementById("smSbMenu");
-        const logoutBtn = document.getElementById("smSbLogout");
-
-        // Body flags (content offset)
         document.body.classList.add("hasSidebar");
 
-        // ===== Restore collapsed/unpin state
-        const collapsed = localStorage.getItem("sm_sb_collapsed") === "1";
-        sidebar.classList.toggle("isCollapsed", collapsed);
-        document.body.classList.toggle("sidebarCollapsed", collapsed);
-        pinBtn?.setAttribute("aria-pressed", collapsed ? "false" : "true");
+        const sidebar = document.getElementById("smSidebar");
+        const backdrop = document.getElementById("smSbBackdrop");
+        const closeBtn = document.getElementById("smSbClose");
+        const hamb = document.getElementById("smSbMobileHamb");
 
-        // ===== Active menu (sayfanın folder'ına göre)
-        const path = location.pathname.replace(/\/+$/, "");
-        const seg = path.split("/")[1] || "feed";
-        const page = seg.endsWith(".html") ? seg.replace(".html","") : seg;
+        // profile dropdown
+        const profileBtn = document.getElementById("smSbProfileBtn");
+        const menu = document.getElementById("smSbMenu");
 
-        document.querySelectorAll("#smSidebar [data-page]").forEach((a) => {
-            if ((a.dataset.page || "").trim().toLowerCase() === page.toLowerCase()) {
-                a.classList.add("active");
-            }
-        });
-
-        // ===== Pin/Unpin (collapsed toggle)
-        pinBtn?.addEventListener("click", () => {
-            const next = !sidebar.classList.contains("isCollapsed");
-            sidebar.classList.toggle("isCollapsed", next);
-            document.body.classList.toggle("sidebarCollapsed", next);
-            localStorage.setItem("sm_sb_collapsed", next ? "1" : "0");
-
-            // dropdown kapat
-            menu?.classList.remove("open");
-            profileBtn?.setAttribute("aria-expanded", "false");
-            if (menu) menu.setAttribute("aria-hidden", "true");
-        });
-
-        // ===== Profile dropdown
         const toggleMenu = (force) => {
             if (!menu) return;
             const open = force ?? !menu.classList.contains("open");
@@ -88,82 +52,63 @@ document.addEventListener("DOMContentLoaded", async () => {
             e.stopPropagation();
             toggleMenu();
         });
-
         menu?.addEventListener("click", (e) => e.stopPropagation());
         document.addEventListener("click", () => toggleMenu(false));
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") {
-                toggleMenu(false);
-                closeMobile();
+
+        // active highlight by path folder
+        const path = location.pathname.replace(/\/+$/, "");
+        const seg = path.split("/")[1] || "feed";
+        const page = seg.endsWith(".html") ? seg.replace(".html","") : seg;
+
+        document.querySelectorAll("#smSidebar [data-page]").forEach((a) => {
+            if ((a.dataset.page || "").trim().toLowerCase() === page.toLowerCase()) {
+                a.classList.add("active");
             }
         });
 
-        // ===== Mobile open/close
+        // MOBILE open/close
         const openMobile = () => {
             sidebar.classList.add("mobileOpen");
-            backdrop?.classList.add("open");
-            closeBtn?.classList.add("open");
-            burger?.setAttribute("aria-expanded", "true");
+            backdrop.classList.add("open");
+            closeBtn.classList.add("open");
             document.documentElement.style.overflow = "hidden";
+            toggleMenu(false);
         };
 
         const closeMobile = () => {
             sidebar.classList.remove("mobileOpen");
-            backdrop?.classList.remove("open");
-            closeBtn?.classList.remove("open");
-            burger?.setAttribute("aria-expanded", "false");
+            backdrop.classList.remove("open");
+            closeBtn.classList.remove("open");
             document.documentElement.style.overflow = "";
+            toggleMenu(false);
         };
 
-        burger?.addEventListener("click", (e) => {
+        hamb?.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
             sidebar.classList.contains("mobileOpen") ? closeMobile() : openMobile();
         });
 
-        closeBtn?.addEventListener("click", () => closeMobile());
-        backdrop?.addEventListener("click", () => closeMobile());
+        closeBtn?.addEventListener("click", closeMobile);
+        backdrop?.addEventListener("click", closeMobile);
 
-        // mobile menu link click => close
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeMobile();
+        });
+
+        // link click => close mobile
         document.querySelectorAll("#smSidebar a").forEach((a) => {
             a.addEventListener("click", () => closeMobile());
         });
 
-        // ===== Profile info (senin auth sisteminden okunabilir)
-        // Şimdilik localStorage varsa oradan dene; yoksa default kalsın.
-        const $name = document.getElementById("smSbName");
-        const $mail = document.getElementById("smSbMail");
-        const $avatar = document.getElementById("smSbAvatar");
+        console.log("✅ sidebar initialized (hover desktop + mobile drawer)");
 
-        const guessName =
-            localStorage.getItem("user_name") ||
-            localStorage.getItem("name") ||
-            "Hozan Bilaloglu";
-        const guessMail =
-            localStorage.getItem("user_email") ||
-            localStorage.getItem("email") ||
-            "—";
-
-        if ($name) $name.textContent = guessName;
-        if ($mail) $mail.textContent = guessMail;
-        if ($avatar) $avatar.textContent = (guessName?.trim()?.[0] || "U").toUpperCase();
-
-        // ===== Logout (senin auth logout fonksiyonun varsa buraya bağlarız)
-        logoutBtn?.addEventListener("click", () => {
-            // örnek: token temizle
-            localStorage.removeItem("jwt");
-            localStorage.removeItem("access_token");
-            // yönlendirme
-            location.href = "/login/";
-        });
-
-        console.log("✅ Sidebar fully initialized");
     } catch (err) {
-        console.error("❌ SIDEBAR ERROR:", err);
+        console.error("❌ sidebar error:", err);
     }
 });
 
-// ✅ Load AI Support widget (external JS) — header.js yerine burada
+// keep support widget loader
 (() => {
     if (document.getElementById("smSupportLoader")) return;
     const s = document.createElement("script");

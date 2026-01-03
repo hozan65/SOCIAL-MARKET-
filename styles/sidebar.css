@@ -1,42 +1,71 @@
-
 /* /styles/sidebar.css */
 
-/* Paddle-like dark */
+/* Paddle vibe: koyu morumsu siyah + soft aktif */
 :root{
-    --sb-bg:#0f0f14;
-    --sb-bg2:#12121a;
-    --sb-line:rgba(255,255,255,.08);
-    --sb-text:rgba(255,255,255,.92);
-    --sb-muted:rgba(255,255,255,.58);
-    --sb-hover:rgba(255,255,255,.06);
-    --sb-active:rgba(255,255,255,.10);
+    --sb-bg1: #0d0b14;
+    --sb-bg2: #100d1a;
+    --sb-edge: rgba(255,255,255,.08);
 
-    --sb-w-close:84px;
-    --sb-w-open:268px;
+    --sb-text: rgba(255,255,255,.92);
+    --sb-muted: rgba(255,255,255,.58);
 
-    /* sayfa boşluğu */
-    --sb-gap: 0px;
+    --sb-hover: rgba(255,255,255,.06);
+    --sb-active: rgba(255,255,255,.10);
+
+    --menu-bg: #141120;
+
+    --w-close: 84px;
+    --w-open: 268px;
 }
 
+/* ========= SIDEBAR ========= */
 .smSidebar{
-    position:fixed;
+    position: fixed;
     top:0; left:0; bottom:0;
-    width: var(--sb-w-open);
-    background: linear-gradient(180deg, var(--sb-bg), var(--sb-bg2));
-    border-right: 1px solid var(--sb-line);
+
+    width: var(--w-close);                 /* ✅ default kapalı */
+    background: linear-gradient(180deg, var(--sb-bg1), var(--sb-bg2));
+    border-right: 1px solid var(--sb-edge);
+
     padding: 14px 12px;
     display:flex;
     flex-direction:column;
     gap: 10px;
+
     z-index: 60;
-    transition: width .18s ease, transform .18s ease;
+    overflow:hidden;
+
+    transition: width .16s ease, transform .16s ease;
 }
 
-/* collapsed (unpin) */
-.smSidebar.isCollapsed{
-    width: var(--sb-w-close);
+/* ✅ Desktop hover: açılır/kapanır */
+@media (min-width: 901px){
+    .smSidebar:hover{ width: var(--w-open); }
 }
 
+/* text hide when closed */
+.smSbBrandText,
+.smSbText,
+.smSbMeta,
+.smSbCaret{
+    opacity:0;
+    width:0;
+    overflow:hidden;
+    transition: opacity .12s ease, width .12s ease;
+}
+
+/* when open (hover desktop) => show */
+@media (min-width: 901px){
+    .smSidebar:hover .smSbBrandText,
+    .smSidebar:hover .smSbText,
+    .smSidebar:hover .smSbMeta,
+    .smSidebar:hover .smSbCaret{
+        opacity:1;
+        width:auto;
+    }
+}
+
+/* ========= TOP ========= */
 .smSbTop{
     display:flex;
     align-items:center;
@@ -57,38 +86,14 @@
 .smSbLogo{
     width:38px;height:38px;
     border-radius:12px;
-    border:1px solid var(--sb-line);
+    border: 1px solid rgba(255,255,255,.10);
     background: rgba(255,255,255,.06);
-    display:grid; place-items:center;
+    display:grid;
+    place-items:center;
     font-weight:900;
-    letter-spacing:.5px;
 }
 
-.smSbBrandText{
-    font-weight:850;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    transition: opacity .12s ease, width .12s ease;
-}
-
-.smSidebar.isCollapsed .smSbBrandText{
-    opacity:0;
-    width:0;
-}
-
-/* Mobile hamburger */
-.smSbBurger{
-    width:40px;height:40px;
-    border-radius:12px;
-    border:1px solid var(--sb-line);
-    background: rgba(255,255,255,.05);
-    color: var(--sb-text);
-    cursor:pointer;
-    display:none;
-}
-
-/* NAV */
+/* ========= NAV ========= */
 .smSbNav{
     display:flex;
     flex-direction:column;
@@ -102,9 +107,9 @@
     gap:12px;
     padding: 11px 12px;
     border-radius: 14px;
-    text-decoration:none;
     color: var(--sb-text);
-    border: 1px solid transparent;
+    text-decoration:none;
+    border:1px solid transparent;
     user-select:none;
 }
 
@@ -113,19 +118,6 @@
     text-align:center;
     font-size:15px;
     color: var(--sb-muted);
-}
-
-.smSbText{
-    font-weight:750;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    transition: opacity .12s ease, width .12s ease;
-}
-
-.smSidebar.isCollapsed .smSbText{
-    opacity:0;
-    width:0;
 }
 
 .smSbItem:hover{
@@ -137,62 +129,49 @@
     background: var(--sb-active);
     border-color: rgba(255,255,255,.10);
 }
-
 .smSbItem.active i{ color: rgba(255,255,255,.92); }
 
-/* Bottom */
+.smSbDivider{
+    height:1px;
+    background: rgba(255,255,255,.08);
+    margin: 10px 6px;
+}
+
+/* ========= BOTTOM / PROFILE ========= */
 .smSbBottom{
     margin-top:auto;
-    display:flex;
-    flex-direction:column;
-    gap:10px;
     padding: 10px 2px 2px;
-    border-top: 1px solid rgba(255,255,255,.08);
 }
 
-.smSbPin{
-    background: rgba(255,255,255,.04);
-    border-color: rgba(255,255,255,.08);
-    cursor:pointer;
-}
-.smSbPin:hover{ background: rgba(255,255,255,.06); }
-
-/* Profile button */
 .smSbProfile{
+    width:100%;
     display:flex;
     align-items:center;
     gap:10px;
-    width:100%;
     padding: 10px 10px;
     border-radius: 16px;
     border:1px solid rgba(255,255,255,.10);
     background: rgba(255,255,255,.04);
     color: var(--sb-text);
     cursor:pointer;
-    position:relative;
+    position: relative;
 }
+
+.smSbProfile:hover{ background: rgba(255,255,255,.06); }
 
 .smSbAvatar{
     width:36px;height:36px;
     border-radius:999px;
-    display:grid;place-items:center;
-    font-weight:900;
+    display:grid;
+    place-items:center;
     background: rgba(255,255,255,.10);
-    border:1px solid rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.10);
+    font-weight:900;
 }
 
-.smSbMeta{
-    min-width:0;
-    flex:1;
-    transition: opacity .12s ease, width .12s ease;
-}
-.smSidebar.isCollapsed .smSbMeta{
-    opacity:0;
-    width:0;
-}
-
+/* Meta */
 .smSbName{
-    font-weight:850;
+    font-weight:900;
     font-size:14px;
     white-space:nowrap;
     overflow:hidden;
@@ -208,23 +187,14 @@
     text-overflow:ellipsis;
 }
 
-.smSbCaret{
-    color: var(--sb-muted);
-    transition: opacity .12s ease, width .12s ease;
-}
-.smSidebar.isCollapsed .smSbCaret{
-    opacity:0;
-    width:0;
-}
-
-/* Dropdown menu */
+/* Dropdown */
 .smSbMenu{
     position:absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 86px;
-    background: #15151d;
-    border:1px solid rgba(255,255,255,.10);
+    left: 10px;
+    right: 10px;
+    bottom: 58px;
+    background: linear-gradient(180deg, #171426, var(--menu-bg));
+    border:1px solid rgba(255,255,255,.12);
     border-radius: 16px;
     padding: 10px;
     display:none;
@@ -236,10 +206,10 @@
     padding: 10px;
     border-radius: 12px;
     background: rgba(255,255,255,.04);
-    border:1px solid rgba(255,255,255,.06);
-    color: var(--sb-text);
+    border: 1px solid rgba(255,255,255,.06);
 }
-.smSbMenuTitle{ font-weight:900; }
+
+.smSbMenuTitle{ font-weight:900; color: rgba(255,255,255,.92); }
 .smSbMenuSub{ margin-top:6px; color: var(--sb-muted); font-size:12px; font-weight:700; }
 
 .smSbMenuItem{
@@ -260,7 +230,7 @@
 }
 .smSbMenuDiv{
     height:1px;
-    background: rgba(255,255,255,.08);
+    background: rgba(255,255,255,.10);
     margin: 10px 4px;
 }
 .smSbMenuBtn{
@@ -269,7 +239,17 @@
     cursor:pointer;
 }
 
-/* Mobile backdrop + close X */
+/* ========= PAGE OFFSET (desktop only) ========= */
+@media (min-width: 901px){
+    body.hasSidebar main.container{
+        margin-left: var(--w-close);
+    }
+    body.hasSidebar .smSidebar:hover ~ main.container{
+        margin-left: var(--w-open);
+    }
+}
+
+/* ========= MOBILE ========= */
 .smSbBackdrop{
     position:fixed;
     inset:0;
@@ -281,44 +261,59 @@
 
 .smSbClose{
     position:fixed;
-    top: 14px;
-    left: calc(var(--sb-w-open) - 46px);
+    top: 12px;
+    left: calc(var(--w-open) - 48px);
     width: 40px;
     height: 40px;
     border-radius: 12px;
     border:1px solid rgba(255,255,255,.14);
-    background: rgba(15,15,20,.65);
+    background: rgba(12,10,18,.70);
     color: rgba(255,255,255,.92);
     cursor:pointer;
     display:none;
     z-index: 61;
 }
+.smSbClose.open{ display:block; }
 
-/* ✅ Sayfa içerik offset (senin container sol boşluk) */
-body.hasSidebar main.container{
-    margin-left: calc(var(--sb-w-open) + var(--sb-gap));
+/* mobile hamburger floating */
+.smSbMobileHamb{
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border:1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.88);
+    cursor:pointer;
+    display:none;
+    z-index: 58;
 }
 
-/* collapsed olunca daha az offset */
-body.hasSidebar.sidebarCollapsed main.container{
-    margin-left: calc(var(--sb-w-close) + var(--sb-gap));
-}
-
-/* Mobile: sidebar kapalı başlar, hamburger ile açılır */
 @media (max-width: 900px){
-    body.hasSidebar main.container,
-    body.hasSidebar.sidebarCollapsed main.container{
-        margin-left: 0 !important;
-    }
-
-    .smSbBurger{ display:inline-flex; align-items:center; justify-content:center; }
-
+    /* sidebar off-canvas */
     .smSidebar{
+        width: var(--w-open);
         transform: translateX(-100%);
-        width: var(--sb-w-open);
     }
     .smSidebar.mobileOpen{
         transform: translateX(0);
     }
-    .smSbClose.open{ display:block; }
+
+    /* show texts when mobile open */
+    .smSidebar.mobileOpen .smSbBrandText,
+    .smSidebar.mobileOpen .smSbText,
+    .smSidebar.mobileOpen .smSbMeta,
+    .smSidebar.mobileOpen .smSbCaret{
+        opacity:1;
+        width:auto;
+    }
+
+    /* content no margin */
+    body.hasSidebar main.container{
+        margin-left: 0 !important;
+    }
+
+    /* show hamburger */
+    .smSbMobileHamb{ display:block; }
 }
