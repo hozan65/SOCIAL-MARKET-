@@ -14,9 +14,10 @@
 
     --w-close:84px;
     --w-open:268px;
-    --content-gap: 18px;
+    --content-gap:18px;
 }
 
+/* Sidebar base */
 .smSidebar{
     position:fixed;
     inset:0 auto 0 0;
@@ -32,12 +33,15 @@
     transition: width .16s ease, transform .16s ease;
 }
 
-/* ✅ PIN açıkken sidebar sabit açık */
-.smSidebar.isPinned{
-    width: var(--w-open);
+/* ✅ PIN açık */
+.smSidebar.isPinned{ width: var(--w-open); }
+
+/* ✅ Desktop hover: PIN kapalıysa açılır */
+@media (min-width: 901px){
+    .smSidebar:not(.isPinned):hover{ width: var(--w-open); }
 }
 
-/* text görünürlüğü */
+/* text visibility */
 .smSbBrandText,.smSbText,.smSbMeta,.smSbCaret{
     opacity:0;
     width:0;
@@ -45,12 +49,19 @@
     transition: opacity .12s ease, width .12s ease;
 }
 
-.smSidebar.isPinned .smSbBrandText,
-.smSidebar.isPinned .smSbText,
-.smSidebar.isPinned .smSbMeta,
-.smSidebar.isPinned .smSbCaret{
-    opacity:1;
-    width:auto;
+/* show on open state (hover OR pinned) */
+@media (min-width: 901px){
+    .smSidebar.isPinned .smSbBrandText,
+    .smSidebar.isPinned .smSbText,
+    .smSidebar.isPinned .smSbMeta,
+    .smSidebar.isPinned .smSbCaret,
+    .smSidebar:not(.isPinned):hover .smSbBrandText,
+    .smSidebar:not(.isPinned):hover .smSbText,
+    .smSidebar:not(.isPinned):hover .smSbMeta,
+    .smSidebar:not(.isPinned):hover .smSbCaret{
+        opacity:1;
+        width:auto;
+    }
 }
 
 /* TOP */
@@ -71,22 +82,6 @@
     font-weight:900;
 }
 
-.smSbPinBtn{
-    width:40px;height:40px;
-    border-radius:12px;
-    border:1px solid rgba(255,255,255,.12);
-    background: rgba(255,255,255,.05);
-    color: rgba(255,255,255,.92);
-    cursor:pointer;
-}
-.smSbPinBtn:hover{ background: rgba(255,255,255,.08); }
-
-/* PIN aktifken görsel */
-.smSidebar.isPinned .smSbPinBtn{
-    background: rgba(255,255,255,.10);
-    border-color: rgba(255,255,255,.18);
-}
-
 /* NAV */
 .smSbNav{ display:flex; flex-direction:column; gap:6px; padding:0 2px; }
 
@@ -100,7 +95,12 @@
     user-select:none;
 }
 
-.smSbItem i{ width:22px; text-align:center; font-size:15px; color: var(--sb-muted); }
+.smSbItem i{
+    width:22px;
+    text-align:center;
+    font-size:15px;
+    color: var(--sb-muted);
+}
 
 .smSbItem:hover{
     background: var(--sb-hover);
@@ -113,13 +113,36 @@
 }
 .smSbItem.active i{ color: rgba(255,255,255,.92); }
 
-/* bottom/profile */
+/* BOTTOM */
 .smSbBottom{
     margin-top:auto;
     padding: 10px 2px 2px;
-    position: relative;
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
 }
 
+/* ✅ PIN row en altta düzgün */
+.smSbPinRow{
+    width:100%;
+    display:flex; align-items:center; gap:12px;
+    padding: 11px 12px;
+    border-radius: 14px;
+    border:1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.04);
+    color: var(--sb-text);
+    cursor:pointer;
+}
+.smSbPinRow i{ width:22px; text-align:center; color: var(--sb-muted); }
+.smSbPinRow:hover{ background: rgba(255,255,255,.06); }
+.smSidebar.isPinned .smSbPinRow{
+    background: rgba(255,255,255,.10);
+    border-color: rgba(255,255,255,.18);
+}
+.smSidebar.isPinned .smSbPinRow i{ color: rgba(255,255,255,.92); }
+
+/* PROFILE button */
 .smSbProfile{
     width:100%;
     display:flex; align-items:center; gap:10px;
@@ -140,15 +163,20 @@
     font-weight:900;
 }
 
+/* ✅ dar modda H şişmesin */
+.smSidebar:not(.isPinned) .smSbAvatar{
+    width:34px;height:34px;
+}
+
 .smSbName{ font-weight:900; font-size:14px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .smSbMail{ margin-top:3px; font-size:12px; color: var(--sb-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-/* Dropdown menu - en altta pop */
+/* Dropdown */
 .smSbMenu{
     position:absolute;
     left: 6px;
     right: 6px;
-    bottom: 64px;
+    bottom: 126px; /* pin + profile yüksekliği */
     background: linear-gradient(180deg, #171426, var(--menu-bg));
     border:1px solid rgba(255,255,255,.12);
     border-radius:16px;
@@ -173,17 +201,14 @@
 .smSbMenuDiv{ height:1px; background: rgba(255,255,255,.10); margin: 10px 4px; }
 .smSbMenuBtn{ width:100%; background:transparent; cursor:pointer; }
 
-/* ✅ Desktop content boşluğu: pinned olmasa da close kadar; pinned olunca open kadar */
+/* ✅ İÇERİK BOŞLUĞU: HER ZAMAN OPEN KADAR (üst üste gelme yok) */
 @media (min-width: 901px){
     body.hasSidebar main.container{
-        margin-left: calc(var(--w-close) + var(--content-gap)) !important;
-    }
-    body.hasSidebar.sidebarPinned main.container{
         margin-left: calc(var(--w-open) + var(--content-gap)) !important;
     }
 }
 
-/* ===== MOBILE drawer ===== */
+/* MOBILE drawer */
 .smSbBackdrop{
     position:fixed; inset:0;
     background: rgba(0,0,0,.45);
@@ -207,7 +232,7 @@
 }
 .smSbClose.open{ display:block; }
 
-/* ✅ Hamburger sağ üstte */
+/* hamburger sağ üst */
 .smSbMobileHamb{
     position:fixed;
     top:14px;
@@ -230,7 +255,6 @@
     }
     .smSidebar.mobileOpen{ transform: translateX(0); }
 
-    /* mobile open => text visible */
     .smSidebar.mobileOpen .smSbBrandText,
     .smSidebar.mobileOpen .smSbText,
     .smSidebar.mobileOpen .smSbMeta,
