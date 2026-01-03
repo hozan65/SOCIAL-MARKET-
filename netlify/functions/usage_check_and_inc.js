@@ -1,17 +1,6 @@
 // netlify/functions/usage_check_and_inc.js
-// Checks daily usage limits for free users and increments counters.
-// Pro users bypass limits.
-//
-// ENV (optional):
-// - FREE_DAILY_MSG_LIMIT (default 10)
-// - FREE_DAILY_IMG_LIMIT (default 1)
-//
-// Requires Supabase tables:
-// - profiles(id, plan, pro_active)
-// - usage_daily(user_id, day, msg_count, img_count)
-//
-// Auth:
-// - For now expects header "x-user-id" (replace with real auth later)
+// Free plan daily limits gate + increments.
+// Uses tables: ai_users, ai_usage_daily
 
 import { sbAdmin } from "./supabase.js";
 
@@ -30,12 +19,11 @@ function json(statusCode, obj) {
 }
 
 function todayISODateUTC() {
-    // Use UTC date to avoid timezone edge issues on serverless
     const d = new Date();
     const yyyy = d.getUTCFullYear();
     const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
     const dd = String(d.getUTCDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`; // YYYY-MM-DD
+    return `${yyyy}-${mm}-${dd}`;
 }
 
 function toInt(v, fallback) {
@@ -48,15 +36,13 @@ export const handler = async (event) => {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        // TEMP AUTH (replace with Appwrite/Supabase auth verification)
         const userId = String(event.headers["x-user-id"] || "").trim();
-        if (!userId) return json(401, { error: "Missing x-user-id (wire this to real auth)" });
+        if (!userId) return json(401, { error: "Missing x-user-id" });
 
         const body = JSON.parse(event.body || "{}");
-        // type: "msg" | "img"
-        const type = String(body.type || "").toLowerCase();
+        const type = String(body.type || "").toLowerCase(); // msg | img
         if (type !== "msg" && type !== "img") {
-            return json(400, { error: "Invalid type. Use: msg | img" });
+            return json(400, { error: "Invalid type. Use msg | img" });
         }
 
         const FREE_MSG_LIMIT = toInt(process.env.FREE_DAILY_MSG_LIMIT, 10);
@@ -64,11 +50,17 @@ export const handler = async (event) => {
 
         const sb = sbAdmin();
 
-        // 1) profile -> pro bypass
+        // Ensure ai_user exists (first time user)
+        await sb.from("ai_users").upsert(
+            { user_id: userId },
+            { onConflict: "user_id", ignoreDuplicates: true }
+        );
+
+        // Read plan
         const profRes = await sb
-            .from("profiles")
+            .from("ai_users")
             .select("plan, pro_active")
-            .eq("id", userId)
+            .eq("user_id", userId)
             .maybeSingle();
 
         if (profRes.error) return json(500, { error: profRes.error.message });
@@ -76,7 +68,8 @@ export const handler = async (event) => {
         const plan = profRes.data?.plan || "free";
         const proActive = Boolean(profRes.data?.pro_active);
 
-        if (proActive || plan.startsWith("pro")) {
+        // Pro bypass
+        if (proActive || String(plan).startsWith("pro")) {
             return json(200, {
                 allowed: true,
                 bypass: true,
@@ -85,25 +78,15 @@ export const handler = async (event) => {
             });
         }
 
-        // 2) Free -> check today's usage
+        // Free usage check + increment
         const day = todayISODateUTC();
 
-        // Ensure row exists
-        // (upsert with defaults)
-        const upsertRes = await sb
-            .from("usage_daily")
-            .upsert(
-                { user_id: userId, day },
-                { onConflict: "user_id,day", ignoreDuplicates: true }
-            );
-
-        if (upsertRes.error) {
-            // Not fatal if already exists, but log it
-            console.error("usage_daily upsert error:", upsertRes.error);
-        }
+        await sb
+            .from("ai_usage_daily")
+            .upsert({ user_id: userId, day }, { onConflict: "user_id,day", ignoreDuplicates: true });
 
         const usageRes = await sb
-            .from("usage_daily")
+            .from("ai_usage_daily")
             .select("msg_count, img_count")
             .eq("user_id", userId)
             .eq("day", day)
@@ -114,14 +97,12 @@ export const handler = async (event) => {
         let msgCount = toInt(usageRes.data?.msg_count, 0);
         let imgCount = toInt(usageRes.data?.img_count, 0);
 
-        // 3) Decide allowed
         const wouldMsg = type === "msg" ? msgCount + 1 : msgCount;
         const wouldImg = type === "img" ? imgCount + 1 : imgCount;
 
-        const msgAllowed = wouldMsg <= FREE_MSG_LIMIT;
-        const imgAllowed = wouldImg <= FREE_IMG_LIMIT;
-
-        const allowed = (type === "msg") ? msgAllowed : imgAllowed;
+        const allowed = type === "msg"
+            ? (wouldMsg <= FREE_MSG_LIMIT)
+            : (wouldImg <= FREE_IMG_LIMIT);
 
         if (!allowed) {
             return json(200, {
@@ -137,23 +118,19 @@ export const handler = async (event) => {
             });
         }
 
-        // 4) Increment counter atomically (best-effort)
-        // Supabase supports "update + select" but atomic increment is easiest via RPC,
-        // however we keep it simple with a guarded update:
-        const updatePatch =
+        const patch =
             type === "msg"
                 ? { msg_count: msgCount + 1, updated_at: new Date().toISOString() }
                 : { img_count: imgCount + 1, updated_at: new Date().toISOString() };
 
         const upd = await sb
-            .from("usage_daily")
-            .update(updatePatch)
+            .from("ai_usage_daily")
+            .update(patch)
             .eq("user_id", userId)
             .eq("day", day);
 
         if (upd.error) return json(500, { error: upd.error.message });
 
-        // Return updated counts
         msgCount = type === "msg" ? msgCount + 1 : msgCount;
         imgCount = type === "img" ? imgCount + 1 : imgCount;
 

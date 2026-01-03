@@ -1,17 +1,8 @@
 // netlify/functions/ai_image.js
-// Image endpoint: checks plan/limits, increments image usage, calls OpenAI Images API.
-//
-// Required ENV:
-// - SUPABASE_URL
-// - SUPABASE_SERVICE_ROLE_KEY
-// - OPENAI_API_KEY
-//
-// Optional ENV:
-// - OPENAI_IMAGE_MODEL (default: "gpt-image-1")
-// - FREE_DAILY_IMG_LIMIT (default: 1)
+// AI Image endpoint: plan check + free daily img limit + OpenAI Images API
+// Tables: ai_users, ai_usage_daily
 
 import { sbAdmin } from "./supabase.js";
-
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -44,7 +35,6 @@ async function openaiImage({ prompt, model }) {
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("Missing OPENAI_API_KEY");
 
-    // OpenAI Images API
     const res = await fetch("https://api.openai.com/v1/images", {
         method: "POST",
         headers: {
@@ -60,15 +50,9 @@ async function openaiImage({ prompt, model }) {
 
     const text = await res.text();
     let data = null;
-    try {
-        data = text ? JSON.parse(text) : null;
-    } catch {}
+    try { data = text ? JSON.parse(text) : null; } catch {}
+    if (!res.ok) throw new Error(`OpenAI API ${res.status}: ${text}`);
 
-    if (!res.ok) {
-        throw new Error(`OpenAI API ${res.status}: ${text}`);
-    }
-
-    // Expect: { data: [{ b64_json: "..." }] }
     const b64 = data?.data?.[0]?.b64_json || null;
     return { b64, raw: data };
 }
@@ -78,9 +62,8 @@ export const handler = async (event) => {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        // TEMP AUTH: replace later with Appwrite/Supabase auth verification
         const userId = String(event.headers["x-user-id"] || "").trim();
-        if (!userId) return json(401, { error: "Missing x-user-id (wire this to real auth)" });
+        if (!userId) return json(401, { error: "Missing x-user-id" });
 
         const body = JSON.parse(event.body || "{}");
         const prompt = String(body.prompt || "").trim();
@@ -91,11 +74,17 @@ export const handler = async (event) => {
 
         const sb = sbAdmin();
 
-        // 1) profile check
+        // Ensure ai_user exists
+        await sb.from("ai_users").upsert(
+            { user_id: userId },
+            { onConflict: "user_id", ignoreDuplicates: true }
+        );
+
+        // Plan check
         const profRes = await sb
-            .from("profiles")
+            .from("ai_users")
             .select("plan, pro_active")
-            .eq("id", userId)
+            .eq("user_id", userId)
             .maybeSingle();
 
         if (profRes.error) return json(500, { error: profRes.error.message });
@@ -103,16 +92,16 @@ export const handler = async (event) => {
         const plan = profRes.data?.plan || "free";
         const proActive = Boolean(profRes.data?.pro_active);
 
-        // 2) limits (only for free)
+        // Free daily img limit
         if (!(proActive || String(plan).startsWith("pro"))) {
             const day = todayISODateUTC();
 
             await sb
-                .from("usage_daily")
+                .from("ai_usage_daily")
                 .upsert({ user_id: userId, day }, { onConflict: "user_id,day", ignoreDuplicates: true });
 
             const usageRes = await sb
-                .from("usage_daily")
+                .from("ai_usage_daily")
                 .select("img_count")
                 .eq("user_id", userId)
                 .eq("day", day)
@@ -133,7 +122,7 @@ export const handler = async (event) => {
             }
 
             const upd = await sb
-                .from("usage_daily")
+                .from("ai_usage_daily")
                 .update({ img_count: imgCount + 1, updated_at: new Date().toISOString() })
                 .eq("user_id", userId)
                 .eq("day", day);
@@ -141,17 +130,16 @@ export const handler = async (event) => {
             if (upd.error) return json(500, { error: upd.error.message });
         }
 
-        // 3) call OpenAI images
         const { b64, raw } = await openaiImage({ prompt, model });
 
         if (!b64) {
-            return json(200, { allowed: true, b64: null, note: "No b64_json in response", raw });
+            return json(200, { allowed: true, b64: null, note: "No b64_json", raw });
         }
 
         return json(200, {
             allowed: true,
             plan: proActive ? plan : "free",
-            b64, // frontend: "data:image/png;base64," + b64
+            b64,
         });
     } catch (e) {
         console.error("ai_image error:", e);

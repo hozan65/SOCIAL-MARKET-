@@ -1,18 +1,8 @@
 // netlify/functions/ai_chat.js
-// AI Chat endpoint: checks plan/limits, increments usage, calls OpenAI Responses API.
-//
-// Required ENV:
-// - SUPABASE_URL
-// - SUPABASE_SERVICE_ROLE_KEY
-// - OPENAI_API_KEY
-//
-// Optional ENV:
-// - OPENAI_MODEL (default: "gpt-5")
-// - OPENAI_MAX_OUTPUT_TOKENS (default: 700)
-// - FREE_DAILY_MSG_LIMIT (default: 10)
+// AI Chat endpoint: plan check + free daily msg limit + OpenAI Responses API
+// Tables: ai_users, ai_usage_daily
 
 import { sbAdmin } from "./supabase.js";
-
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -42,18 +32,13 @@ function todayISODateUTC() {
 }
 
 function extractOutputText(respJson) {
-    // Try the convenient field (some responses include it)
     if (typeof respJson?.output_text === "string" && respJson.output_text.trim()) {
         return respJson.output_text;
     }
-
-    // Otherwise walk the output array
     const out = respJson?.output;
     if (!Array.isArray(out)) return "";
-
     const chunks = [];
     for (const item of out) {
-        // Typical shape: { type: "message", content: [{ type: "output_text", text: "..." }, ...] }
         const content = item?.content;
         if (!Array.isArray(content)) continue;
         for (const c of content) {
@@ -74,25 +59,16 @@ async function openaiResponses({ input, model, max_output_tokens }) {
             "Content-Type": "application/json",
             Authorization: `Bearer ${key}`,
         },
-        body: JSON.stringify({
-            model,
-            input,
-            max_output_tokens,
-        }),
+        body: JSON.stringify({ model, input, max_output_tokens }),
     });
 
     const text = await res.text();
     let data = null;
     try {
         data = text ? JSON.parse(text) : null;
-    } catch {
-        // keep raw
-    }
+    } catch {}
 
-    if (!res.ok) {
-        throw new Error(`OpenAI API ${res.status}: ${text}`);
-    }
-
+    if (!res.ok) throw new Error(`OpenAI API ${res.status}: ${text}`);
     return data;
 }
 
@@ -101,9 +77,8 @@ export const handler = async (event) => {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        // TEMP AUTH: replace later with Appwrite/Supabase auth verification
         const userId = String(event.headers["x-user-id"] || "").trim();
-        if (!userId) return json(401, { error: "Missing x-user-id (wire this to real auth)" });
+        if (!userId) return json(401, { error: "Missing x-user-id" });
 
         const body = JSON.parse(event.body || "{}");
         const userText = String(body.message || "").trim();
@@ -115,11 +90,17 @@ export const handler = async (event) => {
 
         const sb = sbAdmin();
 
-        // 1) profile check
+        // Ensure ai_user exists (first time user)
+        await sb.from("ai_users").upsert(
+            { user_id: userId },
+            { onConflict: "user_id", ignoreDuplicates: true }
+        );
+
+        // Plan check
         const profRes = await sb
-            .from("profiles")
+            .from("ai_users")
             .select("plan, pro_active")
-            .eq("id", userId)
+            .eq("user_id", userId)
             .maybeSingle();
 
         if (profRes.error) return json(500, { error: profRes.error.message });
@@ -127,17 +108,16 @@ export const handler = async (event) => {
         const plan = profRes.data?.plan || "free";
         const proActive = Boolean(profRes.data?.pro_active);
 
-        // 2) limits (only for free)
+        // Free daily msg limit
         if (!(proActive || String(plan).startsWith("pro"))) {
             const day = todayISODateUTC();
 
-            // ensure usage row exists
             await sb
-                .from("usage_daily")
+                .from("ai_usage_daily")
                 .upsert({ user_id: userId, day }, { onConflict: "user_id,day", ignoreDuplicates: true });
 
             const usageRes = await sb
-                .from("usage_daily")
+                .from("ai_usage_daily")
                 .select("msg_count")
                 .eq("user_id", userId)
                 .eq("day", day)
@@ -158,7 +138,7 @@ export const handler = async (event) => {
             }
 
             const upd = await sb
-                .from("usage_daily")
+                .from("ai_usage_daily")
                 .update({ msg_count: msgCount + 1, updated_at: new Date().toISOString() })
                 .eq("user_id", userId)
                 .eq("day", day);
@@ -166,32 +146,21 @@ export const handler = async (event) => {
             if (upd.error) return json(500, { error: upd.error.message });
         }
 
-        // 3) call OpenAI (Responses API)
+        // OpenAI call
         const resp = await openaiResponses({
             model,
             max_output_tokens: maxOut,
             input: [
-                {
-                    role: "user",
-                    content: [{ type: "input_text", text: userText }],
-                },
+                { role: "user", content: [{ type: "input_text", text: userText }] },
             ],
         });
 
         const answer = extractOutputText(resp);
-        if (!answer) {
-            return json(200, {
-                allowed: true,
-                text: "",
-                note: "No output_text found",
-                raw: resp,
-            });
-        }
 
         return json(200, {
             allowed: true,
             plan: proActive ? plan : "free",
-            text: answer,
+            text: answer || "",
             usage: resp?.usage || null,
             response_id: resp?.id || null,
         });

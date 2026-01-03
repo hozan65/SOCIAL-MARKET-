@@ -1,3 +1,6 @@
+// netlify/functions/supabase.js
+// SERVER-ONLY Supabase admin client (Service Role) for Netlify Functions
+
 import { createClient } from "@supabase/supabase-js";
 
 export function sbAdmin() {
@@ -7,5 +10,7 @@ export function sbAdmin() {
     if (!url) throw new Error("Missing SUPABASE_URL");
     if (!key) throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY");
 
-    return createClient(url, key, { auth: { persistSession: false } });
+    return createClient(url, key, {
+        auth: { persistSession: false },
+    });
 }
