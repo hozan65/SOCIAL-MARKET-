@@ -1,60 +1,63 @@
 /* /styles/sidebar.css */
-
-/* Paddle vibe: koyu morumsu siyah + soft aktif */
 :root{
-    --sb-bg1: #0d0b14;
-    --sb-bg2: #100d1a;
-    --sb-edge: rgba(255,255,255,.08);
+    --sb-bg1:#0d0b14;
+    --sb-bg2:#100d1a;
+    --sb-edge:rgba(255,255,255,.08);
 
-    --sb-text: rgba(255,255,255,.92);
-    --sb-muted: rgba(255,255,255,.58);
+    --sb-text:rgba(255,255,255,.92);
+    --sb-muted:rgba(255,255,255,.58);
 
-    --sb-hover: rgba(255,255,255,.06);
-    --sb-active: rgba(255,255,255,.10);
+    --sb-hover:rgba(255,255,255,.06);
+    --sb-active:rgba(255,255,255,.10);
 
-    --menu-bg: #141120;
+    --menu-bg:#141120;
 
-    --w-close: 84px;
-    --w-open: 268px;
+    --w-close:84px;
+    --w-open:268px;  /* ✅ içerik boşluğu bunu kullanacak */
+
+    --content-gap: 18px; /* sidebar ile content arasında ekstra boşluk */
 }
 
-/* ========= SIDEBAR ========= */
 .smSidebar{
-    position: fixed;
-    top:0; left:0; bottom:0;
+    position:fixed;
+    inset:0 auto 0 0;
 
-    width: var(--w-close);                 /* ✅ default kapalı */
+    width: var(--w-close);
     background: linear-gradient(180deg, var(--sb-bg1), var(--sb-bg2));
     border-right: 1px solid var(--sb-edge);
 
     padding: 14px 12px;
     display:flex;
     flex-direction:column;
-    gap: 10px;
+    gap:10px;
 
-    z-index: 60;
+    z-index: 9999;
     overflow:hidden;
 
     transition: width .16s ease, transform .16s ease;
 }
 
-/* ✅ Desktop hover: açılır/kapanır */
+/* ✅ Desktop hover: açılır */
 @media (min-width: 901px){
     .smSidebar:hover{ width: var(--w-open); }
 }
 
-/* text hide when closed */
-.smSbBrandText,
-.smSbText,
-.smSbMeta,
-.smSbCaret{
+/* ✅ içerik boşluğu: DAİMA açık genişlik kadar */
+@media (min-width: 901px){
+    body.hasSidebar main.container{
+        margin-left: calc(var(--w-open) + var(--content-gap)) !important;
+    }
+}
+
+/* collapse mod text gizle */
+.smSbBrandText,.smSbText,.smSbMeta,.smSbCaret{
     opacity:0;
     width:0;
     overflow:hidden;
     transition: opacity .12s ease, width .12s ease;
 }
 
-/* when open (hover desktop) => show */
+/* hover olunca text görünür */
 @media (min-width: 901px){
     .smSidebar:hover .smSbBrandText,
     .smSidebar:hover .smSbText,
@@ -65,46 +68,29 @@
     }
 }
 
-/* ========= TOP ========= */
-.smSbTop{
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding: 6px 4px 12px;
-}
+/* TOP */
+.smSbTop{ display:flex; align-items:center; gap:10px; padding: 6px 4px 12px; }
 
 .smSbBrand{
-    display:flex;
-    align-items:center;
-    gap:10px;
+    display:flex; align-items:center; gap:10px;
     text-decoration:none;
     color: var(--sb-text);
-    flex:1;
-    min-width:0;
+    flex:1; min-width:0;
 }
 
 .smSbLogo{
-    width:38px;height:38px;
-    border-radius:12px;
-    border: 1px solid rgba(255,255,255,.10);
+    width:38px;height:38px;border-radius:12px;
+    border:1px solid rgba(255,255,255,.10);
     background: rgba(255,255,255,.06);
-    display:grid;
-    place-items:center;
+    display:grid; place-items:center;
     font-weight:900;
 }
 
-/* ========= NAV ========= */
-.smSbNav{
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-    padding: 0 2px;
-}
+/* NAV */
+.smSbNav{ display:flex; flex-direction:column; gap:6px; padding:0 2px; }
 
 .smSbItem{
-    display:flex;
-    align-items:center;
-    gap:12px;
+    display:flex; align-items:center; gap:12px;
     padding: 11px 12px;
     border-radius: 14px;
     color: var(--sb-text);
@@ -114,8 +100,7 @@
 }
 
 .smSbItem i{
-    width:22px;
-    text-align:center;
+    width:22px; text-align:center;
     font-size:15px;
     color: var(--sb-muted);
 }
@@ -131,176 +116,115 @@
 }
 .smSbItem.active i{ color: rgba(255,255,255,.92); }
 
-.smSbDivider{
-    height:1px;
-    background: rgba(255,255,255,.08);
-    margin: 10px 6px;
-}
-
-/* ========= BOTTOM / PROFILE ========= */
-.smSbBottom{
-    margin-top:auto;
-    padding: 10px 2px 2px;
-}
+/* bottom/profile */
+.smSbBottom{ margin-top:auto; padding: 10px 2px 2px; }
 
 .smSbProfile{
     width:100%;
-    display:flex;
-    align-items:center;
-    gap:10px;
+    display:flex; align-items:center; gap:10px;
     padding: 10px 10px;
     border-radius: 16px;
     border:1px solid rgba(255,255,255,.10);
     background: rgba(255,255,255,.04);
     color: var(--sb-text);
     cursor:pointer;
-    position: relative;
+    position:relative;
 }
-
 .smSbProfile:hover{ background: rgba(255,255,255,.06); }
 
 .smSbAvatar{
-    width:36px;height:36px;
-    border-radius:999px;
-    display:grid;
-    place-items:center;
+    width:36px;height:36px;border-radius:999px;
+    display:grid;place-items:center;
     background: rgba(255,255,255,.10);
     border: 1px solid rgba(255,255,255,.10);
     font-weight:900;
 }
 
-/* Meta */
-.smSbName{
-    font-weight:900;
-    font-size:14px;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    line-height:1.1;
-}
-.smSbMail{
-    margin-top:3px;
-    font-size:12px;
-    color: var(--sb-muted);
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-}
+.smSbName{ font-weight:900; font-size:14px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.smSbMail{ margin-top:3px; font-size:12px; color: var(--sb-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-/* Dropdown */
+/* Dropdown menu */
 .smSbMenu{
     position:absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 58px;
+    left:10px; right:10px;
+    bottom:58px;
     background: linear-gradient(180deg, #171426, var(--menu-bg));
     border:1px solid rgba(255,255,255,.12);
-    border-radius: 16px;
-    padding: 10px;
+    border-radius:16px;
+    padding:10px;
     display:none;
 }
-
 .smSbMenu.open{ display:block; }
 
 .smSbMenuHead{
-    padding: 10px;
-    border-radius: 12px;
+    padding:10px;
+    border-radius:12px;
     background: rgba(255,255,255,.04);
-    border: 1px solid rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.06);
 }
-
 .smSbMenuTitle{ font-weight:900; color: rgba(255,255,255,.92); }
 .smSbMenuSub{ margin-top:6px; color: var(--sb-muted); font-size:12px; font-weight:700; }
 
 .smSbMenuItem{
     margin-top:6px;
-    display:flex;
-    align-items:center;
-    gap:10px;
-    padding: 10px 10px;
-    border-radius: 12px;
+    display:flex; align-items:center; gap:10px;
+    padding:10px 10px;
+    border-radius:12px;
     color: var(--sb-text);
     text-decoration:none;
     border:1px solid transparent;
 }
 .smSbMenuItem i{ width:18px; text-align:center; color: var(--sb-muted); }
-.smSbMenuItem:hover{
-    background: rgba(255,255,255,.06);
-    border-color: rgba(255,255,255,.06);
-}
-.smSbMenuDiv{
-    height:1px;
-    background: rgba(255,255,255,.10);
-    margin: 10px 4px;
-}
-.smSbMenuBtn{
-    width:100%;
-    background: transparent;
-    cursor:pointer;
-}
+.smSbMenuItem:hover{ background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.06); }
 
-/* ========= PAGE OFFSET (desktop only) ========= */
-@media (min-width: 901px){
-    body.hasSidebar main.container{
-        margin-left: var(--w-close);
-    }
-    body.hasSidebar .smSidebar:hover ~ main.container{
-        margin-left: var(--w-open);
-    }
-}
+.smSbMenuDiv{ height:1px; background: rgba(255,255,255,.10); margin: 10px 4px; }
+.smSbMenuBtn{ width:100%; background:transparent; cursor:pointer; }
 
-/* ========= MOBILE ========= */
+/* ===== MOBILE drawer ===== */
 .smSbBackdrop{
-    position:fixed;
-    inset:0;
+    position:fixed; inset:0;
     background: rgba(0,0,0,.45);
     display:none;
-    z-index: 59;
+    z-index: 9998;
 }
 .smSbBackdrop.open{ display:block; }
 
 .smSbClose{
     position:fixed;
-    top: 12px;
+    top:12px;
     left: calc(var(--w-open) - 48px);
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
+    width:40px;height:40px;
+    border-radius:12px;
     border:1px solid rgba(255,255,255,.14);
     background: rgba(12,10,18,.70);
     color: rgba(255,255,255,.92);
     cursor:pointer;
     display:none;
-    z-index: 61;
+    z-index: 10000;
 }
 .smSbClose.open{ display:block; }
 
-/* mobile hamburger floating */
 .smSbMobileHamb{
-    position: fixed;
-    top: 14px;
-    left: 14px;
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
+    position:fixed;
+    top:14px; left:14px;
+    width:44px; height:44px;
+    border-radius:12px;
     border:1px solid rgba(0,0,0,.10);
     background: rgba(255,255,255,.88);
     cursor:pointer;
     display:none;
-    z-index: 58;
+    z-index: 9997;
 }
 
 @media (max-width: 900px){
-    /* sidebar off-canvas */
+    body.hasSidebar main.container{ margin-left: 0 !important; }
+
     .smSidebar{
         width: var(--w-open);
         transform: translateX(-100%);
     }
-    .smSidebar.mobileOpen{
-        transform: translateX(0);
-    }
+    .smSidebar.mobileOpen{ transform: translateX(0); }
 
-    /* show texts when mobile open */
     .smSidebar.mobileOpen .smSbBrandText,
     .smSidebar.mobileOpen .smSbText,
     .smSidebar.mobileOpen .smSbMeta,
@@ -309,11 +233,5 @@
         width:auto;
     }
 
-    /* content no margin */
-    body.hasSidebar main.container{
-        margin-left: 0 !important;
-    }
-
-    /* show hamburger */
     .smSbMobileHamb{ display:block; }
 }

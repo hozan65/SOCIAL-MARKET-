@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const closeBtn = document.getElementById("smSbClose");
         const hamb = document.getElementById("smSbMobileHamb");
 
-        // profile dropdown
+        // dropdown
         const profileBtn = document.getElementById("smSbProfileBtn");
         const menu = document.getElementById("smSbMenu");
 
@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         menu?.addEventListener("click", (e) => e.stopPropagation());
         document.addEventListener("click", () => toggleMenu(false));
 
-        // active highlight by path folder
+        // Active menu: folder name -> data-page
         const path = location.pathname.replace(/\/+$/, "");
         const seg = path.split("/")[1] || "feed";
         const page = seg.endsWith(".html") ? seg.replace(".html","") : seg;
@@ -96,19 +96,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             if (e.key === "Escape") closeMobile();
         });
 
-        // link click => close mobile
         document.querySelectorAll("#smSidebar a").forEach((a) => {
             a.addEventListener("click", () => closeMobile());
         });
 
-        console.log("✅ sidebar initialized (hover desktop + mobile drawer)");
-
+        console.log("✅ sidebar ok (content always safe gap)");
     } catch (err) {
         console.error("❌ sidebar error:", err);
     }
 });
 
-// keep support widget loader
+// AI support widget loader stays
 (() => {
     if (document.getElementById("smSupportLoader")) return;
     const s = document.createElement("script");
