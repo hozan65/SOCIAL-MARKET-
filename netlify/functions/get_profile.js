@@ -1,12 +1,29 @@
-// netlify/functions/get_profile.js
-import { createClient } from "@supabase/supabase-js";
+// netlify/functions/get_profile.js  (FULL FIXED)
+// - if ?id missing -> infer uid from JWT (same auth as other functions)
+// - still supports /get_profile?id=OTHER_UID
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+import { createClient } from "@supabase/supabase-js";
+import { getAppwriteUser } from "./_appwrite_user.js";
+
+const sb = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE
+);
 
 export const handler = async (event) => {
     try {
-        const uid = event.queryStringParameters?.id;
-        if (!uid) return json(400, { error: "Missing id" });
+        // CORS preflight (optional but good)
+        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+
+        let uid = String(event.queryStringParameters?.id || "").trim();
+
+        // ✅ FIX: if id not provided, use JWT user
+        if (!uid) {
+            const { user } = await getAppwriteUser(event).catch(() => ({ user: null }));
+            uid = user?.$id ? String(user.$id) : "";
+        }
+
+        if (!uid) return json(401, { error: "Missing id" });
 
         const { data: prof, error: pe } = await sb
             .from("profiles")
@@ -20,13 +37,7 @@ export const handler = async (event) => {
         const links = [];
         if (prof.website) links.push({ url: prof.website, label: "" });
 
-        // followers: following_uid = uid
-        // following: follower_uid = uid
-        const [
-            followersRes,
-            followingRes,
-            postsRes
-        ] = await Promise.all([
+        const [followersRes, followingRes, postsRes] = await Promise.all([
             sb.from("follows").select("id", { count: "exact", head: true }).eq("following_uid", uid),
             sb.from("follows").select("id", { count: "exact", head: true }).eq("follower_uid", uid),
             sb.from("analyses").select("id", { count: "exact", head: true }).eq("author_id", uid),
@@ -52,15 +63,15 @@ export const handler = async (event) => {
                 bio: prof.bio,
                 avatar_url: prof.avatar_url,
                 links,
-                created_at: prof.created_at
+                created_at: prof.created_at,
             },
             counts: {
                 followers: followersRes.count ?? 0,
                 following: followingRes.count ?? 0,
-                posts: postsRes.count ?? 0
+                posts: postsRes.count ?? 0,
             },
             posts: postList || [],
-            is_following: false
+            is_following: false,
         });
     } catch (e) {
         return json(500, { error: String(e?.message || e) });
@@ -70,7 +81,12 @@ export const handler = async (event) => {
 function json(statusCode, body) {
     return {
         statusCode,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "content-type, authorization",
+            "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+        },
         body: JSON.stringify(body),
     };
 }
