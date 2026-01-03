@@ -51,7 +51,8 @@
                 Best for trying the app before you upgrade.
             </p>
 
-            <button class="uBtn isDisabled" disabled>Current</button>
+            <!-- ✅ data-plan added (so JS can mark current) -->
+            <button class="uBtn isDisabled" data-plan="go" data-label="Current plan" disabled>Current plan</button>
         </article>
 
         <!-- PLUS -->
@@ -85,7 +86,8 @@
                 Perfect for daily use — more freedom without overpaying.
             </p>
 
-            <button class="uBtn" id="buyPlus">Buy Plus</button>
+            <!-- ✅ data-plan + data-label added -->
+            <button class="uBtn" id="buyPlus" data-plan="plus" data-label="Buy Plus">Buy Plus</button>
         </article>
 
         <!-- PRO -->
@@ -122,7 +124,8 @@
                 Full access for serious traders — no limits, maximum control.
             </p>
 
-            <button class="uBtn" id="buyPro">Buy Pro</button>
+            <!-- ✅ data-plan + data-label added -->
+            <button class="uBtn" id="buyPro" data-plan="pro" data-label="Buy Pro">Buy Pro</button>
         </article>
 
     </section>
@@ -146,20 +149,8 @@
 
 </main>
 
-<script>
-    document.getElementById("buyPlus")?.addEventListener("click", () => {
-        console.log("Plus checkout");
-        // Paddle checkout later
-    });
-
-    document.getElementById("buyPro")?.addEventListener("click", () => {
-        console.log("Pro checkout");
-        // Paddle checkout later
-    });
-</script>
-
+<!-- ✅ ONLY this script (no inline click handlers) -->
 <script src="/signal/upgrade.js" defer></script>
-
 
 </body>
 </html>
