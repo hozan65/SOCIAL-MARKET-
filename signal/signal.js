@@ -1,8 +1,9 @@
-// /signal/signal.js
-// ✅ ChatGPT-like UX: typing bubble ("answering…"), better rendering, English UI strings
-// ✅ Sends: message (+ text for compatibility)
-// ✅ Handles: allowed:false (free limit)
-// ✅ Reads: data.text
+// /signal/signal.js  (FULL - CHATGPT-LIKE)
+// - scroll fixed (messages scroll, page doesn't grow)
+// - typing indicator: "Answering..."
+// - basic markdown renderer (no external libs)
+// - sends { sid, message, text, imageDataUrl }
+// - reads { allowed, reason, plan, text }
 
 (() => {
     const $ = (q) => document.querySelector(q);
@@ -15,8 +16,10 @@
         newChat: $(".btnNew"),
         plus: $(".btnCircle"),
         planText: $(".pPlan"),
+        search: $(".search"),
     };
 
+    // ---------- IDs ----------
     const getUserId = () => localStorage.getItem("sm_uid") || "demo_user";
 
     const getSid = () => {
@@ -28,46 +31,172 @@
         return sid;
     };
 
-    function normalizeAIText(raw = "") {
-        let t = String(raw || "");
-
-        // Remove common LaTeX wrappers if they sneak in
-        t = t.replace(/\\\(|\\\)|\\\[|\\\]/g, "");
-        t = t.replace(/\\text\{([^}]+)\}/g, "$1");
-        t = t.replace(/\\times/g, "×");
-
-        // Trim extra whitespace
-        return t.trim();
+    // ---------- HTML escape ----------
+    function esc(s = "") {
+        return String(s).replace(/[&<>"']/g, (c) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+        }[c]));
     }
 
-    function addBubble(role, text) {
-        const d = document.createElement("div");
-        d.className = `msg ${role === "user" ? "user" : "ai"}`;
+    // ---------- tiny markdown -> html ----------
+    // Supports:
+    // # ## ### headings
+    // **bold** *italic* `inline`
+    // ``` code fences
+    // - lists
+    // > blockquote
+    // links: https://...
+    function mdToHtml(md = "") {
+        const s = String(md || "");
 
-        const out = role === "ai" ? normalizeAIText(text) : String(text || "").trim();
-        d.textContent = out;
+        // code fences first
+        const fences = [];
+        let tmp = s.replace(/```([\s\S]*?)```/g, (_, code) => {
+            const id = fences.length;
+            fences.push(code);
+            return `@@FENCE_${id}@@`;
+        });
 
-        el.messages.appendChild(d);
+        // escape (so user can't inject)
+        tmp = esc(tmp);
+
+        // headings
+        tmp = tmp.replace(/^###\s+(.*)$/gm, "<h3>$1</h3>");
+        tmp = tmp.replace(/^##\s+(.*)$/gm, "<h2>$1</h2>");
+        tmp = tmp.replace(/^#\s+(.*)$/gm, "<h1>$1</h1>");
+
+        // blockquote
+        tmp = tmp.replace(/^\>\s?(.*)$/gm, "<blockquote>$1</blockquote>");
+
+        // unordered lists: group consecutive "- "
+        // convert lines to list items first
+        tmp = tmp.replace(/^\-\s+(.*)$/gm, "<li>$1</li>");
+        // wrap consecutive <li> blocks into <ul>
+        tmp = tmp.replace(/(?:<li>[\s\S]*?<\/li>\s*)+/g, (m) => {
+            // only wrap if it contains <li>
+            if (!m.includes("<li>")) return m;
+            return `<ul>${m}</ul>`;
+        });
+
+        // bold / italic / inline code
+        tmp = tmp.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+        tmp = tmp.replace(/\*(.+?)\*/g, "<em>$1</em>");
+        tmp = tmp.replace(/`(.+?)`/g, "<code>$1</code>");
+
+        // auto-link http(s)
+        tmp = tmp.replace(
+            /(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/g,
+            `<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>`
+        );
+
+        // paragraphs: split by blank lines
+        // but keep headings/ul/blockquote/pre as block elements
+        const lines = tmp.split(/\n/);
+        let out = [];
+        let buf = [];
+
+        const flushP = () => {
+            const text = buf.join(" ").trim();
+            if (text) out.push(`<p>${text}</p>`);
+            buf = [];
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trimEnd();
+
+            if (!line.trim()) {
+                flushP();
+                continue;
+            }
+
+            // if line starts with block html tag, flush paragraph and push raw
+            if (
+                line.startsWith("<h1>") ||
+                line.startsWith("<h2>") ||
+                line.startsWith("<h3>") ||
+                line.startsWith("<ուլ>") || // (won't happen, safe)
+                line.startsWith("<ul>") ||
+                line.startsWith("<blockquote>")
+            ) {
+                flushP();
+                out.push(line);
+                continue;
+            }
+
+            // If this line is a full <ul>...</ul> block created by regex, treat as block
+            if (line.startsWith("<ul>") && line.endsWith("</ul>")) {
+                flushP();
+                out.push(line);
+                continue;
+            }
+
+            // If it's a lone <li> (edge), keep as block list
+            if (line.startsWith("<li>") && line.endsWith("</li>")) {
+                flushP();
+                out.push(`<ul>${line}</ul>`);
+                continue;
+            }
+
+            // Otherwise accumulate into paragraph
+            buf.push(line);
+        }
+        flushP();
+
+        tmp = out.join("\n");
+
+        // restore code fences (as <pre><code>)
+        tmp = tmp.replace(/@@FENCE_(\d+)@@/g, (_, idStr) => {
+            const code = fences[Number(idStr)] ?? "";
+            return `<pre><code>${esc(code)}</code></pre>`;
+        });
+
+        return tmp;
+    }
+
+    // ---------- UI: add message row ----------
+    function addRow(role, html) {
+        const row = document.createElement("div");
+        row.className = `msg ${role}`;
+
+        const inner = document.createElement("div");
+        inner.className = "msgInner";
+        inner.innerHTML = html;
+
+        row.appendChild(inner);
+        el.messages.appendChild(row);
+
+        // keep scroll pinned to bottom
         el.messages.scrollTop = el.messages.scrollHeight;
-        return d;
     }
 
-    // Typing bubble
-    let typingEl = null;
+    // ---------- typing indicator ----------
+    const TYPING_ID = "typingRow";
+
     function showTyping() {
-        if (typingEl) return;
-        typingEl = document.createElement("div");
-        typingEl.className = "msg ai typing";
-        typingEl.textContent = "answering…";
-        el.messages.appendChild(typingEl);
+        if (!el.messages) return;
+        if (document.getElementById(TYPING_ID)) return;
+
+        const row = document.createElement("div");
+        row.id = TYPING_ID;
+        row.className = "msg typing";
+        row.innerHTML =
+            `<div class="msgInner">Answering` +
+            `<span class="dot"></span><span class="dot"></span><span class="dot"></span>` +
+            `</div>`;
+
+        el.messages.appendChild(row);
         el.messages.scrollTop = el.messages.scrollHeight;
     }
+
     function hideTyping() {
-        if (!typingEl) return;
-        typingEl.remove();
-        typingEl = null;
+        document.getElementById(TYPING_ID)?.remove();
     }
 
+    // ---------- file to data url ----------
     async function fileToDataUrl(file) {
         return new Promise((resolve, reject) => {
             const r = new FileReader();
@@ -77,6 +206,7 @@
         });
     }
 
+    // ---------- send ----------
     async function sendToAI({ text, imageDataUrl }) {
         const payload = {
             sid: getSid(),
@@ -96,46 +226,68 @@
                 body: JSON.stringify(payload),
             });
         } catch {
-            addBubble("ai", "Network error: could not connect.");
-            return null;
+            return { ok: false, error: "Network error" };
         }
 
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-            const err = data?.error || `http_${res.status}`;
-            addBubble("ai", `Server error: ${err}`);
-            return null;
+            return { ok: false, error: data?.error || `http_${res.status}` };
         }
 
-        if (el.planText && data.plan) el.planText.textContent = data.plan;
-
+        // allowed:false (still 200)
         if (data.allowed === false) {
-            const reason = data.reason || "not_allowed";
-            if (reason === "msg_limit_reached") {
-                addBubble("ai", "Free limit reached: you used all 10 messages for today. Upgrade to continue.");
-            } else {
-                addBubble("ai", `Request blocked: ${reason}`);
-            }
-            return null;
+            return { ok: false, error: data.reason || "not_allowed", data };
         }
 
-        const answer = (data.text || "").trim();
-        return answer ? answer : null;
+        return { ok: true, data };
     }
 
+    // ---------- handlers ----------
     async function handleSend() {
-        const text = (el.input?.value || "").trim();
-        if (!text) return;
+        const raw = (el.input?.value || "").trim();
+        if (!raw) return;
 
         el.input.value = "";
-        addBubble("user", text);
+
+        // user message (no bubble, just clean line)
+        addRow("user", mdToHtml(raw));
 
         showTyping();
-        const answer = await sendToAI({ text });
+
+        const r = await sendToAI({ text: raw });
+
         hideTyping();
 
-        if (answer) addBubble("ai", answer);
+        if (!r.ok) {
+            // free limit / errors
+            const err = r.error;
+
+            if (err === "msg_limit_reached" || err === "daily_message_limit") {
+                addRow("ai", mdToHtml("Free limit reached: You used your daily 10 messages. Upgrade to continue."));
+                return;
+            }
+            if (err === "daily_image_limit") {
+                addRow("ai", mdToHtml("Free limit reached: You used your daily 1 image. Upgrade to continue."));
+                return;
+            }
+            if (err === "rate_limited") {
+                addRow("ai", mdToHtml("Rate limited. Please try again in a few seconds."));
+                return;
+            }
+
+            addRow("ai", mdToHtml(`Error: ${err}`));
+            return;
+        }
+
+        const data = r.data;
+
+        if (el.planText && data.plan) {
+            el.planText.textContent = String(data.plan).toLowerCase();
+        }
+
+        const answer = String(data.text || "").trim();
+        addRow("ai", mdToHtml(answer || "No response."));
     }
 
     async function handleImagePick() {
@@ -148,32 +300,68 @@
             const file = inp.files?.[0];
             if (!file) return;
 
-            addBubble("user", "[image]");
-            const dataUrl = await fileToDataUrl(file);
+            // show user "sent image"
+            addRow("user", mdToHtml("[image]"));
 
             showTyping();
-            const answer = await sendToAI({ text: "Analyze this image.", imageDataUrl: dataUrl });
+
+            const dataUrl = await fileToDataUrl(file).catch(() => null);
+            if (!dataUrl) {
+                hideTyping();
+                addRow("ai", mdToHtml("Could not read the image."));
+                return;
+            }
+
+            const r = await sendToAI({ text: "Analyze this image.", imageDataUrl: dataUrl });
+
             hideTyping();
 
-            if (answer) addBubble("ai", answer);
+            if (!r.ok) {
+                addRow("ai", mdToHtml(`Error: ${r.error}`));
+                return;
+            }
+
+            const answer = String(r.data?.text || "").trim();
+            addRow("ai", mdToHtml(answer || "No response."));
         };
     }
 
     function newChat() {
-        const sid = crypto.randomUUID();
-        localStorage.setItem("ai_sid", sid);
+        localStorage.setItem("ai_sid", crypto.randomUUID());
         if (el.messages) el.messages.innerHTML = "";
     }
 
+    // ---------- init UI text (EN) ----------
+    function setEnglishUI() {
+        // placeholders / labels
+        if (el.search) el.search.placeholder = "Search chats";
+        if (el.input) el.input.placeholder = "Ask anything";
+
+        // button labels
+        if (el.newChat) {
+            // keep plus icon span if exists
+            const plus = el.newChat.querySelector(".plus");
+            el.newChat.innerHTML = "";
+            if (plus) el.newChat.appendChild(plus);
+            const t = document.createTextNode(" New chat");
+            el.newChat.appendChild(t);
+        }
+        if (el.planText) el.planText.textContent = "free";
+    }
+
+    // ---------- wire events ----------
     el.send?.addEventListener("click", handleSend);
+
     el.input?.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
             handleSend();
         }
     });
+
     el.plus?.addEventListener("click", handleImagePick);
     el.newChat?.addEventListener("click", newChat);
 
-    if (el.planText) el.planText.textContent = "free";
+    // init
+    setEnglishUI();
 })();
