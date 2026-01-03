@@ -1,10 +1,87 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
-</head>
-<body>
-$END$
-</body>
-</html>
+<!-- /components/sidebar.html -->
+<aside class="smSidebar" id="smSidebar" aria-label="Sidebar">
+
+  <div class="smSbTop">
+    <a class="smSbBrand" href="/feed/feed.html" title="Social Market">
+      <div class="smSbLogo">SM</div>
+      <div class="smSbBrandText">Social Market</div>
+    </a>
+
+    <!-- Mobile hamburger -->
+    <button class="smSbBurger" id="smSbBurger" type="button" aria-label="Menu" aria-expanded="false">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+  </div>
+
+  <nav class="smSbNav">
+    <a class="smSbItem" data-page="feed" href="/feed/feed.html">
+      <i class="fa-solid fa-house"></i><span class="smSbText">Feed</span>
+    </a>
+
+    <a class="smSbItem" data-page="post" href="/post/post.html">
+      <i class="fa-solid fa-pen-to-square"></i><span class="smSbText">Post</span>
+    </a>
+
+    <a class="smSbItem" data-page="signal" href="/signal/signal.html">
+      <i class="fa-solid fa-signal"></i><span class="smSbText">Signal</span>
+    </a>
+
+    <a class="smSbItem" data-page="news" href="/news/news.html">
+      <i class="fa-regular fa-newspaper"></i><span class="smSbText">News</span>
+    </a>
+
+    <a class="smSbItem" data-page="tools" href="/tools/tools.html">
+      <i class="fa-solid fa-wand-magic-sparkles"></i><span class="smSbText">Tools</span>
+    </a>
+
+    <a class="smSbItem" data-page="marketplace" href="/marketplace/marketplace.html">
+      <i class="fa-solid fa-store"></i><span class="smSbText">Market Place</span>
+    </a>
+
+    <a class="smSbItem" data-page="messages" href="/messages/">
+      <i class="fa-regular fa-comment-dots"></i><span class="smSbText">Messages</span>
+    </a>
+  </nav>
+
+  <div class="smSbBottom">
+
+    <!-- Pin/Unpin -->
+    <button class="smSbItem smSbPin" id="smSbPin" type="button" aria-pressed="false">
+      <i class="fa-solid fa-thumbtack"></i><span class="smSbText">Pin</span>
+    </button>
+
+    <!-- Profile row (dropdown) -->
+    <button class="smSbProfile" id="smSbProfileBtn" type="button" aria-expanded="false">
+      <div class="smSbAvatar" id="smSbAvatar">U</div>
+      <div class="smSbMeta">
+        <div class="smSbName" id="smSbName">—</div>
+        <div class="smSbMail" id="smSbMail">—</div>
+      </div>
+      <i class="fa-solid fa-chevron-up smSbCaret"></i>
+    </button>
+
+    <!-- Profile dropdown -->
+    <div class="smSbMenu" id="smSbMenu" role="menu" aria-hidden="true">
+      <div class="smSbMenuHead">
+        <div class="smSbMenuTitle">Market AI</div>
+        <div class="smSbMenuSub">Signed in</div>
+      </div>
+
+      <a class="smSbMenuItem" href="/u/index.html"><i class="fa-solid fa-user"></i><span>Profile</span></a>
+      <a class="smSbMenuItem" href="/settings/"><i class="fa-solid fa-gear"></i><span>User settings</span></a>
+      <a class="smSbMenuItem" href="/help/"><i class="fa-regular fa-circle-question"></i><span>Help</span></a>
+
+      <div class="smSbMenuDiv"></div>
+
+      <button class="smSbMenuItem smSbMenuBtn" id="smSbLogout" type="button">
+        <i class="fa-solid fa-right-from-bracket"></i><span>Logout</span>
+      </button>
+    </div>
+
+  </div>
+
+</aside>
+
+<!-- Mobile backdrop + close X -->
+<div class="smSbBackdrop" id="smSbBackdrop" aria-hidden="true"></div>
+<button class="smSbClose" id="smSbClose" type="button" aria-label="Close menu">✕</button>
