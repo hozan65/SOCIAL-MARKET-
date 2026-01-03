@@ -4,25 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>Signal</title>
+
     <link rel="stylesheet" href="/signal/signal.css" />
 </head>
 
 <body class="is-signal">
 
-<header class="topbarWrap">
-    <div class="topbar">
-        <div class="brand">Social Market</div>
-        <nav class="menu">
-            <a href="/feed/feed.html">Feed</a>
-            <a href="/post/post.html">Post</a>
-            <a class="active" href="/signal/signal.html">Signal</a>
-            <a href="/news/news.html">News</a>
-            <a href="/tools/tools.html">Tools</a>
-            <a href="/marketplace/marketplace.html">Market Place</a>
-        </nav>
-        <div class="rightSlot"></div>
-    </div>
-</header>
+<!-- ✅ Sidebar mount (topbar yok) -->
+<div id="sidebarMount"></div>
+<script src="/assets1/sidebar.js" defer></script>
 
 <main class="wrap">
     <section class="panel">
@@ -33,9 +23,11 @@
                 <button class="btnNew" type="button">
                     <span class="plus">+</span> New chat
                 </button>
+
                 <div class="searchWrap">
                     <input class="search" placeholder="Search chats" />
                 </div>
+
                 <div class="label">Your chats</div>
             </div>
 
@@ -73,8 +65,8 @@
 
     </section>
 
+    <!-- ✅ module -->
     <script type="module" src="/signal/signal.js"></script>
 </main>
-
 </body>
 </html>
