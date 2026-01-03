@@ -1,6 +1,9 @@
-// netlify/functions/ai_chat.js
-// AI Chat endpoint: plan check + free daily msg limit + OpenAI Responses API
-// Tables: ai_users, ai_usage_daily
+// netlify/functions/ai_chat.js  (FULL - FIXED)
+// ✅ Accepts: body.message OR body.text
+// ✅ Returns: { allowed, plan, text } (unchanged from your design)
+// ✅ Keeps: free daily msg limit logic
+// ✅ Safer CORS headers
+// ✅ If OpenAI fails -> 500 with message
 
 import { sbAdmin } from "./supabase.js";
 
@@ -80,17 +83,25 @@ export const handler = async (event) => {
         const userId = String(event.headers["x-user-id"] || "").trim();
         if (!userId) return json(401, { error: "Missing x-user-id" });
 
-        const body = JSON.parse(event.body || "{}");
-        const userText = String(body.message || "").trim();
+        // ✅ tolerate missing/invalid body
+        let body = {};
+        try {
+            body = event.body ? JSON.parse(event.body) : {};
+        } catch {
+            body = {};
+        }
+
+        // ✅ FIX: accept message OR text
+        const userText = String(body.message || body.text || "").trim();
         if (!userText) return json(400, { error: "Missing message" });
 
-        const model = "gpt-5";
+        const model = process.env.OPENAI_MODEL || "gpt-5";
         const maxOut = toInt(process.env.OPENAI_MAX_OUTPUT_TOKENS, 700);
         const FREE_MSG_LIMIT = toInt(process.env.FREE_DAILY_MSG_LIMIT, 10);
 
         const sb = sbAdmin();
 
-        // Ensure ai_user exists (first time user)
+        // Ensure ai_user exists
         await sb.from("ai_users").upsert(
             { user_id: userId },
             { onConflict: "user_id", ignoreDuplicates: true }
@@ -126,6 +137,7 @@ export const handler = async (event) => {
             if (usageRes.error) return json(500, { error: usageRes.error.message });
 
             const msgCount = toInt(usageRes.data?.msg_count, 0);
+
             if (msgCount + 1 > FREE_MSG_LIMIT) {
                 return json(200, {
                     allowed: false,
@@ -150,9 +162,7 @@ export const handler = async (event) => {
         const resp = await openaiResponses({
             model,
             max_output_tokens: maxOut,
-            input: [
-                { role: "user", content: [{ type: "input_text", text: userText }] },
-            ],
+            input: [{ role: "user", content: [{ type: "input_text", text: userText }] }],
         });
 
         const answer = extractOutputText(resp);

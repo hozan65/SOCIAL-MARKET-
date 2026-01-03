@@ -1,4 +1,9 @@
-// /signal/signal.js
+// /signal/signal.js  (FULL - FIXED)
+// ✅ Sends: message (and still works if backend accepts text too)
+// ✅ Handles: allowed:false (free limit)
+// ✅ Reads: data.text (backend returns text)
+// ✅ Keeps: image upload flow
+
 (() => {
     const $ = (q) => document.querySelector(q);
 
@@ -12,8 +17,7 @@
         planText: $(".pPlan"),
     };
 
-    // ✅ şimdilik user id: localStorage (sen Appwrite’dan da çekebilirsin)
-    // örnek: localStorage.setItem("sm_uid","abc123");
+    // ✅ user id: localStorage (later you can use Appwrite)
     const getUserId = () => localStorage.getItem("sm_uid") || "demo_user";
 
     // Session id
@@ -27,7 +31,13 @@
     };
 
     function esc(s = "") {
-        return s.replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+        return String(s).replace(/[&<>"']/g, (c) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;",
+        }[c]));
     }
 
     function addBubble(role, text) {
@@ -48,23 +58,34 @@
     }
 
     async function sendToAI({ text, imageDataUrl }) {
-        const res = await fetch("/.netlify/functions/ai_chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-id": getUserId(),
-            },
-            body: JSON.stringify({
-                sid: getSid(),
-                text,
-                imageDataUrl: imageDataUrl || null,
-            }),
-        });
+        const payload = {
+            sid: getSid(),
+            // ✅ backend expects message, also keep text for backward compatibility
+            message: text || "",
+            text: text || "",
+            imageDataUrl: imageDataUrl || null,
+        };
+
+        let res;
+        try {
+            res = await fetch("/.netlify/functions/ai_chat", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-user-id": getUserId(),
+                },
+                body: JSON.stringify(payload),
+            });
+        } catch (e) {
+            addBubble("ai", "Network error: bağlantı kurulamadı.");
+            return null;
+        }
 
         const data = await res.json().catch(() => ({}));
 
+        // HTTP error
         if (!res.ok) {
-            const err = data?.error || "unknown_error";
+            const err = data?.error || `http_${res.status}`;
             const retry = data?.retry_after_ms;
 
             if (err === "daily_message_limit") {
@@ -84,12 +105,27 @@
             return null;
         }
 
+        // ✅ Plan text update
         if (el.planText && data.plan) el.planText.textContent = data.plan;
-        return data.answer;
+
+        // ✅ Free limit case is 200 but allowed:false
+        if (data.allowed === false) {
+            const reason = data.reason || "not_allowed";
+            if (reason === "msg_limit_reached") {
+                addBubble("ai", "Free limit doldu: bugün 10 mesaj hakkın bitti. Upgrade yapabilirsin.");
+            } else {
+                addBubble("ai", `İstek reddedildi: ${reason}`);
+            }
+            return null;
+        }
+
+        // ✅ backend returns text (not answer)
+        const answer = data.text || "";
+        return answer.trim() ? answer : null;
     }
 
     async function handleSend() {
-        const text = (el.input.value || "").trim();
+        const text = (el.input?.value || "").trim();
         if (!text) return;
 
         el.input.value = "";
@@ -110,10 +146,9 @@
             if (!file) return;
 
             addBubble("user", "[image]");
-
             const dataUrl = await fileToDataUrl(file);
 
-            // image-only istek: text boş olabilir
+            // image-only request: still includes message text (backend requires message)
             const answer = await sendToAI({ text: "Analyze this image.", imageDataUrl: dataUrl });
             if (answer) addBubble("ai", answer);
         };
@@ -122,13 +157,16 @@
     function newChat() {
         const sid = crypto.randomUUID();
         localStorage.setItem("ai_sid", sid);
-        el.messages.innerHTML = ""; // temizle
+        if (el.messages) el.messages.innerHTML = "";
     }
 
     // events
     el.send?.addEventListener("click", handleSend);
     el.input?.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") handleSend();
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
     });
     el.plus?.addEventListener("click", handleImagePick);
     el.newChat?.addEventListener("click", newChat);
