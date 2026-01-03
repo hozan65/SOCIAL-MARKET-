@@ -1,4 +1,4 @@
-// /signal/signal.js (FULL) - ChatGPT-like UI + scroll safe + upgrade/profile handlers
+// /signal/signal.js (FULL)
 (() => {
     console.log("✅ signal.js loaded");
 
@@ -7,34 +7,76 @@
     const FN_GET    = "/.netlify/functions/ai_get_messages";
     const FN_SEND   = "/.netlify/functions/ai_send_message";
 
-    // ✅ change these if your paths differ
-    const PROFILE_URL = "/u/index.html";
-    const UPGRADE_URL = "/upgrade/"; // or "/upgrade/index.html"
-
     // DOM
-    const $messages = document.getElementById("messages");
-    const $input    = document.getElementById("chatInput");
-    const $send     = document.getElementById("btnSend");
-    const $chatList = document.querySelector(".chatList");
-    const $btnNew   = document.querySelector(".btnNew");
+    const $sidebar   = document.getElementById("sidebar");
+    const $backdrop  = document.getElementById("sbBackdrop");
+    const $hamb      = document.getElementById("hamburger");
+    const $openChats = document.getElementById("btnOpenChats");
 
+    const $chatList  = document.getElementById("chatList");
+    const $btnNew    = document.getElementById("btnNewChat");
+    const $search    = document.getElementById("chatSearch");
+
+    const $messages  = document.getElementById("messages");
+    const $input     = document.getElementById("chatInput");
+    const $send      = document.getElementById("btnSend");
+
+    const $pfName  = document.getElementById("pfName");
+    const $pfEmail = document.getElementById("pfEmail");
+    const $pfPlan  = document.getElementById("pfPlan");
     const $btnProfile = document.getElementById("btnProfile");
     const $btnUpgrade = document.getElementById("btnUpgrade");
 
-    // ✅ bind profile/upgrade (fix: wrong redirect / page not found)
-    if ($btnProfile) $btnProfile.addEventListener("click", () => { location.href = PROFILE_URL; });
-    if ($btnUpgrade) $btnUpgrade.addEventListener("click", () => { location.href = UPGRADE_URL; });
+    const $activeChatTitle = document.getElementById("activeChatTitle");
 
     const uid = (localStorage.getItem("sm_uid") || "").trim();
     if (!uid) {
-        if ($messages) $messages.innerHTML = `<div class="sysMsg">Giriş yok (sm_uid). Login ol.</div>`;
-        if ($input) $input.disabled = true;
-        if ($send) $send.disabled = true;
+        $messages.innerHTML = `<div class="sysMsg">Giriş yok (sm_uid). Login ol.</div>`;
+        $input.disabled = true;
+        $send.disabled = true;
         return;
     }
 
+    // Drawer open/close
+    const openSidebar = () => {
+        $sidebar.classList.add("open");
+        $backdrop.classList.add("open");
+        $backdrop.setAttribute("aria-hidden", "false");
+        document.documentElement.style.overflow = "hidden";
+    };
+    const closeSidebar = () => {
+        $sidebar.classList.remove("open");
+        $backdrop.classList.remove("open");
+        $backdrop.setAttribute("aria-hidden", "true");
+        document.documentElement.style.overflow = "";
+    };
+
+    $hamb?.addEventListener("click", openSidebar);
+    $openChats?.addEventListener("click", openSidebar);
+    $backdrop?.addEventListener("click", closeSidebar);
+    document.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closeSidebar(); });
+
+    // Buttons routes (senin gerçek path’lerin)
+    $btnProfile?.addEventListener("click", () => {
+        location.href = "/u/index.html";
+    });
+    $btnUpgrade?.addEventListener("click", () => {
+        location.href = "/upgrade/"; // ✅ sadece upgrade
+    });
+
+    // Profile UI (basit: localStorage’dan; istersen server’dan bağlarız)
+    const name  = localStorage.getItem("sm_name") || "—";
+    const email = localStorage.getItem("sm_email") || "—";
+    const plan  = localStorage.getItem("sm_plan") || "free";
+    $pfName.textContent = name;
+    $pfEmail.textContent = email;
+    $pfPlan.textContent = plan;
+
+    // Session state
     const ACTIVE_KEY = `signal_active_sid_${uid}`;
     let activeSid = localStorage.getItem(ACTIVE_KEY) || "";
+
+    let sessionsCache = [];
 
     const esc = (s) =>
         String(s ?? "")
@@ -44,108 +86,123 @@
             .replaceAll('"', "&quot;")
             .replaceAll("'", "&#039;");
 
-    function setBusy(b) {
-        if ($input) $input.disabled = b;
-        if ($send) $send.disabled = b;
+    function setBusy(b){
+        $input.disabled = b;
+        $send.disabled = b;
     }
 
-    // ✅ ChatGPT-like message row
-    function addMsg(role, text) {
-        const el = document.createElement("div");
-        el.className = `msg ${role === "assistant" ? "assistant" : "user"}`;
-        el.innerHTML = `<div class="msgInner">${esc(text)}</div>`;
-        $messages.appendChild(el);
+    // ChatGPT-style render
+    function renderMessage(role, text){
+        const block = document.createElement("div");
+        block.className = "msgBlock";
+        block.innerHTML = `
+      <div class="msgRole">${role === "assistant" ? "AI" : "You"}</div>
+      <div class="msgBubble">${esc(text)}</div>
+    `;
+        $messages.appendChild(block);
+
+        const div = document.createElement("div");
+        div.className = "divider";
+        $messages.appendChild(div);
+
         $messages.scrollTop = $messages.scrollHeight;
-        return el;
+        return block;
     }
 
-    function renderSessions(items) {
-        if (!$chatList) return;
-        $chatList.innerHTML = "";
+    function setSystem(text){
+        $messages.innerHTML = `<div class="sysMsg">${esc(text)}</div>`;
+    }
 
-        if (!items.length) {
-            $chatList.innerHTML = `<div class="sysMsg" style="margin:8px;">No chats yet</div>`;
+    function renderSessions(items){
+        $chatList.innerHTML = "";
+        if(!items.length){
+            $chatList.innerHTML = `<div class="sysMsg">No chats yet</div>`;
             return;
         }
 
-        for (const s of items) {
-            const el = document.createElement("button");
-            el.type = "button";
-            el.className = "chatItem";
-            el.dataset.sid = s.sid;
+        for(const s of items){
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "chatItem" + (s.sid === activeSid ? " active" : "");
+            btn.dataset.sid = s.sid;
 
             const title = s.title || "New chat";
-            const dt = s.created_at ? new Date(s.created_at) : null;
+            const when  = s.created_at ? new Date(s.created_at).toLocaleString() : "";
 
-            el.innerHTML = `
+            btn.innerHTML = `
         <div class="chatTitle">${esc(title)}</div>
-        <div class="chatMeta">${esc(dt ? dt.toLocaleString() : "")}</div>
+        <div class="chatMeta">${esc(when)}</div>
       `;
 
-            if (s.sid === activeSid) el.classList.add("active");
-
-            el.addEventListener("click", async () => {
+            btn.addEventListener("click", async () => {
                 activeSid = s.sid;
                 localStorage.setItem(ACTIVE_KEY, activeSid);
+                $activeChatTitle.textContent = title;
 
-                $chatList.querySelectorAll(".chatItem").forEach(x => x.classList.remove("active"));
-                el.classList.add("active");
+                document.querySelectorAll(".chatItem").forEach(x => x.classList.remove("active"));
+                btn.classList.add("active");
 
+                closeSidebar();
                 await loadMessages();
             });
 
-            $chatList.appendChild(el);
+            $chatList.appendChild(btn);
         }
     }
 
-    async function loadSessions() {
-        const r = await fetch(FN_LIST, {
-            headers: { "x-user-id": uid },
-            cache: "no-store",
-        });
-
+    async function loadSessions(){
+        const r = await fetch(FN_LIST, { headers: { "x-user-id": uid }, cache:"no-store" });
         const t = await r.text();
         let data = {};
-        try { data = JSON.parse(t); } catch {}
+        try{ data = JSON.parse(t); }catch{}
 
-        if (!r.ok) {
-            console.error("❌ list sessions", r.status, data || t);
-            if ($chatList) $chatList.innerHTML = `<div class="sysMsg" style="margin:8px;">Sessions load failed</div>`;
+        if(!r.ok){
+            console.error("❌ ai_list_sessions", r.status, t);
+            $chatList.innerHTML = `<div class="sysMsg">Sessions load failed</div>`;
             return [];
         }
 
-        const sessions = data.sessions || [];
+        sessionsCache = data.sessions || [];
 
-        if (!activeSid && sessions[0]?.sid) {
-            activeSid = sessions[0].sid;
+        if(!activeSid && sessionsCache[0]?.sid){
+            activeSid = sessionsCache[0].sid;
             localStorage.setItem(ACTIVE_KEY, activeSid);
         }
 
-        renderSessions(sessions);
-        return sessions;
+        const $emptyHero = document.getElementById("emptyHero");
+        function hideEmptyHero(){
+            if ($emptyHero) $emptyHero.remove();
+        }
+
+
+        // set title
+        const active = sessionsCache.find(x => x.sid === activeSid);
+        $activeChatTitle.textContent = active?.title || "New chat";
+
+        renderSessions(sessionsCache);
+        return sessionsCache;
     }
 
-    async function createSession() {
+    async function createSession(){
         const r = await fetch(FN_CREATE, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-id": uid,
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json",
+                "x-user-id": uid
             },
-            body: JSON.stringify({ title: "New chat" }),
+            body: JSON.stringify({ title: "New chat" })
         });
 
         const t = await r.text();
         let data = {};
-        try { data = JSON.parse(t); } catch {}
+        try{ data = JSON.parse(t); }catch{}
 
-        if (!r.ok) {
-            console.error("❌ create session", r.status, data || t);
-            $messages.innerHTML = `<div class="sysMsg">Create session failed</div>`;
+        if(!r.ok){
+            console.error("❌ ai_create_session", r.status, t);
             return null;
         }
 
-        activeSid = data.session.sid;
+        activeSid = data.session?.sid;
         localStorage.setItem(ACTIVE_KEY, activeSid);
 
         await loadSessions();
@@ -153,102 +210,119 @@
         return data.session;
     }
 
-    async function loadMessages() {
-        if (!$messages) return;
-
-        if (!activeSid) {
-            $messages.innerHTML = `<div class="sysMsg">Chat seç veya New chat</div>`;
+    async function loadMessages(){
+        if(!activeSid){
+            setSystem("Chat seç veya New chat");
             return;
         }
 
-        $messages.innerHTML = `<div class="sysMsg">Loading…</div>`;
+        setSystem("Loading…");
 
         const url = `${FN_GET}?session_id=${encodeURIComponent(activeSid)}`;
-        const r = await fetch(url, {
-            headers: { "x-user-id": uid },
-            cache: "no-store",
-        });
-
+        const r = await fetch(url, { headers: { "x-user-id": uid }, cache:"no-store" });
         const t = await r.text();
-        let data = {};
-        try { data = JSON.parse(t); } catch {}
 
-        if (!r.ok) {
-            console.error("❌ load messages", r.status, data || t);
-            $messages.innerHTML = `<div class="sysMsg">Messages load failed (${r.status})</div>`;
+        let data = {};
+        try{ data = JSON.parse(t); }catch{}
+
+        if(!r.ok){
+            console.error("❌ ai_get_messages", r.status, t);
+            setSystem(`Messages load failed (${r.status})`);
             return;
         }
 
         const msgs = data.messages || [];
         $messages.innerHTML = "";
 
-        if (!msgs.length) {
-            $messages.innerHTML = `<div class="sysMsg">Henüz mesaj yok. Bir şey yaz 👇</div>`;
+        if(!msgs.length){
+            setSystem("Henüz mesaj yok. Bir şey yaz 👇");
             return;
         }
 
-        for (const m of msgs) {
-            addMsg(m.role === "assistant" ? "assistant" : "user", m.content || "");
+        for(const m of msgs){
+            renderMessage(m.role === "assistant" ? "assistant" : "user", m.content || "");
         }
+
+        // divider zaten renderMessage içinde var, en sonda da scroll
+        $messages.scrollTop = $messages.scrollHeight;
     }
 
-    async function sendMessage() {
-        const text = ($input?.value || "").trim();
-        if (!text) return;
+    // auto textarea grow
+    function autoGrow(){
+        $input.style.height = "auto";
+        $input.style.height = Math.min($input.scrollHeight, 160) + "px";
+    }
+    $input.addEventListener("input", autoGrow);
 
-        if (!activeSid) {
+    async function sendMessage(){
+        const text = ($input.value || "").trim();
+        if(!text) return;
+
+        if(!activeSid){
             await createSession();
-            if (!activeSid) return;
+            if(!activeSid) return;
         }
 
         $input.value = "";
-        addMsg("user", text);
+        autoGrow();
 
-        const typing = addMsg("assistant", "…");
+        renderMessage("user", text);
+
+        // typing block
+        const typing = renderMessage("assistant", "…");
         setBusy(true);
 
         const r = await fetch(FN_SEND, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "x-user-id": uid,
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json",
+                "x-user-id": uid
             },
-            body: JSON.stringify({ session_id: activeSid, text }),
+            body: JSON.stringify({ session_id: activeSid, text })
         });
 
         const t = await r.text();
         let data = {};
-        try { data = JSON.parse(t); } catch {}
+        try{ data = JSON.parse(t); }catch{}
 
-        if (!r.ok) {
-            console.error("❌ send", r.status, data || t);
-            typing.querySelector(".msgInner").textContent = `Hata: ${data?.error || "send failed"}`;
+        if(!r.ok){
+            console.error("❌ ai_send_message", r.status, t);
+            typing.querySelector(".msgBubble").textContent = `Hata: ${data?.error || "send failed"}`;
             setBusy(false);
             return;
         }
 
-        // ✅ reply text
-        typing.querySelector(".msgInner").textContent = data.reply || "(no reply)";
+        typing.querySelector(".msgBubble").textContent = data.reply || "(no reply)";
         setBusy(false);
 
-        // Optional: refresh session list if you update titles
-        // await loadSessions();
+        // refresh sessions to show updated order/title if you do that server-side
+        await loadSessions();
     }
 
-    // Bind UI
-    if ($btnNew) $btnNew.addEventListener("click", () => createSession());
-    if ($send) $send.addEventListener("click", sendMessage);
+    $btnNew.addEventListener("click", async ()=> {
+        await createSession();
+        closeSidebar();
+    });
 
-    if ($input) {
-        $input.addEventListener("keydown", (e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-    }
+    $send.addEventListener("click", sendMessage);
 
-    // Init
+    $input.addEventListener("keydown", (e) => {
+        if(e.key === "Enter" && !e.shiftKey){
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    // search filter UI only
+    $search.addEventListener("input", () => {
+        const q = ($search.value || "").toLowerCase().trim();
+        const filtered = !q ? sessionsCache : sessionsCache.filter(s =>
+            String(s.title || "").toLowerCase().includes(q)
+        );
+        renderSessions(filtered);
+    });
+
+    // init
     (async () => {
         await loadSessions();
         await loadMessages();
