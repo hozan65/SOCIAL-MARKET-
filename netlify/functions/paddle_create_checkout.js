@@ -1,16 +1,10 @@
 // netlify/functions/paddle_create_checkout.js
-// Creates a Paddle transaction and returns checkout_url for redirect.
-//
-// ENV required:
-// - PADDLE_API_KEY
-// - PADDLE_ENV = sandbox | live
-// - PADDLE_PRICE_ID_BASIC   ($10/mo)
-// - PADDLE_PRICE_ID_PLUS    ($20/mo)
-// - SITE_URL (optional, for future redirects / metadata)
+// Creates Paddle transaction and returns checkout.url
+// Requires ENV: PADDLE_ENV, PADDLE_API_KEY, PADDLE_PRICE_NORMAL_ID, PADDLE_PRICE_PRO_ID, PADDLE_SUCCESS_URL, PADDLE_CANCEL_URL
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "content-type, x-user-id, authorization",
+    "Access-Control-Allow-Headers": "content-type, x-user-id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -22,109 +16,86 @@ function json(statusCode, obj) {
     };
 }
 
-function paddleBaseUrl() {
-    const env = (process.env.PADDLE_ENV || "sandbox").toLowerCase();
+function getPaddleBaseUrl() {
+    const env = String(process.env.PADDLE_ENV || "sandbox").toLowerCase();
+    // Paddle uses different base URLs for sandbox vs live
+    // Sandbox: https://sandbox-api.paddle.com
+    // Live:    https://api.paddle.com
     return env === "live" ? "https://api.paddle.com" : "https://sandbox-api.paddle.com";
 }
 
-async function paddleFetch(path, { method = "GET", body } = {}) {
-    const apiKey = process.env.PADDLE_API_KEY;
-    if (!apiKey) throw new Error("Missing PADDLE_API_KEY");
-
-    const res = await fetch(`${paddleBaseUrl()}${path}`, {
-        method,
-        headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-        body: body ? JSON.stringify(body) : undefined,
-    });
-
-    const text = await res.text();
-    let data = null;
-    try {
-        data = text ? JSON.parse(text) : null;
-    } catch {
-        // ignore
-    }
-
-    if (!res.ok) {
-        throw new Error(`Paddle API ${res.status}: ${text}`);
-    }
-    return data;
-}
-
-/**
- * POST body:
- *   { "plan": "basic" | "plus" }
- *
- * Auth:
- *   For now: header "x-user-id" is required.
- *   (Later we will replace this with Appwrite/Supabase auth verification)
- */
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        // ✅ TEMP AUTH (replace with real auth later)
         const userId = String(event.headers["x-user-id"] || "").trim();
-        if (!userId) {
-            return json(401, { error: "Missing x-user-id (wire this to real auth)" });
-        }
+        if (!userId) return json(401, { error: "Missing x-user-id" });
 
-        const body = JSON.parse(event.body || "{}");
-        const plan = String(body.plan || "").toLowerCase();
+        const body = event.body ? JSON.parse(event.body) : {};
+        const plan = String(body.plan || "").toLowerCase().trim();
+        if (!["normal", "pro"].includes(plan)) return json(400, { error: "Invalid plan" });
 
-        // Choose price id by plan
-        const priceBasic = process.env.PADDLE_PRICE_ID_BASIC;
-        const pricePlus = process.env.PADDLE_PRICE_ID_PLUS;
+        const apiKey = process.env.PADDLE_API_KEY;
+        const successUrl = process.env.PADDLE_SUCCESS_URL;
+        const cancelUrl = process.env.PADDLE_CANCEL_URL;
 
-        if (!priceBasic) return json(500, { error: "Missing PADDLE_PRICE_ID_BASIC" });
-        if (!pricePlus) return json(500, { error: "Missing PADDLE_PRICE_ID_PLUS" });
+        if (!apiKey) return json(500, { error: "Missing PADDLE_API_KEY" });
+        if (!successUrl || !cancelUrl) return json(500, { error: "Missing PADDLE_SUCCESS_URL or PADDLE_CANCEL_URL" });
 
-        let priceId = null;
-        if (plan === "basic") priceId = priceBasic;
-        if (plan === "plus") priceId = pricePlus;
+        const priceId =
+            plan === "pro" ? process.env.PADDLE_PRICE_PRO_ID : process.env.PADDLE_PRICE_NORMAL_ID;
 
-        if (!priceId) {
-            return json(400, { error: "Invalid plan. Use: basic | plus" });
-        }
+        if (!priceId) return json(500, { error: `Missing price env for ${plan}` });
 
-        // Optional: pass your own metadata to Paddle
-        const site = process.env.SITE_URL || "";
-        const customData = {
-            app_user_id: userId,
-            plan,
-            site,
+        const baseUrl = getPaddleBaseUrl();
+
+        // Create transaction (enable_checkout=true so Paddle returns checkout.url) :contentReference[oaicite:2]{index=2}
+        const payload = {
+            items: [{ price_id: priceId, quantity: 1 }],
+            enable_checkout: true,
+            checkout: {
+                // If you omit url, Paddle uses default payment link domain
+                // url: "https://pay.yourdomain.com",
+            },
+            custom_data: {
+                user_id: userId,
+                plan,
+                app: "social_market",
+            },
+            // Optional: if you want to force redirect URLs at the payment link domain level,
+            // Paddle typically controls success/cancel via your checkout settings/payment link.
+            // Many teams just put success/cancel in their payment link configuration.
         };
 
-        // Create transaction (Paddle returns checkout.url)
-        const created = await paddleFetch("/transactions", {
+        const res = await fetch(`${baseUrl}/transactions`, {
             method: "POST",
-            body: {
-                items: [{ price_id: priceId, quantity: 1 }],
-                collection_mode: "automatic",
-                custom_data: customData,
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${apiKey}`,
             },
+            body: JSON.stringify(payload),
         });
 
-        const checkoutUrl = created?.data?.checkout?.url || null;
-        const transactionId = created?.data?.id || null;
-
-        if (!checkoutUrl) {
-            return json(500, {
-                error: "No checkout.url returned from Paddle",
-                debug: created,
-            });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return json(400, { error: "paddle_error", details: data });
         }
 
+        const checkoutUrl = data?.data?.checkout?.url;
+        if (!checkoutUrl) {
+            return json(500, { error: "Missing checkout.url from Paddle", data });
+        }
+
+        // We append redirect info ourselves (optional, if your payment link supports it you can use it)
+        // Otherwise, keep it simple and just redirect to checkoutUrl
         return json(200, {
-            checkout_url: checkoutUrl,
-            transaction_id: transactionId,
+            ok: true,
             plan,
+            checkout_url: checkoutUrl,
         });
     } catch (e) {
+        console.error("paddle_create_checkout error:", e);
         return json(500, { error: e?.message || String(e) });
     }
 };
