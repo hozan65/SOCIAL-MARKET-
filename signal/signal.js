@@ -1,9 +1,6 @@
-// /signal/signal.js (FULL - updated for NEW HTML/CSS)
-// - keeps your working API logic
-// - ChatGPT-like messages (no bubbles)
-// - mobile drawer via btnChatDrawer + sigBackdrop
-// - no "Loading..." text
-// - intro centered, disappears on first message
+// /signal/signal.js (FULL - plan badge FIX + keep your UI)
+// - badge (pfPlan) now comes from get_my_plan (Supabase) so it updates after purchase
+// - still caches in localStorage (sm_plan) for fast first paint
 
 (() => {
     console.log("✅ signal.js loaded");
@@ -214,12 +211,47 @@
 
     $search?.addEventListener("input", applySearchFilter);
 
+    // ✅ FIXED: plan badge now syncs with Supabase via get_my_plan
     async function loadProfileBadge() {
-        // simple: localStorage
-        if ($pfPlan) $pfPlan.textContent = (localStorage.getItem("sm_plan") || "free").toLowerCase();
-
+        // Links
         $btnProfile?.addEventListener("click", () => (location.href = PROFILE_URL));
         $btnUpgrade?.addEventListener("click", () => (location.href = UPGRADE_URL));
+
+        // Map backend plan -> label shown near Upgrade
+        // backend: free | normal | pro
+        // UI label: go | plus | pro
+        const labelFromPlan = (p) => {
+            const plan = String(p || "").toLowerCase();
+            if (plan === "pro") return "pro";
+            if (plan === "normal") return "plus";
+            return "go";
+        };
+
+        // fast paint from cache
+        const cached = localStorage.getItem("sm_plan") || "free";
+        if ($pfPlan) $pfPlan.textContent = labelFromPlan(cached);
+
+        // real fetch
+        try {
+            const r = await fetch("/.netlify/functions/get_my_plan", {
+                method: "GET",
+                headers: { "x-user-id": uid },
+                cache: "no-store",
+            });
+
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok) {
+                console.warn("get_my_plan failed", r.status, data);
+                return;
+            }
+
+            const plan = data?.plan || "free";
+            localStorage.setItem("sm_plan", plan);
+
+            if ($pfPlan) $pfPlan.textContent = labelFromPlan(plan);
+        } catch (e) {
+            console.warn("get_my_plan network error", e);
+        }
     }
 
     async function loadSessions() {
@@ -319,7 +351,7 @@
         // optimistic append
         addMsg("user", text);
 
-        // typing placeholder (still no "loading" banner)
+        // typing placeholder
         const typingRow = addMsg("assistant", "…");
 
         setBusy(true);
@@ -363,11 +395,10 @@
     });
 
     (async function init() {
-        await loadProfileBadge();
+        await loadProfileBadge(); // ✅ plan badge updated here
         await loadSessions();
         await loadMessages();
 
-        // activeSid yoksa intro göster
         if (!activeSid) setIntro();
     })();
 })();
