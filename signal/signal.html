@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
@@ -10,78 +10,73 @@
 
 <body class="is-signal">
 
-<!-- MOBILE TOPBAR -->
-<header class="mTopbar">
-    <button id="hamburger" class="mBtn" type="button" aria-label="Open chats">☰</button>
-    <button id="btnOpenChats" class="mTitle" type="button">Chats</button>
-    <div class="mRight"></div>
-</header>
+<!-- ✅ Sidebar mount (global) -->
+<div id="sidebarMount"></div>
+<script src="/assets1/sidebar.js" defer></script>
 
-<!-- BACKDROP (mobile drawer overlay) -->
-<div id="sbBackdrop" class="sbBackdrop" aria-hidden="true"></div>
-
+<!-- ✅ App -->
 <main class="app">
-    <!-- SIDEBAR (desktop fixed + mobile drawer) -->
-    <aside id="sidebar" class="sidebar" aria-label="Chats sidebar">
-        <div class="sbTop">
-            <div class="sbTitle">Your chats</div>
-            <button class="btnNew" id="btnNewChat" type="button">
-                <span class="plus">+</span> New chat
-            </button>
+    <section class="panel">
 
-            <div class="searchWrap">
-                <input class="search" id="chatSearch" placeholder="Search chats" />
+        <!-- LEFT (desktop chats list) -->
+        <aside class="left" id="leftPane">
+            <div class="leftHeader">
+                <button class="btnNew" id="btnNewChat" type="button">
+                    <span class="plus">+</span> New chat
+                </button>
+
+                <div class="searchWrap">
+                    <input class="search" id="chatSearch" placeholder="Search chats" />
+                </div>
+
+                <div class="label">Your chats</div>
             </div>
 
-            <div class="label">Chats</div>
-        </div>
+            <div class="chatList" id="chatList"></div>
 
-        <div class="chatList" id="chatList"></div>
+            <div class="leftFooter">
+                <div class="profileCard">
+                    <div class="avatar" id="pfAvatar">SM</div>
 
-        <div class="sbBottom">
-            <button class="btnUpgrade" id="btnUpgrade" type="button">Upgrade</button>
+                    <div class="pMeta">
+                        <div class="pName" id="pfName">—</div>
+                        <div class="pEmail" id="pfEmail">—</div>
 
-            <div class="profileCard">
-                <div class="avatar" id="pfAvatar">SM</div>
-                <div class="pMeta">
-                    <div class="pName" id="pfName">—</div>
-                    <div class="pEmail" id="pfEmail">—</div>
-                    <div class="pRow">
-                        <div class="pPlanBadge" id="pfPlan">free</div>
-                        <button class="btnSoft" id="btnProfile" type="button">Profile</button>
+                        <div class="pRow">
+                            <div class="pPlanBadge" id="pfPlan">free</div>
+                            <button class="btnSoft" id="btnProfile" type="button">Profile</button>
+                            <button class="btnUpgrade" id="btnUpgrade" type="button">Upgrade</button>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </aside>
+        </aside>
 
-    <!-- CHAT PANEL -->
-    <section class="chatPanel">
-        <!-- Optional header (desktop) -->
-        <div class="chatHeader">
-            <div class="chatHeaderTitle" id="activeChatTitle">New chat</div>
-        </div>
-
-        <!-- SCROLL AREA -->
-        <div class="messages" id="messages">
-            <div class="emptyHero" id="emptyHero">
-                <div class="heroTitle">HEY, I'm Your Finance Assistant</div>
-                <div class="heroSub">Ask about crypto, stocks, risk, and market structure.</div>
+        <!-- RIGHT (chat) -->
+        <section class="right">
+            <!-- mobile top bar -->
+            <div class="chatTop">
+                <button class="hambBtn" id="openDrawer" type="button" aria-label="Open chats">☰</button>
+                <div class="chatTopTitle" id="chatTopTitle">Chats</div>
+                <button class="ghostBtn" id="mobileNewChat" type="button">New</button>
             </div>
 
-        </div>
+            <div class="messages" id="messages"></div>
 
-        <!-- COMPOSER (fixed bottom in panel) -->
-        <div class="composerWrap">
-            <div class="composer">
-                <button class="btnCircle" id="btnImage" type="button" title="Upload image">+</button>
-                <textarea class="input" id="chatInput" rows="1" placeholder="Mesaj yaz..."></textarea>
-                <button class="btnSend" id="btnSend" type="button" aria-label="Send">➤</button>
+            <div class="composerWrap">
+                <div class="composer">
+                    <button class="btnCircle" id="btnImage" type="button" title="Upload image">＋</button>
+                    <input class="input" id="chatInput" placeholder="Message…" />
+                    <button class="btnSend" id="btnSend" type="button" aria-label="Send">➤</button>
+                </div>
+                <div class="composerHint">Shift+Enter yeni satır • Enter gönder</div>
             </div>
-        </div>
+        </section>
+
     </section>
+
+    <script type="module" src="/signal/signal.js"></script>
 </main>
 
-<script type="module" src="/signal/signal.js"></script>
 </body>
 </html>
