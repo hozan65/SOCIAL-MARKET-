@@ -2,7 +2,7 @@
 // - Upload image to Supabase Storage (client via /service/supabase.js)
 // - Create analysis row via API (create_post)
 
-import { supabase } from "/service/supabase.js";
+import { supabase } from "/services/supabase.js";
 
 const BUCKET = "analysis-images";
 const FN_CREATE_POST = "/.netlify/functions/create_post"; // sen backend endpointin buysa kalsın
