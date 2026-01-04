@@ -290,25 +290,78 @@ body{
 
 #msgHint{ display:none !important; }
 
-/* =========================
-   MOBILE
-========================= */
+/* ===============================
+   MOBILE FIX – composer görünmüyor
+   (Android Chrome 100vh bug + sticky cut)
+=============================== */
 @media (max-width: 860px){
-    .msgShell{ padding: 0; }
-    .msgApp{
-        grid-template-columns: 1fr;
-        gap: 0;
+
+    html, body{
+        height: 100%;
+        overflow: hidden; /* sayfa scroll yok */
     }
 
-    .msgLeft{ border-radius: 0; border-left:none; border-right:none; }
-    .msgRight{ border-radius: 0; border-left:none; border-right:none; display:none; }
+    /* msgShell full ekran */
+    .msgShell{
+        height: 100dvh !important;
+        height: 100vh !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+    }
 
-    body.dmChatOpen .msgLeft{ display:none; }
-    body.dmChatOpen .msgRight{ display:grid; }
+    /* chat açılınca sağ panel tam ekran */
+    body.dmChatOpen .msgRight{
+        display: grid !important;
+        height: 100% !important;
+    }
 
-    .msgBody{ padding: 14px 12px; }
-    .msgComposer{ padding: 10px 10px; }
-    .mBubble{ max-width: 86%; }
+    /* ✅ chatViewport altı composer için yer bırak */
+    body.dmChatOpen .chatViewport{
+        position: relative;
+        height: 100% !important;
+        min-height: 0 !important;
+        padding-bottom: 76px; /* composer yüksekliği kadar */
+        box-sizing: border-box;
+    }
 
-    .msgInput{ width: 100%; justify-self: stretch; }
+    /* ✅ mesaj listesi composer yüzünden kesilmesin */
+    body.dmChatOpen .msgBody{
+        height: 100% !important;
+        min-height: 0 !important;
+        overflow: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* ✅ composer sticky değil FIXED -> her zaman görünür */
+    body.dmChatOpen .msgComposer{
+        position: fixed !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        z-index: 9999 !important;
+
+        background: #fff !important;
+        border-top: 1px solid rgba(15,23,42,.10) !important;
+
+        padding: 10px 10px !important;
+        box-sizing: border-box;
+
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) 46px !important;
+        gap: 10px !important;
+        align-items: center !important;
+    }
+
+    body.dmChatOpen .msgInput{
+        width: 100% !important;
+        justify-self: stretch !important;
+        min-width: 0 !important;
+    }
+
+    body.dmChatOpen .msgSend{
+        width: 46px !important;
+        height: 46px !important;
+        min-width: 46px !important;
+    }
 }
