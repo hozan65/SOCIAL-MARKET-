@@ -316,11 +316,11 @@ async function deleteAvatar(){
         try{
             setMsg("Saving...");
             await saveProfile();
-            setMsg("✅ Saved");
+            setMsg("Saved");
             setTimeout(()=> setMsg(""), 1200);
         }catch(e){
             console.error(e);
-            setMsg("❌ " + (e?.message || e));
+            setMsg(" " + (e?.message || e));
         }
     };
 
@@ -335,11 +335,11 @@ async function deleteAvatar(){
             const url = await uploadAvatar(file);
             setAvatar(url);
             initial.avatar_url = url || "";
-            setMsg("✅ Uploaded");
+            setMsg(" Uploaded");
             setTimeout(()=> setMsg(""), 1200);
         }catch(e){
             console.error(e);
-            setMsg("❌ " + (e?.message || e));
+            setMsg(" " + (e?.message || e));
         }finally{
             avatarInput.value = "";
         }
@@ -352,11 +352,11 @@ async function deleteAvatar(){
             await deleteAvatar();
             setAvatar("");
             initial.avatar_url = "";
-            setMsg("✅ Deleted");
+            setMsg("Deleted");
             setTimeout(()=> setMsg(""), 1200);
         }catch(e){
             console.error(e);
-            setMsg("❌ " + (e?.message || e));
+            setMsg(" " + (e?.message || e));
         }
     };
 })();

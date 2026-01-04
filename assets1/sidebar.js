@@ -120,9 +120,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             a.addEventListener("click", () => closeMobile());
         });
 
-        console.log("✅ sidebar ready (clean layout + no overlap)");
+        console.log(" sidebar ready (clean layout + no overlap)");
     } catch (err) {
-        console.error("❌ sidebar error:", err);
+        console.error("sidebar error:", err);
     }
 });
 
@@ -135,3 +135,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     s.defer = true;
     document.head.appendChild(s);
 })();
+
+
+const logoutBtn = document.getElementById("smSbLogout");
+
+logoutBtn?.addEventListener("click", async () => {
+    try {
+        const { account } = await import("/assets/appwrite.js");
+        await account.deleteSession("current");
+    } catch (e) {
+        console.warn("logout: session already gone");
+    }
+
+    // local temizle
+    localStorage.removeItem("sm_uid");
+    localStorage.removeItem("sm_jwt");
+
+    // login sayfasına gönder
+    window.location.href = "/auth/login.html";
+});
