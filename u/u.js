@@ -423,3 +423,24 @@ document.addEventListener("keydown", (e) => {
 
 // init
 document.addEventListener("DOMContentLoaded", loadProfile);
+
+function openDrawer(title) {
+    document.body.classList.add("uDrawerOpen"); // ✅ EKLE
+    if ($drawerBackdrop) $drawerBackdrop.hidden = false;
+    if ($drawer) {
+        $drawer.setAttribute("aria-hidden", "false");
+        $drawer.classList.add("isOpen");
+    }
+    if ($drawerTitle) $drawerTitle.textContent = title || "—";
+}
+
+function closeDrawer() {
+    document.body.classList.remove("uDrawerOpen"); // ✅ EKLE
+    if ($drawerBackdrop) $drawerBackdrop.hidden = true;
+    if ($drawer) {
+        $drawer.setAttribute("aria-hidden", "true");
+        $drawer.classList.remove("isOpen");
+    }
+    if ($drawerBody) $drawerBody.innerHTML = "";
+}
+

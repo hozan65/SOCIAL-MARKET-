@@ -17,7 +17,7 @@
     window.__SM_SUPPORT_WIDGET__ = true;
 
     const API_URL = "/.netlify/functions/ai_support";
-    const SUPPORT_ICON_URL = "/assets1/img/support.png"; // kendi iconun
+    const SUPPORT_ICON_URL = "/assets1/Ai.png"; // kendi iconun
     const Z = 2147483647;
 
     const TELEGRAM_SVG =

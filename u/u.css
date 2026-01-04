@@ -300,3 +300,11 @@
 @media (max-width: 560px){
     .uPostsGrid{ grid-template-columns: 1fr; }
 }
+
+/* Drawer açıkken hamburger görünmesin */
+body.uDrawerOpen #smSbMobileHamb { display:none !important; }
+
+/* Drawer close (X) hamburger ile çakışmasın */
+@media (max-width: 980px){
+    #uDrawerClose{ right:64px !important; } /* X'i sola it */
+}
