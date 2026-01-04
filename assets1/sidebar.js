@@ -137,20 +137,99 @@ document.addEventListener("DOMContentLoaded", async () => {
 })();
 
 
-const logoutBtn = document.getElementById("smSbLogout");
+// /assets1/sidebar.js  (ADD THIS PART)
 
-logoutBtn?.addEventListener("click", async () => {
+// 1) auth kontrol (Appwrite varsa onu kullanırız, yoksa sm_uid ile fallback)
+async function smIsLoggedIn() {
+    // local hızlı kontrol
+    const uid = localStorage.getItem("sm_uid");
+    if (uid) return true;
+
+    // Appwrite ile doğrula (varsa)
     try {
-        const { account } = await import("/assets/appwrite.js");
-        await account.deleteSession("current");
+        const mod = await import("/assets/appwrite.js");
+        if (mod?.account?.get) {
+            const u = await mod.account.get();
+            if (u?.$id) {
+                localStorage.setItem("sm_uid", u.$id);
+                return true;
+            }
+        }
+    } catch {}
+    return false;
+}
+
+// 2) güvenli logout
+async function smDoLogout() {
+    try {
+        const mod = await import("/assets/appwrite.js");
+        if (mod?.account?.deleteSession) {
+            await mod.account.deleteSession("current");
+        }
     } catch (e) {
-        console.warn("logout: session already gone");
+        console.warn("logout: deleteSession failed (non-blocking)", e?.message || e);
     }
 
     // local temizle
     localStorage.removeItem("sm_uid");
     localStorage.removeItem("sm_jwt");
+    localStorage.removeItem("sm_name");
+    localStorage.removeItem("sm_email");
 
-    // login sayfasına gönder
-    window.location.href = "/auth/login.html";
+    // login sayfasına
+    location.href = "/auth/login.html";
+}
+
+// 3) butonu Login/Logout olarak ayarla
+async function smSetupLoginLogoutButton() {
+    const btn = document.getElementById("smSbLogout");
+    if (!btn) return;
+
+    const label = btn.querySelector("span");
+    const icon = btn.querySelector("i");
+
+    const loggedIn = await smIsLoggedIn();
+
+    if (!loggedIn) {
+        // ✅ LOGIN MODE
+        if (label) label.textContent = "Login";
+        if (icon) icon.className = "fa-solid fa-right-to-bracket";
+        btn.classList.remove("danger");
+        btn.dataset.mode = "login";
+    } else {
+        // ✅ LOGOUT MODE
+        if (label) label.textContent = "Logout";
+        if (icon) icon.className = "fa-solid fa-right-from-bracket";
+        btn.classList.add("danger");
+        btn.dataset.mode = "logout";
+    }
+}
+
+// 4) tıklama: login mi logout mu?
+document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("#smSbLogout");
+    if (!btn) return;
+    e.preventDefault();
+
+    // buton mode yoksa, anlık kontrol yap
+    const mode = btn.dataset.mode || (await smIsLoggedIn() ? "logout" : "login");
+
+    if (mode === "login") {
+        location.href = "/auth/login.html";
+    } else {
+        await smDoLogout();
+    }
+});
+
+// 5) sidebar yüklendikten sonra çağır
+// Eğer senin sidebar.js'de "mountSidebar()" gibi bir fonksiyon varsa,
+// mount bitince smSetupLoginLogoutButton() çağır.
+document.addEventListener("DOMContentLoaded", () => {
+    // sidebar mount gecikebileceği için küçük retry
+    let tries = 0;
+    const t = setInterval(async () => {
+        tries++;
+        await smSetupLoginLogoutButton();
+        if (document.getElementById("smSbLogout") || tries > 80) clearInterval(t);
+    }, 50);
 });
