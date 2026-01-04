@@ -1,6 +1,4 @@
-// /services/supabase.js
-// ✅ ONLY PUBLIC READ CLIENT
-// ❌ NO AUTH, NO getUser, NO session
+
 
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 

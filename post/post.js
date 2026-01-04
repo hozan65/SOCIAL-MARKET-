@@ -1,8 +1,7 @@
-// /post/post.js (FINAL - Appwrite JWT + Netlify create_post)
-// - Upload image to Supabase Storage (client)
-// - Create analysis row via Netlify Function (server)
+// /post/post.js
 
-import { supabase } from "../netlify/functions/supabase.js";
+import { supabase } from "/services/supabase.js";
+
 
 const BUCKET = "analysis-images";
 const FN_CREATE_POST = "/.netlify/functions/create_post";
@@ -93,10 +92,10 @@ form?.addEventListener("submit", async (e) => {
         const pairs = parsePairs(pairInput);
         if (!pairs.length) throw new Error("Invalid pair format.");
 
-        setMsg("📤 Uploading image...");
+        setMsg("Uploading image...");
         const imageUrl = await uploadImage(file);
 
-        setMsg("📝 Saving analysis...");
+        setMsg("Saving analysis...");
 
         // ✅ create_post function already sets author_id from Appwrite userId
         const payload = {
@@ -112,11 +111,11 @@ form?.addEventListener("submit", async (e) => {
 
         await createPost(payload);
 
-        setMsg("✅ Published successfully!");
+        setMsg(" Published successfully!");
         form.reset();
     } catch (err) {
         console.error("POST ERROR:", err);
-        setMsg("❌ Error: " + (err?.message || "unknown"));
+        setMsg(" Error: " + (err?.message || "unknown"));
     } finally {
         if (publishBtn) publishBtn.disabled = false;
     }
