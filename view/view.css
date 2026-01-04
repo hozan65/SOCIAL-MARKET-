@@ -1,7 +1,9 @@
 /* =========================
-  VIEW PAGE – CLEAN / NO SHADOW
+  VIEW PAGE – CLEAN / NO SHADOW (FULL)
   ✅ ID'ler bozulmaz
+  ✅ No shadow (flat)
   ✅ Comments kutusuz (flat)
+  ✅ Comment input üstte sabit, sadece liste scroll
 ========================= */
 
 .viewWrap{
@@ -35,10 +37,9 @@
     overflow:hidden;
     border: 1px solid rgba(0,0,0,.10);
     background: rgba(255,255,255,.96);
-    box-shadow: none; /* ✅ shadow yok */
+    box-shadow: none;
 }
 
-/* "loading..." hissi yok; sadece hata mesajı vs */
 .viewMsg{
     margin-top: 10px;
     font-weight: 900;
@@ -108,7 +109,7 @@
     padding: 9px 12px;
     border-radius: 12px;
     border: 1px solid rgba(0,0,0,.10);
-    background: #fff; /* sade */
+    background: #fff;
     font-weight: 1000;
     cursor:pointer;
 }
@@ -158,14 +159,22 @@
     overflow:hidden;
 }
 
-/* RIGHT (comments) – ✅ kutusuz flat */
+/* =========================
+   RIGHT (comments) – FULL FLAT + STICKY INPUT
+========================= */
+
 .viewRight{
-    border-radius: 0;         /* ✅ kare/kutu hissi yok */
-    overflow: visible;
-    border: none;             /* ✅ kutu yok */
-    background: transparent;  /* ✅ panel yok */
-    box-shadow: none;         /* ✅ shadow yok */
-    padding: 0;               /* ✅ sade */
+    border-radius: 0;
+    overflow: hidden;        /* sticky için içeride kalsın */
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+
+    /* ✅ input üstte sabit, sadece liste scroll */
+    display:flex;
+    flex-direction:column;
+    min-height: 520px;       /* panel yüksek his */
 }
 
 /* Comments header */
@@ -174,7 +183,6 @@
     align-items:center;
     justify-content:space-between;
     gap:10px;
-    margin-bottom: 10px;
     padding: 10px 0;
     border-bottom: 1px solid rgba(0,0,0,.08);
 }
@@ -187,14 +195,58 @@
     opacity: .8;
 }
 
-/* List */
+/* ✅ Form üstte sabit */
+.commentForm{
+    display:flex;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+
+    position: sticky;
+    top: 0;                 /* header’ın altında kalması için */
+    background: rgba(238,245,255,.96); /* senin sayfa bg vibe */
+    backdrop-filter: blur(6px);
+    z-index: 5;
+}
+
+.commentInput{
+    flex: 1;
+    height: 42px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,.10);
+    background: #fff;
+    padding: 0 12px;
+    font-weight: 900;
+    outline:none;
+    min-width: 0;
+}
+.commentInput:focus{
+    border-color: rgba(37,99,235,.35);
+    box-shadow: none;
+}
+
+.commentBtn{
+    height: 42px;
+    padding: 0 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,.10);
+    background: rgba(37,99,235,.10);
+    font-weight: 1100;
+    cursor:pointer;
+}
+.commentBtn:disabled{ opacity:.6; cursor:not-allowed; }
+
+/* ✅ Liste: panelin kalan kısmı scroll */
 .commentsList{
+    flex: 1;
+    min-height: 0;
+    overflow:auto;
+
     display:flex;
     flex-direction:column;
-    gap: 0;                   /* ✅ araya boş kutu yok */
-    max-height: 520px;
-    overflow:auto;
+    gap: 0;
     padding-right: 6px;
+    padding-top: 6px;
 }
 
 /* scrollbar */
@@ -211,7 +263,7 @@
     padding: 10px 0;
 }
 
-/* ✅ comment item: düz satır + alt çizgi */
+/* comment item: flat satır + alt çizgi */
 .cItem{
     display:flex;
     gap: 10px;
@@ -271,39 +323,6 @@
     white-space: pre-wrap;
 }
 
-/* form */
-.commentForm{
-    margin-top: 12px;
-    display:flex;
-    gap: 10px;
-    padding-top: 12px;
-}
-.commentInput{
-    flex: 1;
-    height: 42px;
-    border-radius: 14px;
-    border: 1px solid rgba(0,0,0,.10);
-    background: #fff;
-    padding: 0 12px;
-    font-weight: 900;
-    outline:none;
-}
-.commentInput:focus{
-    border-color: rgba(37,99,235,.35);
-    box-shadow: none; /* ✅ focus glow yok */
-}
-
-.commentBtn{
-    height: 42px;
-    padding: 0 14px;
-    border-radius: 14px;
-    border: 1px solid rgba(0,0,0,.10);
-    background: rgba(37,99,235,.10);
-    font-weight: 1100;
-    cursor:pointer;
-}
-.commentBtn:disabled{ opacity:.6; cursor:not-allowed; }
-
 /* =========================
    SOFT LOADING (only if slow)
 ========================= */
@@ -346,8 +365,10 @@ html, body{
 
     .pvHead{ padding: 12px 12px 8px; }
     .pvContent{ padding: 0 12px 12px; }
+
+    /* mobilde comment panel yükseklik hissi */
+    .viewRight{ min-height: 420px; }
 }
 
 /* comment form mobile */
 .commentForm{ min-width:0; }
-.commentInput{ min-width:0; }
