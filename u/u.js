@@ -1,8 +1,5 @@
-// /u/u.js  (FULL) — FIX: if no id and no me=1 => treat as MY profile (me=1)
-
-// Profile page logic: load profile, stats, posts, follow/message/visit controls, drawer lists
-
-console.log("✅ u.js loaded (profile + follow toggle + posts cards + drawer)");
+// /u/u.js  (FULL) — STABLE
+console.log(" u.js loaded (profile + follow toggle + posts cards + drawer)");
 
 // Netlify functions
 const FN_GET = "/.netlify/functions/get_profile";
@@ -16,8 +13,8 @@ const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";   // POST { follow
 
 // pages
 const PROFILE_PAGE = "/u/index.html";
-const MESSAGES_PAGE = "/messages/"; // /messages/index.html
-const VIEW_PAGE = "/view/view.html"; // post detail page
+const MESSAGES_PAGE = "/messages/";
+const VIEW_PAGE = "/view/view.html";
 
 // helpers
 const qs = (k) => new URLSearchParams(location.search).get(k);
@@ -35,7 +32,7 @@ const $msg = $("uMsg");
 
 const $followBtn = $("uFollowBtn");
 const $msgBtn = $("uMsgBtn");
-const $visitBtn = $("uVisitBtn"); // ✅ must exist in HTML
+const $visitBtn = $("uVisitBtn");
 
 // drawer
 const $drawerBackdrop = $("uDrawerBackdrop");
@@ -47,17 +44,37 @@ const $followersBtn = $("uFollowersBtn");
 const $followingBtn = $("uFollowingBtn");
 
 // ---------------------------
-// JWT helper (same pattern as your other pages)
+// JWT helpers
 // ---------------------------
 function getJWT() {
     return window.SM_JWT || localStorage.getItem("sm_jwt") || "";
+}
+
+async function ensureJWTOrRedirect() {
+    // ✅ wait jwt.js async init (if loaded)
+    if (window.SM_JWT_READY) {
+        try { await window.SM_JWT_READY; } catch {}
+    }
+
+    // still none? try one refresh call if available
+    if (!getJWT() && window.SM_REFRESH_JWT) {
+        try { await window.SM_REFRESH_JWT(); } catch {}
+    }
+
+    if (!getJWT()) {
+        setMsg(" Missing JWT. Please login again.");
+        // ✅ prevent endless 401 spam
+        setTimeout(() => (location.href = "/auth/login.html"), 300);
+        return false;
+    }
+    return true;
 }
 
 async function fnGet(url) {
     const jwt = getJWT();
     const r = await fetch(url, {
         method: "GET",
-        headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+        headers: { Authorization: `Bearer ${jwt}` },
     });
     const j = await r.json().catch(() => null);
     if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
@@ -70,7 +87,7 @@ async function fnPost(url, body) {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+            Authorization: `Bearer ${jwt}`,
         },
         body: JSON.stringify(body || {}),
     });
@@ -100,16 +117,15 @@ function safeUrl(u) {
 }
 
 // ---------------------------
-// Determine target profile  ✅ FIXED
+// Determine target profile
 // ---------------------------
 const params = new URLSearchParams(location.search);
 const targetIdFromQuery = String(params.get("id") || "").trim();
 
-// ✅ If neither id nor me=1 exists => this is MY profile
+// ✅ If neither id nor me=1 exists => treat as MY profile
 let isMe = params.get("me") === "1";
 if (!isMe && !targetIdFromQuery) {
     isMe = true;
-    // silently fix URL so refresh won't break
     const url = new URL(location.href);
     url.searchParams.delete("id");
     url.searchParams.set("me", "1");
@@ -119,7 +135,7 @@ if (!isMe && !targetIdFromQuery) {
 let TARGET_UID = isMe ? "" : targetIdFromQuery;
 
 // ---------------------------
-// UI visibility rules (Follow/Message/Visit)
+// UI visibility rules
 // ---------------------------
 function applyActionVisibility({ isMeProfile, targetUid, postsCount }) {
     if ($followBtn) $followBtn.hidden = !!isMeProfile || !targetUid;
@@ -139,7 +155,7 @@ function applyActionVisibility({ isMeProfile, targetUid, postsCount }) {
 }
 
 // ---------------------------
-// Profile fetchers
+// Normalize payload
 // ---------------------------
 function normalizeProfilePayload(j) {
     const p = j?.profile || j?.user || j?.data || j || {};
@@ -176,18 +192,18 @@ function renderPosts(posts) {
             const href = id ? `${VIEW_PAGE}?id=${encodeURIComponent(id)}` : "#";
 
             return `
-      <a class="uPostCard" href="${href}">
-        ${
+        <a class="uPostCard" href="${href}">
+          ${
                 img
                     ? `<img class="uPostImg" src="${esc(img)}" alt="" loading="lazy" decoding="async">`
                     : `<div class="uPostNoImg">NO IMAGE</div>`
             }
-        <div class="uPostBody">
-          <div class="uPostTitle">${title}</div>
-          <div class="uPostMeta">${esc(time)}</div>
-        </div>
-      </a>
-    `;
+          <div class="uPostBody">
+            <div class="uPostTitle">${title}</div>
+            <div class="uPostMeta">${esc(time)}</div>
+          </div>
+        </a>
+      `;
         })
         .join("");
 }
@@ -219,7 +235,7 @@ function setFollowBtnState(following) {
 }
 
 // ---------------------------
-// Drawer (Followers / Following)
+// Drawer
 // ---------------------------
 function openDrawer(title) {
     if ($drawerBackdrop) $drawerBackdrop.hidden = false;
@@ -277,20 +293,20 @@ async function loadDrawerList(kind) {
             const href = uid ? `${PROFILE_PAGE}?id=${encodeURIComponent(uid)}` : "#";
 
             return `
-      <a class="uDrawerItem" href="${href}">
-        <div class="uDrawerAvatar">
-          ${
+        <a class="uDrawerItem" href="${href}">
+          <div class="uDrawerAvatar">
+            ${
                 avatar
                     ? `<img src="${esc(avatar)}" alt="" loading="lazy" decoding="async">`
                     : `<div class="uDrawerAvatarFallback">${username.slice(0, 1).toUpperCase()}</div>`
             }
-        </div>
-        <div class="uDrawerInfo">
-          <div class="uDrawerName">${username}</div>
-          <div class="uDrawerSub">${esc(uid)}</div>
-        </div>
-      </a>
-    `;
+          </div>
+          <div class="uDrawerInfo">
+            <div class="uDrawerName">${username}</div>
+            <div class="uDrawerSub">${esc(uid)}</div>
+          </div>
+        </a>
+      `;
         })
         .join("");
 }
@@ -301,9 +317,13 @@ async function loadDrawerList(kind) {
 async function loadProfile() {
     setMsg("");
 
+    // ✅ MUST have JWT for functions
+    const ok = await ensureJWTOrRedirect();
+    if (!ok) return;
+
     // ✅ if other profile but still missing id -> show error
     if (!isMe && !TARGET_UID) {
-        setMsg("❌ Missing profile id");
+        setMsg(" Missing profile id");
         applyActionVisibility({ isMeProfile: false, targetUid: "", postsCount: 0 });
         return;
     }
@@ -353,7 +373,7 @@ async function loadProfile() {
         }
     } catch (err) {
         console.error(err);
-        setMsg("❌ " + (err?.message || "unknown error"));
+        setMsg(" " + (err?.message || "unknown error"));
     }
 }
 
@@ -378,7 +398,7 @@ $followBtn?.addEventListener("click", async () => {
             }
         }
     } catch (err) {
-        alert("❌ " + (err?.message || err));
+        alert(" " + (err?.message || err));
     } finally {
         $followBtn.disabled = false;
     }
@@ -386,20 +406,12 @@ $followBtn?.addEventListener("click", async () => {
 
 $followersBtn?.addEventListener("click", async () => {
     openDrawer("Followers");
-    try {
-        await loadDrawerList("followers");
-    } catch (e) {
-        console.error(e);
-    }
+    try { await loadDrawerList("followers"); } catch (e) { console.error(e); }
 });
 
 $followingBtn?.addEventListener("click", async () => {
     openDrawer("Following");
-    try {
-        await loadDrawerList("following");
-    } catch (e) {
-        console.error(e);
-    }
+    try { await loadDrawerList("following"); } catch (e) { console.error(e); }
 });
 
 $drawerBackdrop?.addEventListener("click", closeDrawer);

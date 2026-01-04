@@ -11,7 +11,8 @@ import { account } from "/assets/appwrite.js";
 
 async function refreshJWT() {
     try {
-        await account.get(); // throws if no session
+        // throws if no session
+        await account.get();
 
         const jwtObj = await account.createJWT();
         const jwt = jwtObj?.jwt;
@@ -24,9 +25,11 @@ async function refreshJWT() {
         console.log(" sm_jwt updated");
         return jwt;
     } catch (e) {
-        window.SM_JWT = "";
-        localStorage.removeItem("sm_jwt");
-        console.warn("⚠ No session -> sm_jwt cleared");
+        // ✅ IMPORTANT: session yok diye tokenı silme
+        // Eğer localde jwt varsa onu bırak.
+        window.SM_JWT = window.SM_JWT || localStorage.getItem("sm_jwt") || "";
+
+        console.warn("⚠ No session -> JWT refresh skipped (kept existing sm_jwt if any)");
         return null;
     }
 }
