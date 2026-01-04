@@ -1,230 +1,137 @@
 // /assets1/sidebar.js
-// ✅ Loads /components/sidebar.html into #sidebarMount
-// ✅ Active menu highlight
-// ✅ Pin / collapse remember (localStorage)
-// ✅ Mobile drawer (hamburger + backdrop + close)
-// ✅ Profile dropdown
-// ✅ Logout works (Appwrite)
+console.log("✅ sidebar.js loaded (hover + pin clean)");
 
-(() => {
-    const SIDEBAR_HTML = "/components/sidebar.html";
-    const LS_PIN = "sm_sidebar_pinned"; // "1" pinned, "0" not pinned
+document.addEventListener("DOMContentLoaded", async () => {
+    const mount = document.getElementById("sidebarMount");
+    if (!mount) return;
 
-    const mountId = "sidebarMount";
-
-    function $(id) { return document.getElementById(id); }
-
-    function setAria(el, key, val) {
-        if (!el) return;
-        el.setAttribute(key, String(val));
-    }
-
-    function pageKeyFromPath() {
-        const seg = (location.pathname.split("/")[1] || "").toLowerCase();
-        // examples: feed, post, signal, news, tools, marketplace, messages, u, profile, auth
-        if (seg === "profile") return "settings"; // settings page
-        if (seg === "u") return "profile";
-        if (seg === "messages") return "messages";
-        return seg;
-    }
-
-    function applyActive(sidebarEl) {
-        const key = pageKeyFromPath();
-        sidebarEl.querySelectorAll(".smSbItem").forEach(a => {
-            const on = (a.dataset.page || "").toLowerCase() === key;
-            a.classList.toggle("active", on);
-        });
-    }
-
-    function applyPinState(sidebarEl) {
-        const pinned = localStorage.getItem(LS_PIN) === "1";
-        sidebarEl.classList.toggle("isPinned", pinned);
-
-        const btn = $("smSbPinBtn");
-        if (btn) setAria(btn, "aria-pressed", pinned ? "true" : "false");
-    }
-
-    function closeProfileMenu() {
-        const btn = $("smSbProfileBtn");
-        const menu = $("smSbMenu");
-        if (!btn || !menu) return;
-        btn.classList.remove("open");
-        setAria(btn, "aria-expanded", "false");
-        setAria(menu, "aria-hidden", "true");
-    }
-
-    function toggleProfileMenu() {
-        const btn = $("smSbProfileBtn");
-        const menu = $("smSbMenu");
-        if (!btn || !menu) return;
-
-        const open = btn.classList.toggle("open");
-        setAria(btn, "aria-expanded", open ? "true" : "false");
-        setAria(menu, "aria-hidden", open ? "false" : "true");
-    }
-
-    function closeMobileDrawer() {
-        const sb = $("smSidebar");
-        const bd = $("smSbBackdrop");
-        const close = $("smSbClose");
-        if (!sb || !bd || !close) return;
-
-        sb.classList.remove("isMobileOpen");
-        setAria(bd, "aria-hidden", "true");
-    }
-
-    function openMobileDrawer() {
-        const sb = $("smSidebar");
-        const bd = $("smSbBackdrop");
-        const close = $("smSbClose");
-        if (!sb || !bd || !close) return;
-
-        sb.classList.add("isMobileOpen");
-        setAria(bd, "aria-hidden", "false");
-    }
-
-    async function doLogout() {
-        // 1) try Appwrite sign out
-        try {
-            const mod = await import("/assets/appwrite.js");
-            if (mod?.account?.deleteSession) {
-                await mod.account.deleteSession("current");
-            }
-        } catch (e) {
-            console.warn("logout: appwrite deleteSession failed (non-blocking)", e);
+    try {
+        // Font Awesome once
+        if (!document.getElementById("faCDN")) {
+            const fa = document.createElement("link");
+            fa.id = "faCDN";
+            fa.rel = "stylesheet";
+            fa.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css";
+            document.head.appendChild(fa);
         }
 
-        // 2) clear local tokens
-        try {
-            localStorage.removeItem("sm_uid");
-            localStorage.removeItem("sm_jwt");
-        } catch (e) {}
-
-        // 3) redirect login
-        location.href = "/auth/login.html";
-    }
-
-    async function hydrateProfile() {
-        // Sidebar name/mail/avatar initial
-        const nameEl = $("smSbName");
-        const mailEl = $("smSbMail");
-        const avaEl  = $("smSbAvatar");
-
-        // from localStorage first (fast)
-        const cachedName = localStorage.getItem("sm_name");
-        const cachedMail = localStorage.getItem("sm_email");
-        if (cachedName && nameEl) nameEl.textContent = cachedName;
-        if (cachedMail && mailEl) mailEl.textContent = cachedMail;
-        if (avaEl && (cachedName || cachedMail)) {
-            const letter = (cachedName || cachedMail || "S").trim()[0]?.toUpperCase() || "S";
-            avaEl.textContent = letter;
+        // CSS once
+        if (!document.getElementById("smSidebarCss")) {
+            const css = document.createElement("link");
+            css.id = "smSidebarCss";
+            css.rel = "stylesheet";
+            css.href = "/styles/sidebar.css";
+            document.head.appendChild(css);
         }
-
-        // then Appwrite (truth)
-        try {
-            const mod = await import("/assets/appwrite.js");
-            if (!mod?.account?.get) return;
-            const user = await mod.account.get();
-
-            const nm = (user?.name || "").trim();
-            const em = (user?.email || "").trim();
-
-            if (nm && nameEl) nameEl.textContent = nm;
-            if (em && mailEl) mailEl.textContent = em;
-
-            if (avaEl) {
-                const letter = (nm || em || "S")[0]?.toUpperCase() || "S";
-                avaEl.textContent = letter;
-            }
-
-            // cache
-            if (nm) localStorage.setItem("sm_name", nm);
-            if (em) localStorage.setItem("sm_email", em);
-        } catch (e) {
-            // not logged in or module fail -> keep cached
-            console.warn("sidebar profile hydrate skipped:", e?.message || e);
-        }
-    }
-
-    async function init() {
-        const mount = document.getElementById(mountId);
-        if (!mount) return; // some pages may not have sidebar
 
         // Load HTML
-        const res = await fetch(SIDEBAR_HTML, { cache: "no-store" });
-        if (!res.ok) {
-            console.error("sidebar.html not found:", SIDEBAR_HTML);
-            return;
-        }
+        const res = await fetch("/components/sidebar.html", { cache: "no-store" });
+        if (!res.ok) throw new Error("sidebar.html not found");
         mount.innerHTML = await res.text();
 
-        const sidebarEl = $("smSidebar");
-        if (!sidebarEl) return;
+        document.body.classList.add("hasSidebar");
 
-        // Active menu
-        applyActive(sidebarEl);
+        const sidebar = document.getElementById("smSidebar");
+        const pinBtn = document.getElementById("smSbPinBtn");
 
-        // Pin state
-        applyPinState(sidebarEl);
+        const backdrop = document.getElementById("smSbBackdrop");
+        const closeBtn = document.getElementById("smSbClose");
+        const hamb = document.getElementById("smSbMobileHamb");
 
-        // Profile info
-        hydrateProfile();
+        const profileBtn = document.getElementById("smSbProfileBtn");
+        const menu = document.getElementById("smSbMenu");
 
-        // Pin button
-        const pinBtn = $("smSbPinBtn");
-        pinBtn?.addEventListener("click", () => {
-            const pinned = !(localStorage.getItem(LS_PIN) === "1");
-            localStorage.setItem(LS_PIN, pinned ? "1" : "0");
-            applyPinState(sidebarEl);
+        // Restore PIN
+        const pinned = localStorage.getItem("sm_sidebar_pinned") === "1";
+        sidebar.classList.toggle("isPinned", pinned);
+        pinBtn?.setAttribute("aria-pressed", pinned ? "true" : "false");
+
+        pinBtn?.addEventListener("click", (e) => {
+            e.preventDefault();
+            const next = !sidebar.classList.contains("isPinned");
+            sidebar.classList.toggle("isPinned", next);
+            localStorage.setItem("sm_sidebar_pinned", next ? "1" : "0");
+            pinBtn.setAttribute("aria-pressed", next ? "true" : "false");
+
+            // dropdown kapat
+            menu?.classList.remove("open");
+            profileBtn?.setAttribute("aria-expanded", "false");
+            menu?.setAttribute("aria-hidden", "true");
         });
 
-        // Profile dropdown
-        const profileBtn = $("smSbProfileBtn");
-        profileBtn?.addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleProfileMenu();
-        });
+        // Active menu highlight
+        const path = location.pathname.replace(/\/+$/, "");
+        const seg = path.split("/")[1] || "feed";
+        const page = seg.endsWith(".html") ? seg.replace(".html", "") : seg;
 
-        // Outside click closes menu
-        document.addEventListener("click", () => closeProfileMenu());
-
-        // Escape closes menu + drawer
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") {
-                closeProfileMenu();
-                closeMobileDrawer();
+        document.querySelectorAll("#smSidebar [data-page]").forEach((a) => {
+            if ((a.dataset.page || "").trim().toLowerCase() === page.toLowerCase()) {
+                a.classList.add("active");
             }
         });
 
-        // Mobile drawer controls
-        $("smSbMobileHamb")?.addEventListener("click", (e) => {
+        // Dropdown
+        const toggleMenu = (force) => {
+            if (!menu) return;
+            const open = force ?? !menu.classList.contains("open");
+            menu.classList.toggle("open", open);
+            profileBtn?.setAttribute("aria-expanded", open ? "true" : "false");
+            menu.setAttribute("aria-hidden", open ? "false" : "true");
+        };
+
+        profileBtn?.addEventListener("click", (e) => {
+            e.stopPropagation();
+            toggleMenu();
+        });
+        menu?.addEventListener("click", (e) => e.stopPropagation());
+        document.addEventListener("click", () => toggleMenu(false));
+
+        // Mobile drawer
+        const openMobile = () => {
+            sidebar.classList.add("mobileOpen");
+            backdrop.classList.add("open");
+            closeBtn.classList.add("open");
+            document.documentElement.style.overflow = "hidden";
+            toggleMenu(false);
+        };
+
+        const closeMobile = () => {
+            sidebar.classList.remove("mobileOpen");
+            backdrop.classList.remove("open");
+            closeBtn.classList.remove("open");
+            document.documentElement.style.overflow = "";
+            toggleMenu(false);
+        };
+
+        hamb?.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            openMobileDrawer();
+            sidebar.classList.contains("mobileOpen") ? closeMobile() : openMobile();
         });
 
-        $("smSbBackdrop")?.addEventListener("click", () => {
-            closeMobileDrawer();
-            closeProfileMenu();
+        closeBtn?.addEventListener("click", closeMobile);
+        backdrop?.addEventListener("click", closeMobile);
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeMobile();
         });
 
-        $("smSbClose")?.addEventListener("click", () => {
-            closeMobileDrawer();
-            closeProfileMenu();
+        document.querySelectorAll("#smSidebar a").forEach((a) => {
+            a.addEventListener("click", () => closeMobile());
         });
 
-        // Logout
-        $("smSbLogout")?.addEventListener("click", async (e) => {
-            e.preventDefault();
-            await doLogout();
-        });
-
-        console.log("✅ sidebar.js loaded (hover + pin + menu + logout)");
+        console.log("✅ sidebar ready (clean layout + no overlap)");
+    } catch (err) {
+        console.error("❌ sidebar error:", err);
     }
+});
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", init);
-    } else {
-        init();
-    }
+// AI support loader
+(() => {
+    if (document.getElementById("smSupportLoader")) return;
+    const s = document.createElement("script");
+    s.id = "smSupportLoader";
+    s.src = "/assets1/ai_support_widget.js";
+    s.defer = true;
+    document.head.appendChild(s);
 })();
