@@ -1,10 +1,11 @@
-// /post/post.js
+// /post/post.js (FINAL - Appwrite JWT + create_post)
+// - Upload image to Supabase Storage (client via /service/supabase.js)
+// - Create analysis row via API (create_post)
 
-import { supabase } from "/services/supabase.js";
-
+import { supabase } from "/service/supabase.js";
 
 const BUCKET = "analysis-images";
-const FN_CREATE_POST = "/.netlify/functions/create_post";
+const FN_CREATE_POST = "/.netlify/functions/create_post"; // sen backend endpointin buysa kalsın
 
 const form = document.getElementById("postForm");
 const msg = document.getElementById("formMsg");
@@ -31,19 +32,27 @@ function getJWT() {
     return jwt;
 }
 
+function guessExt(file) {
+    const byName = (file?.name || "").split(".").pop()?.toLowerCase();
+    if (byName) return byName;
+    const t = (file?.type || "").toLowerCase();
+    if (t.includes("png")) return "png";
+    if (t.includes("jpeg") || t.includes("jpg")) return "jpg";
+    if (t.includes("webp")) return "webp";
+    return "png";
+}
+
 async function uploadImage(file) {
     if (!file) throw new Error("Please select an image.");
 
-    const ext = (file.name.split(".").pop() || "png").toLowerCase();
+    const ext = guessExt(file);
     const filePath = `posts/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
 
-    const { error } = await supabase.storage
-        .from(BUCKET)
-        .upload(filePath, file, {
-            upsert: false,
-            cacheControl: "3600",
-            contentType: file.type || "image/*",
-        });
+    const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, {
+        upsert: false,
+        cacheControl: "3600",
+        contentType: file.type || "image/*",
+    });
 
     if (error) throw error;
 
@@ -61,7 +70,7 @@ async function createPost(payload) {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${jwt}`,
+            Authorization: `Bearer ${jwt}`,
         },
         body: JSON.stringify(payload),
     });
@@ -111,11 +120,11 @@ form?.addEventListener("submit", async (e) => {
 
         await createPost(payload);
 
-        setMsg(" Published successfully!");
+        setMsg("Published successfully!");
         form.reset();
     } catch (err) {
         console.error("POST ERROR:", err);
-        setMsg(" Error: " + (err?.message || "unknown"));
+        setMsg("Error: " + (err?.message || "unknown"));
     } finally {
         if (publishBtn) publishBtn.disabled = false;
     }
