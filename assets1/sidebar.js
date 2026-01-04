@@ -1,4 +1,7 @@
 // /assets1/sidebar.js
+
+document.body.classList.add("hasSidebar");
+
 console.log("✅ sidebar.js loaded (MOBILE FIXED CLOSE + USER HYDRATE)");
 
 /* =======================
