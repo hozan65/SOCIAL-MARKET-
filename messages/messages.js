@@ -289,7 +289,30 @@
 
     // Back (mobile)
     chatBackBtn?.addEventListener("click", () => {
-        if (isMobile()) setMobileModeChat(false);
+        if (!isMobile()) return;
+
+        // 1) listeye dön
+        setMobileModeChat(false);
+
+        // 2) state temizle
+        state.peer_id = "";
+        state.conversation_id = "";
+        state.peer_name = "";
+        state.peer_avatar = "";
+
+        // 3) UI temizle
+        setPeerHeader({});
+        clearMsgs();
+
+        // 4) URL temizle (en kritik)
+        try{
+            const u = new URL(location.href);
+            u.searchParams.delete("to");
+            u.searchParams.delete("id");
+            u.searchParams.delete("to_id");
+            u.searchParams.delete("conversation_id");
+            history.replaceState(null, "", u.toString());
+        }catch(e){}
     });
 
     window.addEventListener("resize", () => {
