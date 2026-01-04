@@ -1,27 +1,23 @@
-// netlify/functions/_auth_user.js  (COMMONJS FIX)
-// ✅ add_comment.js require("./_auth_user") ile çalışır
-// ✅ /_auth_user endpoint'i (GET) çalışmaya devam eder
+// netlify/functions/_auth_user.js (CJS - NO extra file needed)
 
-const { getAppwriteUser } = require("/lib/_appwrite_user.cjs");
+const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT;
+const APPWRITE_PROJECT_ID = process.env.APPWRITE_PROJECT_ID;
 
-
-// --- Netlify endpoint (GET) ---
 exports.handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
 
-        const { user } = await getAppwriteUser(event);
+        const jwt = extractJWT(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
+
+        const user = await fetchUser(jwt);
 
         return json(200, {
             ok: true,
             uid: user.$id,
             user_id: user.$id,
-            user: {
-                $id: user.$id,
-                name: user.name || "",
-                email: user.email || "",
-            },
+            user: { $id: user.$id, name: user.name || "", email: user.email || "" },
         });
     } catch (e) {
         const msg = String(e?.message || e);
@@ -31,24 +27,55 @@ exports.handler = async (event) => {
     }
 };
 
-// --- add_comment gibi fonksiyonların çağıracağı helper ---
+// add_comment gibi yerler için helper
 async function authUser(jwt) {
-    // add_comment tarafı event değil jwt gönderiyor
-    const fakeEvent = {
-        headers: {
-            authorization: `Bearer ${jwt}`,
-            Authorization: `Bearer ${jwt}`,
-        },
-        httpMethod: "GET",
-    };
-
-    const { user } = await getAppwriteUser(fakeEvent);
+    const user = await fetchUser(jwt);
     const uid = String(user?.$id || "").trim();
     if (!uid) throw new Error("User id missing");
     return { uid, user };
 }
-
 module.exports.authUser = authUser;
+
+async function fetchUser(jwt) {
+    if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID) {
+        throw new Error("Missing APPWRITE_ENDPOINT or APPWRITE_PROJECT_ID env");
+    }
+
+    const r = await fetch(`${APPWRITE_ENDPOINT}/account`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+            "X-Appwrite-JWT": jwt,
+        },
+    });
+
+    const txt = await r.text().catch(() => "");
+    let data = null;
+    try { data = txt ? JSON.parse(txt) : null; } catch {}
+
+    if (!r.ok) {
+        const msg = data?.message || data?.error || `Appwrite /account failed: HTTP ${r.status}`;
+        throw new Error(msg);
+    }
+
+    if (!data?.$id) throw new Error("Invalid JWT");
+    return data;
+}
+
+function extractJWT(event) {
+    const h = event?.headers || {};
+    const auth = h.authorization || h.Authorization || "";
+    const xjwt = h["x-appwrite-jwt"] || h["X-Appwrite-JWT"] || h["X-APPWRITE-JWT"] || "";
+
+    if (auth) {
+        const m = auth.match(/Bearer\s+(.+)/i);
+        if (m?.[1]) return m[1].trim();
+        return auth.trim();
+    }
+    if (xjwt) return String(xjwt).trim();
+    return "";
+}
 
 function json(statusCode, body) {
     return {
