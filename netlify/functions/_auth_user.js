@@ -2,7 +2,8 @@
 // ✅ add_comment.js require("./_auth_user") ile çalışır
 // ✅ /_auth_user endpoint'i (GET) çalışmaya devam eder
 
-const { getAppwriteUser } = require("./_appwrite_user.cjs");
+const { getAppwriteUser } = require("../lib/appwrite_user.cjs");
+
 
 // --- Netlify endpoint (GET) ---
 exports.handler = async (event) => {
