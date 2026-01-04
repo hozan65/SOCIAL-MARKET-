@@ -1,52 +1,55 @@
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SRK = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-const sb = createClient(SUPABASE_URL, SRK);
+function pickId(row, keys) {
+    for (const k of keys) {
+        const v = row?.[k];
+        if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return "";
+}
 
 export const handler = async (event) => {
     try {
-        if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-        if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
-
         const uid = String(event.queryStringParameters?.id || "").trim();
         if (!uid) return json(400, { error: "Missing id" });
 
+        // ✅ select("*") => kolon adı ne olursa olsun satır gelir
         const { data: rel, error: e1 } = await sb
             .from("follows")
-            .select("follower_uid, created_at")
-            .eq("following_uid", uid)
+            .select("*")
+            .eq("follower_uid", uid)
             .order("created_at", { ascending: false })
             .limit(200);
 
         if (e1) return json(500, { error: e1.message });
 
-        const ids = (rel || []).map(r => r.follower_uid).filter(Boolean);
+        // ✅ following uid'yi farklı kolon adlarından yakala
+        const ids = (rel || [])
+            .map(r => pickId(r, ["following_uid", "following_id", "following_user_id", "following", "to_uid", "to_id"]))
+            .filter(Boolean);
+
         if (!ids.length) return json(200, { list: [] });
 
         const { data: profs, error: e2 } = await sb
             .from("profiles")
             .select("appwrite_user_id, name, avatar_url")
-            .in("appwrite_user_id", ids)
-            .limit(200);
+            .in("appwrite_user_id", ids);
 
         if (e2) return json(500, { error: e2.message });
 
         const map = new Map((profs || []).map(p => [p.appwrite_user_id, p]));
 
-        const list = ids
-            .map(id => map.get(id))
-            .filter(Boolean)
-            .map(p => ({
-                user_id: p.appwrite_user_id,
-                username: p.name || "User",
-                avatar_url: p.avatar_url || null,
-            }));
+        // ✅ profile yoksa bile listede göster
+        const list = ids.map(id => {
+            const p = map.get(id);
+            return { id, name: p?.name || "User", avatar_url: p?.avatar_url || null };
+        });
 
         return json(200, { list });
     } catch (e) {
-        return json(502, { error: String(e?.message || e) });
+        return json(500, { error: String(e?.message || e) });
     }
 };
 
@@ -55,10 +58,8 @@ function json(statusCode, body) {
         statusCode,
         headers: {
             "Content-Type": "application/json",
-            "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Cache-Control": "no-store",
         },
         body: JSON.stringify(body),
     };
