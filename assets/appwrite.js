@@ -9,18 +9,19 @@ import {
 
 export const client = new Client()
     .setEndpoint("https://cloud.appwrite.io/v1")
-    .setProject("694957a0001a0479bd64"); // PROJECT ID
+    .setProject("694957a0001a0479bd64");
 
 export const account = new Account(client);
 export const db = new Databases(client);
 
-// IDs
-export const DATABASE_ID = "6949590f0022a0f4370a";      // trading_db
-export const SETTINGS_COL = "69495c37000f41ab237f";    // user_settings table
+export const DATABASE_ID = "6949590f0022a0f4370a";
+export const SETTINGS_COL = "69495c37000f41ab237f";
 
 export { ID, Permission, Role };
 
-// expose to window for non-module scripts (settings.js gibi)
-window.client = client;
-window.account = account;
-window.db = db;
+// ✅ Only if running in browser
+if (typeof window !== "undefined") {
+    window.client = client;
+    window.account = account;
+    window.db = db;
+}
