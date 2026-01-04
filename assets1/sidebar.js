@@ -1,15 +1,13 @@
 // /assets1/sidebar.js
-console.log("✅ sidebar.js loaded (hover + pin clean)");
+console.log("✅ sidebar.js loaded (FINAL STABLE)");
 
 /* =======================
-   LOGIN / LOGOUT HELPERS
+   AUTH HELPERS
 ======================= */
 async function smIsLoggedIn() {
-    // local hızlı kontrol
     const uid = localStorage.getItem("sm_uid");
     if (uid) return true;
 
-    // Appwrite ile doğrula (varsa)
     try {
         const mod = await import("/assets/appwrite.js");
         if (mod?.account?.get) {
@@ -30,16 +28,14 @@ async function smDoLogout() {
             await mod.account.deleteSession("current");
         }
     } catch (e) {
-        console.warn("logout: deleteSession failed (non-blocking)", e?.message || e);
+        console.warn("logout: deleteSession failed", e?.message || e);
     }
 
-    // local temizle
     localStorage.removeItem("sm_uid");
     localStorage.removeItem("sm_jwt");
     localStorage.removeItem("sm_name");
     localStorage.removeItem("sm_email");
 
-    // login sayfasına
     location.href = "/auth/login.html";
 }
 
@@ -48,43 +44,15 @@ function smSetBtnMode(btn, loggedIn) {
     const icon = btn.querySelector("i");
 
     if (!loggedIn) {
-        // LOGIN MODE
         if (label) label.textContent = "Login";
         if (icon) icon.className = "fa-solid fa-right-to-bracket";
         btn.dataset.mode = "login";
-        btn.classList.remove("danger");
     } else {
-        // LOGOUT MODE
         if (label) label.textContent = "Logout";
         if (icon) icon.className = "fa-solid fa-right-from-bracket";
         btn.dataset.mode = "logout";
-        btn.classList.add("danger");
     }
 }
-
-async function smSetupLoginLogoutButton() {
-    const btn = document.getElementById("smSbLogout");
-    if (!btn) return;
-    const loggedIn = await smIsLoggedIn();
-    smSetBtnMode(btn, loggedIn);
-}
-
-/* ✅ Event delegation: sidebar sonradan yüklense bile çalışır */
-document.addEventListener("click", async (e) => {
-    const btn = e.target.closest("#smSbLogout");
-    if (!btn) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const mode = btn.dataset.mode || (await smIsLoggedIn() ? "logout" : "login");
-
-    if (mode === "login") {
-        location.href = "/auth/login.html";
-    } else {
-        await smDoLogout();
-    }
-});
 
 /* =======================
    SIDEBAR MOUNT
@@ -94,7 +62,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!mount) return;
 
     try {
-        // Font Awesome once
+        /* Font Awesome */
         if (!document.getElementById("faCDN")) {
             const fa = document.createElement("link");
             fa.id = "faCDN";
@@ -104,7 +72,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.head.appendChild(fa);
         }
 
-        // CSS once
+        /* Sidebar CSS */
         if (!document.getElementById("smSidebarCss")) {
             const css = document.createElement("link");
             css.id = "smSidebarCss";
@@ -113,7 +81,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             document.head.appendChild(css);
         }
 
-        // Load HTML
+        /* Load sidebar HTML */
         const res = await fetch("/components/sidebar.html", { cache: "no-store" });
         if (!res.ok) throw new Error("sidebar.html not found");
         mount.innerHTML = await res.text();
@@ -130,9 +98,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         const profileBtn = document.getElementById("smSbProfileBtn");
         const menu = document.getElementById("smSbMenu");
 
-        // Restore PIN
+        /* Restore pin */
         const pinned = localStorage.getItem("sm_sidebar_pinned") === "1";
-        sidebar?.classList.toggle("isPinned", pinned);
+        sidebar.classList.toggle("isPinned", pinned);
         pinBtn?.setAttribute("aria-pressed", pinned ? "true" : "false");
 
         pinBtn?.addEventListener("click", (e) => {
@@ -142,24 +110,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             localStorage.setItem("sm_sidebar_pinned", next ? "1" : "0");
             pinBtn.setAttribute("aria-pressed", next ? "true" : "false");
 
-            // dropdown kapat
             menu?.classList.remove("open");
             profileBtn?.setAttribute("aria-expanded", "false");
             menu?.setAttribute("aria-hidden", "true");
         });
 
-        // Active menu highlight
+        /* Active page */
         const path = location.pathname.replace(/\/+$/, "");
         const seg = path.split("/")[1] || "feed";
         const page = seg.endsWith(".html") ? seg.replace(".html", "") : seg;
 
         document.querySelectorAll("#smSidebar [data-page]").forEach((a) => {
-            if ((a.dataset.page || "").trim().toLowerCase() === page.toLowerCase()) {
+            if ((a.dataset.page || "").toLowerCase() === page.toLowerCase()) {
                 a.classList.add("active");
             }
         });
 
-        // Dropdown
+        /* Profile dropdown */
         const toggleMenu = (force) => {
             if (!menu) return;
             const open = force ?? !menu.classList.contains("open");
@@ -172,22 +139,23 @@ document.addEventListener("DOMContentLoaded", async () => {
             e.stopPropagation();
             toggleMenu();
         });
+
         menu?.addEventListener("click", (e) => e.stopPropagation());
         document.addEventListener("click", () => toggleMenu(false));
 
-        // Mobile drawer
+        /* Mobile */
         const openMobile = () => {
             sidebar.classList.add("mobileOpen");
-            backdrop?.classList.add("open");
-            closeBtn?.classList.add("open");
+            backdrop.classList.add("open");
+            closeBtn.classList.add("open");
             document.documentElement.style.overflow = "hidden";
             toggleMenu(false);
         };
 
         const closeMobile = () => {
             sidebar.classList.remove("mobileOpen");
-            backdrop?.classList.remove("open");
-            closeBtn?.classList.remove("open");
+            backdrop.classList.remove("open");
+            closeBtn.classList.remove("open");
             document.documentElement.style.overflow = "";
             toggleMenu(false);
         };
@@ -200,26 +168,37 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         closeBtn?.addEventListener("click", closeMobile);
         backdrop?.addEventListener("click", closeMobile);
+        document.addEventListener("keydown", (e) => e.key === "Escape" && closeMobile());
 
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape") closeMobile();
-        });
+        /* =======================
+           LOGIN / LOGOUT BUTTON
+        ======================= */
+        const logoutBtn = document.getElementById("smSbLogout");
+        if (logoutBtn) {
+            const loggedIn = await smIsLoggedIn();
+            smSetBtnMode(logoutBtn, loggedIn);
 
-        document.querySelectorAll("#smSidebar a").forEach((a) => {
-            a.addEventListener("click", () => closeMobile());
-        });
+            logoutBtn.addEventListener("click", async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
 
-        // ✅ sidebar mount bitti → login/logout butonu ayarla
-        await smSetupLoginLogoutButton();
+                const mode = logoutBtn.dataset.mode;
+                if (mode === "login") {
+                    location.href = "/auth/login.html";
+                } else {
+                    await smDoLogout();
+                }
+            });
+        }
 
-        console.log("✅ sidebar ready (clean layout + no overlap)");
+        console.log("✅ sidebar ready (FULL STABLE)");
     } catch (err) {
         console.error("sidebar error:", err);
     }
 });
 
 /* =======================
-   AI support loader
+   AI SUPPORT LOADER
 ======================= */
 (() => {
     if (document.getElementById("smSupportLoader")) return;
