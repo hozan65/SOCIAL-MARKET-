@@ -246,8 +246,8 @@ async function isFollowingUser(targetUserId) {
 // =========================
 // RENDER POST (TradingView-like)
 // =========================
-function renderPost(row) {
-    const postIdRaw = String(row.id || "").trim();
+function renderPost(row, index = 0) {
+    const isFirst = (postsPage === 0 && index === 0); // LCP FIX
     const authorIdRaw = String(row.author_id || "").trim();
 
     const postId = esc(postIdRaw);

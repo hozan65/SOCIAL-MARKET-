@@ -284,6 +284,3 @@
     .uPostsGrid{ grid-template-columns: 1fr; }
 }
 
-.uLinks{ margin-top:10px; display:flex; gap:10px; flex-wrap:wrap; }
-.uLink{ text-decoration:none; font-weight:800; font-size:13px; color:#111; opacity:.8; }
-.uLink:hover{ opacity:1; text-decoration:underline; }
