@@ -5,7 +5,7 @@ const { authUser } = require("./_auth_user");
 const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
 const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
-// 🔥 socket
+// socket emit
 const SOCKET_COMMENT_EMIT_URL = process.env.SOCKET_COMMENT_EMIT_URL || "";
 const SOCKET_SECRET = process.env.SOCKET_SECRET || "";
 
@@ -38,9 +38,11 @@ exports.handler = async (event) => {
         const jwt = getBearer(event);
         if (!jwt) return json(401, { error: "Missing JWT" });
 
-        const user = await authUser(jwt);
+        const { uid } = await authUser(jwt);
 
-        const body = JSON.parse(event.body || "{}");
+        let body = {};
+        try { body = JSON.parse(event.body || "{}"); } catch { body = {}; }
+
         const post_id = String(body.post_id || "").trim();
         const content = String(body.content || "").trim();
 
@@ -51,13 +53,13 @@ exports.handler = async (event) => {
 
         const { data, error } = await sb
             .from("post_comments")
-            .insert([{ post_id, user_id: user.uid, content }])
+            .insert([{ post_id, user_id: uid, content }])
             .select("id, post_id, user_id, content, created_at")
             .single();
 
         if (error) throw error;
 
-        // 🔥 SOCKET: yorumu anında yayınla
+        // fire-and-forget socket
         emitCommentSafe({
             post_id: data.post_id,
             comment_id: data.id,

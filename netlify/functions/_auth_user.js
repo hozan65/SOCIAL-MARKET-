@@ -1,7 +1,11 @@
-// netlify/functions/_auth_user.js
-import { getAppwriteUser } from "./_appwrite_user.js";
+// netlify/functions/_auth_user.js  (COMMONJS FIX)
+// ✅ add_comment.js require("./_auth_user") ile çalışır
+// ✅ /_auth_user endpoint'i (GET) çalışmaya devam eder
 
-export const handler = async (event) => {
+const { getAppwriteUser } = require("./_appwrite_user.cjs");
+
+// --- Netlify endpoint (GET) ---
+exports.handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "GET") return json(405, { error: "Method not allowed" });
@@ -25,6 +29,25 @@ export const handler = async (event) => {
         return json(status, { error: msg });
     }
 };
+
+// --- add_comment gibi fonksiyonların çağıracağı helper ---
+async function authUser(jwt) {
+    // add_comment tarafı event değil jwt gönderiyor
+    const fakeEvent = {
+        headers: {
+            authorization: `Bearer ${jwt}`,
+            Authorization: `Bearer ${jwt}`,
+        },
+        httpMethod: "GET",
+    };
+
+    const { user } = await getAppwriteUser(fakeEvent);
+    const uid = String(user?.$id || "").trim();
+    if (!uid) throw new Error("User id missing");
+    return { uid, user };
+}
+
+module.exports.authUser = authUser;
 
 function json(statusCode, body) {
     return {
