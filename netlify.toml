@@ -3,5 +3,5 @@ command = "npm run build"
 publish = "."
 
 [functions]
-directory = "functions"
+directory = "netlify/functions"
 node_bundler = "esbuild"
