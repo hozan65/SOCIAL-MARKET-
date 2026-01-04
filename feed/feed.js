@@ -1,19 +1,4 @@
-/* =========================
-  FEED.JS (NO MODULE / NO IMPORT)
-  - Supabase CDN (READ ONLY)
-  - Like / Follow: Netlify Functions (Appwrite JWT)
-  - News slider (Supabase news table)
-  - NEW:
-    ✅ Post card: TradingView-like
-    ✅ Whole card click -> /view/view.html?id=POST_ID (buttons 제외)
-    ✅ Follow state hydrate on refresh:
-       - cache first
-       - ✅ definitive check via Netlify function is_following (JWT)
 
-  ✅ REALTIME (Socket.IO):
-     - Emits: like:toggle, join:post
-     - Listens: post:like:update
-========================= */
 
 console.log("✅ feed.js running");
 
@@ -402,7 +387,7 @@ function setPostsMoreLoading() {
 async function loadFeed(reset = false) {
     if (!grid) return;
     if (!sb) {
-        setMsg("❌ Supabase CDN not loaded");
+        setMsg(" Supabase CDN not loaded");
         return;
     }
 
@@ -480,7 +465,7 @@ async function loadFeedMore() {
         setMsg("");
     } catch (err) {
         console.error(err);
-        setMsg("❌ Feed error: " + (err?.message || "unknown"));
+        setMsg(" Feed error: " + (err?.message || "unknown"));
         ensurePostsMoreUI();
     } finally {
         postsBusy = false;
@@ -503,18 +488,26 @@ async function fetchNews(limit = 6) {
     return data || [];
 }
 
-function renderNewsSlide(n, active = false) {
+// ✅ DEĞİŞTİR: renderNewsSlide (LCP FIX)
+function renderNewsSlide(n, active = false, isFirst = false) {
     const title = esc(n.title || "");
     const img = esc(n.image_url || "");
     const url = esc(n.url || "#");
     const source = esc(n.source || "");
     const time = esc(formatTime(n.created_at));
 
+    // ✅ İlk görsel LCP: eager + fetchpriority high
+    const loading = isFirst ? "eager" : "lazy";
+    const fetchp = isFirst ? ' fetchpriority="high"' : "";
+
+    // ✅ CLS için yer ayır (reserve)
+    const wh = ' width="1200" height="675"';
+
     return `
     <div class="newsSlide ${active ? "active" : ""}" data-url="${url}">
       ${
         img
-            ? `<img class="newsSlideImg" src="${img}" alt="" loading="lazy" decoding="async">`
+            ? `<img class="newsSlideImg" src="${img}" alt="" loading="${loading}" decoding="async"${fetchp}${wh}>`
             : `<div class="newsSlideSkeleton">NO IMAGE</div>`
     }
       <div class="newsOverlay">
@@ -553,10 +546,14 @@ async function loadNews() {
             return;
         }
 
-        newsSlider.innerHTML = items.map((n, i) => renderNewsSlide(n, i === 0)).join("");
+        // ✅ DEĞİŞTİR: map satırı (ilk slide isFirst=true)
+        newsSlider.innerHTML = items
+            .map((n, i) => renderNewsSlide(n, i === 0, i === 0))
+            .join("");
+
         startNewsAutoRotate();
     } catch (err) {
-        console.error("❌ News error:", err);
+        console.error(" News error:", err);
         newsSlider.innerHTML = `<div class="newsSlideSkeleton">News unavailable</div>`;
     }
 }
@@ -567,6 +564,7 @@ document.addEventListener("click", (e) => {
     const url = slide.dataset.url;
     if (url && url !== "#") window.open(url, "_blank", "noopener");
 });
+
 
 // =========================
 // EVENTS (Like/Follow)

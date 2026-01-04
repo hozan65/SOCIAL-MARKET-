@@ -269,3 +269,4 @@ body.smSbOpen .smSbMobileHamb{
     /* ✅ X sadece drawer açıkken görünsün */
     .smSidebar.mobileOpen .smSbClose{ display:block; }
 }
+
