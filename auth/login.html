@@ -1,45 +1,105 @@
+<!-- /auth/login.html -->
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>Login | Social Market</title>
-    <link rel="stylesheet" href="/auth/auth.css?v=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Auth</title>
+
+    <link rel="stylesheet" href="/auth/auth.css" />
 </head>
 
 <body>
-<main class="authCenter">
-    <h1>Welcome 👋</h1>
-    <p class="muted">Login or create your account</p>
+<div class="page">
+    <div class="shell">
 
-    <div class="authTabs">
-        <button type="button" class="authTab active" id="tabLogin">Login</button>
-        <button type="button" class="authTab" id="tabRegister">Register</button>
+        <!-- LEFT: AUTH -->
+        <section class="panel auth">
+            <div class="brandMark">□</div>
+
+            <div class="head">
+                <h1 class="title">Get Started</h1>
+                <p class="sub">Sign in to access real trading insights.</p>
+            </div>
+
+            <!-- ✅ SWITCH TABS (IDs match JS) -->
+            <div class="tabs">
+                <button id="tabLogin" class="tab active" type="button">Login</button>
+                <button id="tabRegister" class="tab" type="button">Register</button>
+            </div>
+
+            <!-- OAuth -->
+            <div class="oauth">
+                <button id="googleBtn" class="btn" type="button">
+                    <span class="gDot"></span>
+                    <span>Continue with Google</span>
+                </button>
+            </div>
+
+            <div class="divider">or</div>
+
+            <!-- ✅ Register-only fields (IDs match JS) -->
+            <div class="field">
+                <div class="label">Name</div>
+                <input id="firstName" class="input" type="text" placeholder="Name" autocomplete="given-name" style="display:none;">
+            </div>
+
+            <div class="field">
+                <div class="label">Surname</div>
+                <input id="lastName" class="input" type="text" placeholder="Surname" autocomplete="family-name" style="display:none;">
+            </div>
+
+            <!-- Common -->
+            <div class="field">
+                <div class="label">Email</div>
+                <input id="email" class="input" type="email" placeholder="name@email.com" autocomplete="email">
+            </div>
+
+            <div class="field">
+                <div class="label">Password</div>
+                <input id="password" class="input" type="password" placeholder="Password" autocomplete="current-password">
+            </div>
+
+            <!-- ✅ Submit (ID match JS) -->
+            <button id="submitBtn" class="primary" type="button">Login</button>
+
+            <!-- ✅ message (ID match JS) -->
+            <div id="msg" class="msg"></div>
+
+            <div class="fineprint">
+                By clicking continue, you agree to our
+                <a href="#">Terms and Conditions</a> and <a href="#">Privacy Policy</a>.
+            </div>
+
+            <div class="foot">©2026 Social Market. All rights reserved.</div>
+        </section>
+
+        <!-- RIGHT: PROMO (PC only) -->
+        <section class="panel promo" aria-label="Promo">
+            <div class="promoTop">
+                <div class="promoDots"><span></span><span></span><span></span></div>
+                <div class="promoTopRight">◦ ◦ ◦</div>
+            </div>
+
+            <div class="promoVisual">
+                <div class="promoChip">AI</div>
+            </div>
+
+            <div class="promoTitle">AI Powered<br/>Finance Insights</div>
+            <div class="promoText">
+                Smart financial data by our AI, adjusted for you.
+                Lightning-fast charting and easy trading tools.
+            </div>
+
+            <div class="promoPager" aria-hidden="true">
+                <span class="on"></span><span></span><span></span>
+            </div>
+        </section>
+
     </div>
+</div>
 
-    <form id="authForm" class="soft" autocomplete="on">
-
-        <!-- 👇 SADECE REGISTER'DA GÖRÜNECEK -->
-        <input id="firstName" type="text" placeholder="Name" style="display:none">
-        <input id="lastName" type="text" placeholder="Surname" style="display:none">
-
-        <input id="email" type="email" placeholder="Email" required>
-        <input id="password" type="password" placeholder="Password" required>
-
-        <div class="btnRow">
-            <button class="btn primary" id="submitBtn" type="button">Login</button>
-        </div>
-
-        <p id="msg" class="msg"></p>
-    </form>
-
-    <div class="orLine">OR</div>
-
-    <button id="googleBtn" class="btn googleBtn" type="button">
-        Continue with Google
-    </button>
-</main>
-
-<script type="module" src="/auth/login.js?v=2"></script>
+<!-- ✅ Your existing JS -->
+<script type="module" src="/auth/login.js"></script>
 </body>
 </html>
