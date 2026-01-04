@@ -1,5 +1,5 @@
-// /u/u.js  (FULL) — STABLE
-console.log(" u.js loaded (profile + follow toggle + posts cards + drawer)");
+// /u/u.js  (FULL — FAST + COUNTS FIX + NO UID TEXT IN DRAWER)
+console.log("✅ u.js loaded (FAST profile + follow + posts + drawer)");
 
 // Netlify functions
 const FN_GET = "/.netlify/functions/get_profile";
@@ -17,7 +17,6 @@ const MESSAGES_PAGE = "/messages/";
 const VIEW_PAGE = "/view/view.html";
 
 // helpers
-const qs = (k) => new URLSearchParams(location.search).get(k);
 const $ = (id) => document.getElementById(id);
 
 // elements
@@ -51,49 +50,20 @@ function getJWT() {
 }
 
 async function ensureJWTOrRedirect() {
-    // ✅ wait jwt.js async init (if loaded)
+    // wait jwt.js init if it exposes a promise
     if (window.SM_JWT_READY) {
         try { await window.SM_JWT_READY; } catch {}
     }
-
-    // still none? try one refresh call if available
+    // try refresh once if exposed
     if (!getJWT() && window.SM_REFRESH_JWT) {
         try { await window.SM_REFRESH_JWT(); } catch {}
     }
-
     if (!getJWT()) {
-        setMsg(" Missing JWT. Please login again.");
-        // ✅ prevent endless 401 spam
+        setMsg("❌ Missing JWT. Please login again.");
         setTimeout(() => (location.href = "/auth/login.html"), 300);
         return false;
     }
     return true;
-}
-
-async function fnGet(url) {
-    const jwt = getJWT();
-    const r = await fetch(url, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${jwt}` },
-    });
-    const j = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
-    return j;
-}
-
-async function fnPost(url, body) {
-    const jwt = getJWT();
-    const r = await fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-        },
-        body: JSON.stringify(body || {}),
-    });
-    const j = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
-    return j;
 }
 
 function setMsg(t) {
@@ -116,13 +86,50 @@ function safeUrl(u) {
     return "";
 }
 
+// ---- fetch helpers with timeout (prevents “6s hang” feeling)
+async function fetchJson(url, options = {}, timeoutMs = 6000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+    try {
+        const r = await fetch(url, { ...options, signal: ctrl.signal });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
+        return j;
+    } finally {
+        clearTimeout(t);
+    }
+}
+
+async function fnGet(url) {
+    const jwt = getJWT();
+    return fetchJson(
+        url,
+        { method: "GET", headers: { Authorization: `Bearer ${jwt}` } },
+        6500
+    );
+}
+
+async function fnPost(url, body) {
+    const jwt = getJWT();
+    return fetchJson(
+        url,
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${jwt}` },
+            body: JSON.stringify(body || {}),
+        },
+        6500
+    );
+}
+
 // ---------------------------
 // Determine target profile
 // ---------------------------
 const params = new URLSearchParams(location.search);
 const targetIdFromQuery = String(params.get("id") || "").trim();
 
-// ✅ If neither id nor me=1 exists => treat as MY profile
+// If neither id nor me=1 exists => treat as MY profile
 let isMe = params.get("me") === "1";
 if (!isMe && !targetIdFromQuery) {
     isMe = true;
@@ -155,13 +162,13 @@ function applyActionVisibility({ isMeProfile, targetUid, postsCount }) {
 }
 
 // ---------------------------
-// Normalize payload
+// Normalize payload (counts/stats compatible)
 // ---------------------------
 function normalizeProfilePayload(j) {
     const p = j?.profile || j?.user || j?.data || j || {};
-    const stats = j?.stats || {};
+    const stats = j?.stats || j?.counts || {};
 
-    const user_id = String(p.user_id || p.uid || p.id || j?.user_id || j?.uid || "").trim();
+    const user_id = String(p.user_id || p.uid || p.id || p.appwrite_user_id || j?.user_id || j?.uid || "").trim();
     const username = String(p.username || p.name || p.display_name || "—").trim();
     const avatar_url = safeUrl(p.avatar_url || p.avatar || p.photo_url || "");
     const bio = String(p.bio || p.about || "").trim();
@@ -175,6 +182,9 @@ function normalizeProfilePayload(j) {
     return { user_id, username, avatar_url, bio, followers, following, posts_count, posts };
 }
 
+// ---------------------------
+// Render
+// ---------------------------
 function renderPosts(posts) {
     if (!$postsGrid) return;
 
@@ -186,7 +196,8 @@ function renderPosts(posts) {
     $postsGrid.innerHTML = posts
         .map((row) => {
             const id = String(row.id || row.post_id || "").trim();
-            const title = esc(row.title || row.pairs || row.market || "Post");
+            const titleRaw = row.title || row.caption || row.content || row.pairs || row.market || "Post";
+            const title = esc(titleRaw);
             const time = esc(row.created_at || row.time || "");
             const img = safeUrl(row.image_url || row.image_path || row.image || "");
             const href = id ? `${VIEW_PAGE}?id=${encodeURIComponent(id)}` : "#";
@@ -208,6 +219,48 @@ function renderPosts(posts) {
         .join("");
 }
 
+function renderProfile(p) {
+    if (!p) return;
+
+    if ($name) $name.textContent = p.username || "—";
+    if ($bio) $bio.textContent = p.bio || "";
+
+    // ✅ always paint numbers (fix “0 but list has user” feeling)
+    if ($followers) $followers.textContent = String(p.followers || 0);
+    if ($following) $following.textContent = String(p.following || 0);
+    if ($postsCount) $postsCount.textContent = String(p.posts_count || 0);
+
+    if ($avatar) {
+        if (p.avatar_url) $avatar.src = p.avatar_url;
+        else $avatar.removeAttribute("src");
+    }
+
+    renderPosts(p.posts);
+
+    applyActionVisibility({ isMeProfile: isMe, targetUid: TARGET_UID, postsCount: p.posts_count || 0 });
+}
+
+// ---------------------------
+// Cache-first
+// ---------------------------
+function cacheKey() {
+    const key = isMe ? "me" : (TARGET_UID || "other");
+    return `sm_profile_cache_v3:${key}`;
+}
+
+function readCache() {
+    try {
+        const raw = localStorage.getItem(cacheKey());
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeCache(p) {
+    try { localStorage.setItem(cacheKey(), JSON.stringify(p)); } catch {}
+}
+
 // ---------------------------
 // Follow actions
 // ---------------------------
@@ -216,7 +269,7 @@ async function isFollowing(targetUid) {
     if (!id) return false;
     try {
         const r = await fnGet(`${FN_IS_FOLLOWING}?id=${encodeURIComponent(id)}`);
-        return !!(r?.following ?? r?.is_following ?? r?.data?.following);
+        return !!(r?.is_following ?? r?.following ?? r?.data?.following);
     } catch {
         return false;
     }
@@ -235,7 +288,7 @@ function setFollowBtnState(following) {
 }
 
 // ---------------------------
-// Drawer
+// Drawer (NO UID TEXT EVER)
 // ---------------------------
 function openDrawer(title) {
     if ($drawerBackdrop) $drawerBackdrop.hidden = false;
@@ -256,20 +309,18 @@ function closeDrawer() {
 }
 
 async function loadDrawerList(kind) {
-    if (!TARGET_UID && !isMe) return;
-
-    const url =
-        kind === "followers"
-            ? TARGET_UID
-                ? `${FN_LIST_FOLLOWERS}?id=${encodeURIComponent(TARGET_UID)}`
-                : FN_LIST_FOLLOWERS
-            : TARGET_UID
-                ? `${FN_LIST_FOLLOWING}?id=${encodeURIComponent(TARGET_UID)}`
-                : FN_LIST_FOLLOWING;
-
     if ($drawerBody) $drawerBody.innerHTML = `<div class="uDrawerLoading">Loading...</div>`;
 
+    const base =
+        kind === "followers" ? FN_LIST_FOLLOWERS : FN_LIST_FOLLOWING;
+
+    const url =
+        !isMe && TARGET_UID
+            ? `${base}?id=${encodeURIComponent(TARGET_UID)}`
+            : base; // JWT fallback in backend recommended, but we can still pass id if you want
+
     const j = await fnGet(url).catch((e) => ({ error: e?.message || "failed" }));
+
     const list = Array.isArray(j?.list)
         ? j.list
         : Array.isArray(j?.data)
@@ -285,10 +336,11 @@ async function loadDrawerList(kind) {
         return;
     }
 
+    // ✅ render items WITHOUT showing id under name
     $drawerBody.innerHTML = list
         .map((x) => {
             const uid = String(x.user_id || x.uid || x.id || "").trim();
-            const username = esc(x.username || x.name || uid || "user");
+            const username = esc(x.username || x.name || "user");
             const avatar = safeUrl(x.avatar_url || x.avatar || "");
             const href = uid ? `${PROFILE_PAGE}?id=${encodeURIComponent(uid)}` : "#";
 
@@ -298,12 +350,11 @@ async function loadDrawerList(kind) {
             ${
                 avatar
                     ? `<img src="${esc(avatar)}" alt="" loading="lazy" decoding="async">`
-                    : `<div class="uDrawerAvatarFallback">${username.slice(0, 1).toUpperCase()}</div>`
+                    : `<div class="uDrawerAvatarFallback">${username.slice(0,1).toUpperCase()}</div>`
             }
           </div>
           <div class="uDrawerInfo">
             <div class="uDrawerName">${username}</div>
-            <div class="uDrawerSub">${esc(uid)}</div>
           </div>
         </a>
       `;
@@ -317,18 +368,21 @@ async function loadDrawerList(kind) {
 async function loadProfile() {
     setMsg("");
 
-    // ✅ MUST have JWT for functions
+    // ✅ paint cache immediately (instant UI)
+    const cached = readCache();
+    if (cached) renderProfile(cached);
+
+    // ✅ jwt gate
     const ok = await ensureJWTOrRedirect();
     if (!ok) return;
 
-    // ✅ if other profile but still missing id -> show error
     if (!isMe && !TARGET_UID) {
-        setMsg(" Missing profile id");
+        setMsg("❌ Missing profile id");
         applyActionVisibility({ isMeProfile: false, targetUid: "", postsCount: 0 });
         return;
     }
 
-    applyActionVisibility({ isMeProfile: isMe, targetUid: TARGET_UID, postsCount: 0 });
+    applyActionVisibility({ isMeProfile: isMe, targetUid: TARGET_UID, postsCount: cached?.posts_count || 0 });
 
     try {
         const url = isMe ? FN_GET : `${FN_GET}?id=${encodeURIComponent(TARGET_UID)}`;
@@ -337,43 +391,44 @@ async function loadProfile() {
         try {
             j = await fnGet(url);
         } catch (e) {
-            // try ensure_profile then retry once
-            await fnPost(FN_ENSURE, {});
-            j = await fnGet(url);
+            const msg = String(e?.message || "");
+            const isNotFound =
+                msg.includes("404") ||
+                msg.toLowerCase().includes("not found") ||
+                msg.toLowerCase().includes("profile not found");
+
+            // ✅ only ensure on 404
+            if (isNotFound) {
+                await fnPost(FN_ENSURE, {});
+                j = await fnGet(url);
+            } else {
+                throw e;
+            }
         }
 
         const p = normalizeProfilePayload(j);
 
+        // keep canonical user id
         if (!isMe && p.user_id) TARGET_UID = p.user_id;
 
-        if ($name) $name.textContent = p.username || "—";
-        if ($bio) $bio.textContent = p.bio || "";
-        if ($followers) $followers.textContent = String(p.followers || 0);
-        if ($following) $following.textContent = String(p.following || 0);
-        if ($postsCount) $postsCount.textContent = String(p.posts_count || 0);
+        renderProfile(p);
+        writeCache(p);
 
-        if ($avatar) {
-            if (p.avatar_url) $avatar.src = p.avatar_url;
-            else $avatar.removeAttribute("src");
-        }
+        // ✅ post-render: follow check & msg button (non-blocking)
+        if (!isMe && TARGET_UID) {
+            if ($msgBtn) {
+                $msgBtn.hidden = false;
+                $msgBtn.href = `${MESSAGES_PAGE}?id=${encodeURIComponent(TARGET_UID)}`;
+            }
 
-        renderPosts(p.posts);
-
-        applyActionVisibility({ isMeProfile: isMe, targetUid: TARGET_UID, postsCount: p.posts_count });
-
-        if (!isMe && TARGET_UID && $followBtn) {
-            const following = await isFollowing(TARGET_UID);
-            setFollowBtnState(following);
-            $followBtn.hidden = false;
-        }
-
-        if (!isMe && TARGET_UID && $msgBtn) {
-            $msgBtn.hidden = false;
-            $msgBtn.href = `${MESSAGES_PAGE}?id=${encodeURIComponent(TARGET_UID)}`;
+            if ($followBtn) {
+                $followBtn.hidden = false;
+                isFollowing(TARGET_UID).then(setFollowBtnState);
+            }
         }
     } catch (err) {
         console.error(err);
-        setMsg(" " + (err?.message || "unknown error"));
+        setMsg("❌ " + (err?.message || "unknown error"));
     }
 }
 
@@ -386,19 +441,25 @@ $followBtn?.addEventListener("click", async () => {
     $followBtn.disabled = true;
     try {
         const r = await toggleFollow(TARGET_UID);
+
         const following = !!(r?.following ?? r?.is_following ?? r?.data?.following);
         setFollowBtnState(following);
 
-        if (typeof r?.followers_count === "number" && $followers) {
-            $followers.textContent = String(r.followers_count);
-        } else {
-            if ($followers) {
-                const n = Number($followers.textContent || "0") || 0;
-                $followers.textContent = String(following ? n + 1 : Math.max(0, n - 1));
-            }
+        // optimistic followers count
+        if ($followers) {
+            const n = Number($followers.textContent || "0") || 0;
+            $followers.textContent = String(following ? n + 1 : Math.max(0, n - 1));
+        }
+
+        // update cache too
+        const c = readCache();
+        if (c) {
+            const cur = Number(c.followers || 0) || 0;
+            c.followers = following ? cur + 1 : Math.max(0, cur - 1);
+            writeCache(c);
         }
     } catch (err) {
-        alert(" " + (err?.message || err));
+        alert("❌ " + (err?.message || err));
     } finally {
         $followBtn.disabled = false;
     }
@@ -416,12 +477,7 @@ $followingBtn?.addEventListener("click", async () => {
 
 $drawerBackdrop?.addEventListener("click", closeDrawer);
 $drawerClose?.addEventListener("click", closeDrawer);
-
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeDrawer();
-});
+document.addEventListener("keydown", (e) => e.key === "Escape" && closeDrawer());
 
 // init
 document.addEventListener("DOMContentLoaded", loadProfile);
-
-

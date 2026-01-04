@@ -1,10 +1,8 @@
+// netlify/functions/list_following.js (FULL FIX)
 import { createClient } from "@supabase/supabase-js";
 import { getAppwriteUser } from "./_appwrite_user.js";
 
-const sb = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export const handler = async (event) => {
     try {
@@ -13,7 +11,7 @@ export const handler = async (event) => {
 
         let uid = String(event.queryStringParameters?.id || "").trim();
 
-        // ✅ if id missing, use JWT user
+        // ✅ if id missing, fallback to JWT user
         if (!uid) {
             const { user } = await getAppwriteUser(event);
             uid = user?.$id ? String(user.$id) : "";
@@ -21,7 +19,6 @@ export const handler = async (event) => {
 
         if (!uid) return json(400, { error: "Missing id" });
 
-        // who I follow? follower_uid = uid -> following_uid list
         const { data: rel, error: e1 } = await sb
             .from("follows")
             .select("following_uid, created_at")
@@ -31,7 +28,7 @@ export const handler = async (event) => {
 
         if (e1) return json(500, { error: e1.message });
 
-        const ids = (rel || []).map((r) => r.following_uid).filter(Boolean);
+        const ids = (rel || []).map(r => r.following_uid).filter(Boolean);
         if (!ids.length) return json(200, { list: [] });
 
         const { data: profs, error: e2 } = await sb
@@ -42,15 +39,15 @@ export const handler = async (event) => {
 
         if (e2) return json(500, { error: e2.message });
 
-        const map = new Map((profs || []).map((p) => [p.appwrite_user_id, p]));
+        const map = new Map((profs || []).map(p => [p.appwrite_user_id, p]));
 
         const list = ids
-            .map((id) => map.get(id))
+            .map(id => map.get(id))
             .filter(Boolean)
-            .map((p) => ({
+            .map(p => ({
                 user_id: p.appwrite_user_id,
                 username: p.name || "User",
-                avatar_url: p.avatar_url || null,
+                avatar_url: p.avatar_url || null
             }));
 
         return json(200, { list });
@@ -67,8 +64,8 @@ function json(statusCode, body) {
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Methods": "GET, OPTIONS"
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(body)
     };
 }
