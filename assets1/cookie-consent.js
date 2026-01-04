@@ -11,7 +11,7 @@ console.log("✅ cookie-consent.js loaded (SkySports-like)");
     const btnNecessary = document.getElementById("smCookieNecessary");
 
     if (!overlay || !bar || !btnAccept || !btnReject || !btnNecessary) {
-        console.warn(" Cookie bar DOM missing. Check IDs + placement inside <body>.");
+        console.warn("❌ Cookie bar DOM missing. Check IDs + placement inside <body>.");
         return;
     }
 
@@ -24,7 +24,21 @@ console.log("✅ cookie-consent.js loaded (SkySports-like)");
         localStorage.setItem(KEY, JSON.stringify({ ...obj, ts: Date.now() }));
     };
 
+    // ✅ CLS: yer ayır
+    function showCookieBar() {
+        document.body.classList.add("smCookiePending");
+        document.body.classList.remove("smCookieDone");
+    }
+
+    // ✅ CLS: geri al
+    function doneCookieBar() {
+        document.body.classList.remove("smCookiePending");
+        document.body.classList.add("smCookieDone");
+    }
+
     const show = () => {
+        showCookieBar(); // ✅ burada çalışmalı
+
         overlay.hidden = false;
         bar.hidden = false;
 
@@ -38,23 +52,13 @@ console.log("✅ cookie-consent.js loaded (SkySports-like)");
         bar.classList.remove("show");
         overlay.hidden = true;
         bar.hidden = true;
+
+        doneCookieBar(); // ✅ burada çalışmalı
     };
-
-
-    function showCookieBar(){
-        document.body.classList.add("smCookiePending");
-        document.body.classList.remove("smCookieDone");
-        // mevcut show kodların (bar.hidden=false, bar.classList.add("show") vs) aynen kalsın
-    }
-
-    function doneCookieBar(){
-        document.body.classList.remove("smCookiePending");
-        document.body.classList.add("smCookieDone");
-        // mevcut hide kodların aynen kalsın
-    }
 
     // Already decided?
     if (!load()) show();
+    else doneCookieBar(); // ✅ daha önce seçtiyse padding hiç eklenmesin
 
     btnAccept.addEventListener("click", () => {
         save({ necessary: true, analytics: true, marketing: true });
@@ -71,4 +75,3 @@ console.log("✅ cookie-consent.js loaded (SkySports-like)");
         hide();
     });
 })();
-
