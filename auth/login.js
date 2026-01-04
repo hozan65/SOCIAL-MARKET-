@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const firstNameEl = document.getElementById("firstName");
     const lastNameEl = document.getElementById("lastName");
+    const regFields = document.getElementById("regFields");
 
     const FN_ENSURE = "/.netlify/functions/ensure_profile";
 
@@ -37,17 +38,22 @@ document.addEventListener("DOMContentLoaded", () => {
         tabLogin?.classList.toggle("active", m === "login");
         tabRegister?.classList.toggle("active", m === "register");
 
-        if (firstNameEl) firstNameEl.style.display = (m === "register") ? "block" : "none";
-        if (lastNameEl) lastNameEl.style.display = (m === "register") ? "block" : "none";
+        // ✅ no jump: wrapper open/close
+        if (regFields) {
+            const open = (m === "register");
+            regFields.classList.toggle("open", open);
+            regFields.setAttribute("aria-hidden", open ? "false" : "true");
+
+            // login'e dönünce name alanlarını temizle (opsiyonel)
+            if (!open) {
+                if (firstNameEl) firstNameEl.value = "";
+                if (lastNameEl) lastNameEl.value = "";
+            }
+        }
 
         if (submitBtn) submitBtn.textContent = (m === "login") ? "Login" : "Register";
         setMsg("");
-
-        console.log("✅ MODE:", mode);
     }
-
-    // ✅ if any critical element missing, show it
-    console.log("auth elements:", { tabLogin, tabRegister, firstNameEl, lastNameEl, submitBtn, googleBtn });
 
     tabLogin?.addEventListener("click", () => setMode("login"));
     tabRegister?.addEventListener("click", () => setMode("register"));

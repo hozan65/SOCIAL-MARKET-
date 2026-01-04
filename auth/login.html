@@ -14,7 +14,7 @@
     <div class="shell">
 
         <!-- LEFT: AUTH -->
-        <section class="panel auth">
+        <section class="panel auth" id="authPanel">
             <div class="brandMark">□</div>
 
             <div class="head">
@@ -38,15 +38,17 @@
 
             <div class="divider">or</div>
 
-            <!-- ✅ Register-only fields (IDs match JS) -->
-            <div class="field">
-                <div class="label">Name</div>
-                <input id="firstName" class="input" type="text" placeholder="Name" autocomplete="given-name" style="display:none;">
-            </div>
+            <!-- ✅ Register-only WRAPPER (JS artık wrapper'ı açıp kapatacak) -->
+            <div class="regFields" id="regFields" aria-hidden="true">
+                <div class="field">
+                    <div class="label">Name</div>
+                    <input id="firstName" class="input" type="text" placeholder="Name" autocomplete="given-name">
+                </div>
 
-            <div class="field">
-                <div class="label">Surname</div>
-                <input id="lastName" class="input" type="text" placeholder="Surname" autocomplete="family-name" style="display:none;">
+                <div class="field">
+                    <div class="label">Surname</div>
+                    <input id="lastName" class="input" type="text" placeholder="Surname" autocomplete="family-name">
+                </div>
             </div>
 
             <!-- Common -->
