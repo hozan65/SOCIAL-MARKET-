@@ -1,9 +1,19 @@
-/* /messages/messages.css (FULL - FLAT CLEAN + ROUND AVATAR + FULL HEIGHT) */
+/* ===============================
+   MESSAGES – FULL CLEAN FINAL
+   PC + MOBILE
+=============================== */
 
-html, body { height: 100%; }
-body { overflow: hidden; background: #eaf2ff; } /* sağ/alt boşluk görünmesin */
+html, body {
+    height: 100%;
+}
+body {
+    overflow: hidden;
+    background: #eef3fb;
+}
 
-/* ✅ BU SAYFADA container'ı FULL WIDTH yap (sağda boşluk bunun yüzünden) */
+/* ===============================
+   CONTAINER – FULL WIDTH FIX
+=============================== */
 .container.msgShell{
     max-width: none !important;
     width: 100% !important;
@@ -11,258 +21,279 @@ body { overflow: hidden; background: #eaf2ff; } /* sağ/alt boşluk görünmesin
     padding: 0 !important;
 }
 
-/* ✅ EKRANI TAM DOLDUR (PC + mobil) */
 .msgShell{
-    padding-top: 0 !important;
-    height: 100dvh !important;   /* modern tarayıcı */
-    height: 100vh !important;    /* fallback */
-    min-height: 0 !important;
+    height: 100dvh;
+    height: 100vh;
+    min-height: 0;
 }
 
-/* ana grid - page'e yapışık */
+/* ===============================
+   MAIN GRID
+=============================== */
 .msgApp{
     display: grid;
     grid-template-columns: 360px 1fr;
-    gap: 0 !important;
-    align-items: stretch;
-
-    height: 100% !important;
-    min-height: 0 !important;
-    background: #fff; /* ortadaki alan beyaz */
-    border-top: 1px solid rgba(0,0,0,.08);
-    border-bottom: 1px solid rgba(0,0,0,.08);
+    height: 100%;
+    min-height: 0;
+    background: #fff;
 }
 
-/* =========================
-   LEFT (INBOX) - FLAT
-========================= */
+/* ===============================
+   LEFT – INBOX
+=============================== */
 .msgLeft{
     background: #fff;
     border-right: 1px solid rgba(0,0,0,.10);
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    overflow: hidden;
-
     display: grid;
     grid-template-rows: auto 1fr auto;
     min-height: 0;
-    align-content: start;
 }
 
 .leftTop{
-    padding: 12px 12px 10px;
+    padding: 14px 14px 10px;
     border-bottom: 1px solid rgba(0,0,0,.08);
-    background: #fff;
 }
+
 .leftTitle{
-    font-weight: 900;
-    letter-spacing: .2px;
+    font-weight: 800;
 }
 
 .leftSearch{
     width: 100%;
     margin-top: 10px;
-    border: 1px solid rgba(0,0,0,.12);
-    border-radius: 10px;        /* ✅ sade ama güzel */
     padding: 10px 12px;
+    border: 1px solid rgba(0,0,0,.12);
+    border-radius: 10px;
     outline: none;
-    background: #fff;
-}
-.leftSearch:focus{
-    border-color: rgba(0,0,0,.22);
 }
 
 .leftList{
-    padding: 8px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-
     overflow: auto;
-    min-height: 0;
-    justify-content: flex-start;
-    align-content: flex-start;
 }
 
 .leftHint{
-    padding: 10px 12px;
-    opacity: .75;
+    padding: 10px 14px;
+    font-size: 13px;
+    opacity: .7;
     border-top: 1px solid rgba(0,0,0,.08);
 }
 
-/* inbox item - flat */
+/* inbox item */
 .inboxItem{
-    width: 100%;
-    text-align: left;
     border: 1px solid rgba(0,0,0,.10);
-    border-radius: 12px;        /* ✅ kutu güzel dursun */
-    background: #fff;
+    border-radius: 12px;
     padding: 12px;
+    background: #fff;
     cursor: pointer;
 }
+
 .inboxItem:hover{
-    border-color: rgba(0,0,0,.20);
+    border-color: rgba(0,0,0,.22);
 }
-.inboxTitle{ font-weight: 900; }
-.inboxMeta{ opacity: .65; font-size: 12px; margin-top: 2px; }
+
+.inboxTitle{
+    font-weight: 700;
+}
+
+.inboxMeta{
+    font-size: 12px;
+    opacity: .6;
+    margin-top: 2px;
+}
+
 .inboxPreview{
-    opacity: .8;
+    margin-top: 6px;
     font-size: 13px;
-    margin-top: 8px;
+    opacity: .8;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* =========================
-   RIGHT (CHAT) - FULL HEIGHT
-========================= */
+/* ===============================
+   RIGHT – CHAT
+=============================== */
 .msgRight{
-    border: 0;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    background: #fff;
-
     display: grid;
-    grid-template-rows: auto 1fr; /* header + viewport */
+    grid-template-rows: auto 1fr;
     min-height: 0;
+    background: #fff;
 }
 
 /* header */
 .chatTop{
-    position: relative;
-    z-index: 5;
-
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 12px;
-    background: #fff;
+    padding: 12px;
     border-bottom: 1px solid rgba(0,0,0,.08);
 }
 
 .chatBack{
-    border: 1px solid rgba(0,0,0,.10);
+    border: 1px solid rgba(0,0,0,.12);
     background: #fff;
     border-radius: 10px;
-    padding: 8px 10px;
+    padding: 6px 10px;
     cursor: pointer;
-    pointer-events: auto;
 }
 
-/* peer */
-.chatPeer{ display:flex; align-items:center; gap:10px; min-width:0; }
+.chatPeer{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
 
-/* ✅ AVATAR YUVARLAK */
 .peerAva{
-    width: 40px; height: 40px;
-    border-radius: 999px !important;     /* ✅ yuvarlak */
-    background: rgba(0,0,0,.06);
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: rgba(0,0,0,.08);
     background-size: cover;
     background-position: center;
-    border: 1px solid rgba(0,0,0,.10);
 }
-.peerAva.hasImg{ background-color: transparent; }
 
-.peerMeta{ min-width: 0; }
 .peerName{
-    font-weight: 900;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-weight: 700;
 }
-.peerSub{ opacity: .65; font-size: 12px; }
 
-/* viewport: sadece chat list scroll */
+.peerSub{
+    font-size: 12px;
+    opacity: .6;
+}
+
+/* ===============================
+   CHAT VIEWPORT
+=============================== */
 .chatViewport{
-    position: relative;
     display: grid;
     grid-template-rows: 1fr auto;
     min-height: 0;
-    background: #fff; /* ✅ düz */
+    background: #fff;
 }
 
-/* message list */
+/* ===============================
+   MESSAGE LIST (KEY FIX)
+=============================== */
 .msgBody{
-    padding: 12px 12px;
-    overflow: auto;
-    min-height: 0;
+    width: 100%;
+    max-width: 760px;        /* ✅ chat çok genişlemesin */
+    margin: 0 auto;          /* ✅ ortala */
+    padding: 16px;
+    overflow-y: auto;
+}
+
+/* rows */
+.mRow{
+    display: flex;
+    margin: 8px 0;
+}
+
+.mRow.mMine{
+    justify-content: flex-end;
+}
+
+.mRow.mTheirs{
+    justify-content: flex-start;
 }
 
 /* bubbles */
-.mRow{ display: flex; margin: 8px 0; }
-.mRow.mMine{ justify-content: flex-end; }
-.mRow.mTheirs{ justify-content: flex-start; }
-
 .mBubble{
-    max-width: min(620px, 86%);
-    border-radius: 14px;            /* ✅ modern, çok abartı değil */
-    padding: 10px 12px;
-    border: 1px solid rgba(0,0,0,.10);
+    max-width: 92%;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(0,0,0,.12);
     background: #fff;
 }
 
-/* mine bubble - hafif ayrım (flat) */
+/* benim mesaj */
 .mRow.mMine .mBubble{
-    background: rgba(0,0,0,.03);
+    background: rgba(0,0,0,.04);
 }
 
-.mText{ white-space: pre-wrap; word-break: break-word; }
-.mTime{ opacity: .6; font-size: 11px; margin-top: 6px; }
+/* karşı taraf mesajı */
+.mRow.mTheirs .mBubble{
+    background: #fff;
+}
 
-/* composer - altta sabit, sarkma yok */
+.mText{
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.mTime{
+    font-size: 11px;
+    opacity: .6;
+    margin-top: 6px;
+}
+
+/* ===============================
+   COMPOSER
+=============================== */
 .msgComposer{
+    width: 100%;
+    max-width: 760px;        /* ✅ list ile aynı */
+    margin: 0 auto;
+    padding: 12px 16px;
     display: grid;
     grid-template-columns: 1fr 46px;
     gap: 10px;
-    padding: 12px;
     border-top: 1px solid rgba(0,0,0,.08);
-    background: #fff;
 }
 
 .msgInput{
-    border: 1px solid rgba(0,0,0,.12);
+    padding: 12px;
     border-radius: 12px;
-    padding: 12px 12px;
+    border: 1px solid rgba(0,0,0,.12);
     outline: none;
-    background: #fff;
-}
-.msgInput:focus{
-    border-color: rgba(0,0,0,.22);
 }
 
 .msgSend{
-    width: 46px; height: 46px;
-    display: grid; place-items: center;
+    width: 46px;
+    height: 46px;
     border-radius: 12px;
     border: 1px solid rgba(0,0,0,.12);
     background: #fff;
+    display: grid;
+    place-items: center;
     cursor: pointer;
 }
-.msgSend:hover{
-    border-color: rgba(0,0,0,.22);
-}
-.sendIcon{ width: 20px; height: 20px; }
 
-/* loading hint kapalı */
+.sendIcon{
+    width: 20px;
+    height: 20px;
+}
+
+/* loading kapalı */
 #msgHint{ display: none !important; }
 
-/* =========================
+/* ===============================
    MOBILE
-========================= */
+=============================== */
 @media (max-width: 860px){
-    .msgShell{ height: 100dvh !important; height: 100vh !important; }
-
     .msgApp{
         grid-template-columns: 1fr;
-        height: 100%;
     }
 
-    /* default: inbox */
-    .msgRight{ display: none; }
-    .chatBack{ display: inline-flex; }
+    .msgRight{
+        display: none;
+    }
 
-    /* chat open */
-    body.dmChatOpen .msgLeft{ display: none; }
-    body.dmChatOpen .msgRight{ display: grid; }
+    body.dmChatOpen .msgLeft{
+        display: none;
+    }
+
+    body.dmChatOpen .msgRight{
+        display: grid;
+    }
+
+    .msgBody,
+    .msgComposer{
+        max-width: none;
+        margin: 0;
+        padding: 12px;
+    }
 }
