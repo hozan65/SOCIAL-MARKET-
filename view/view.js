@@ -1,5 +1,9 @@
 /* =========================
-  VIEW.JS (NO MODULE / NO IMPORT)
+  VIEW.JS (NO MODULE / NO IMPORT) - FAST + CLEAN
+  ✅ No "Loading..." message
+  ✅ Delayed minimal loading (only if slow)
+  ✅ Parallel requests
+  ✅ Comment submit without full reload
 ========================= */
 
 console.log("✅ view.js running");
@@ -74,6 +78,26 @@ function resolveImageUrl(image_path) {
 }
 
 // =========================
+// DELAYED LOADING (no "delay feel")
+// =========================
+let _loadingTimer = null;
+function startLoadingSoft() {
+    clearTimeout(_loadingTimer);
+    // 250ms altıysa hiç görünmesin
+    _loadingTimer = setTimeout(() => {
+        document.documentElement.classList.add("isLoading");
+        if (postBox) postBox.setAttribute("aria-busy", "true");
+        if (commentsList) commentsList.setAttribute("aria-busy", "true");
+    }, 250);
+}
+function stopLoadingSoft() {
+    clearTimeout(_loadingTimer);
+    document.documentElement.classList.remove("isLoading");
+    if (postBox) postBox.removeAttribute("aria-busy");
+    if (commentsList) commentsList.removeAttribute("aria-busy");
+}
+
+// =========================
 // AUTH
 // =========================
 function getJWT() {
@@ -84,7 +108,6 @@ function getJWT() {
 
 async function fnPost(url, body) {
     const jwt = getJWT();
-
     const r = await fetch(url, {
         method: "POST",
         headers: {
@@ -218,6 +241,20 @@ async function loadComments(postId, limit = 100) {
     return data || [];
 }
 
+// light fallback: only latest comment
+async function loadLatestComment(postId) {
+    if (!sb) throw new Error("Supabase CDN not loaded");
+    const { data, error } = await sb
+        .from("post_comments")
+        .select("id, user_id, content, created_at")
+        .eq("post_id", postId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+    if (error) throw error;
+    return (data && data[0]) ? data[0] : null;
+}
+
 const PROFILES_TABLE = "profiles";
 async function loadProfiles(userIds) {
     const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
@@ -337,7 +374,6 @@ function renderComments(list, profilesMap) {
 }
 
 function addCommentToUI(comment, profilesMap) {
-    // comment: {post_id, comment_id, user_id, content, created_at}
     if (!commentsList) return;
 
     const cid = String(comment.comment_id || comment.id || "").trim();
@@ -371,20 +407,19 @@ function addCommentToUI(comment, profilesMap) {
     </div>
   `;
 
-    // empty state varsa temizle
     const empty = commentsList.querySelector(".cEmpty");
     if (empty) empty.remove();
 
     commentsList.insertAdjacentHTML("beforeend", html);
 
-    // count +
     if (cCount) {
         const n = Number(cCount.textContent || "0") || 0;
         cCount.textContent = String(n + 1);
     }
 
-    // scroll bottom
-    try { commentsList.scrollTop = commentsList.scrollHeight; } catch {}
+    try {
+        commentsList.scrollTop = commentsList.scrollHeight;
+    } catch {}
 }
 
 // =========================
@@ -394,7 +429,7 @@ let CURRENT_POST = null;
 let CURRENT_POST_ID = null;
 let CURRENT_AUTHOR_ID = null;
 
-let _profilesForComments = new Map(); // cache (commenters)
+let _profilesForComments = new Map();
 
 async function loadAll() {
     CURRENT_POST_ID = getPostIdFromQuery();
@@ -412,26 +447,30 @@ async function loadAll() {
         return;
     }
 
-    setMsg("Loading...");
+    setMsg("");              // ✅ Loading yazısı yok
+    startLoadingSoft();      // ✅ sadece yavaşsa görünür
+
     try {
         const row = await getPostById(CURRENT_POST_ID);
         if (!row) {
             setMsg("❌ Post not found");
+            stopLoadingSoft();
             return;
         }
+
         CURRENT_POST = row;
         CURRENT_AUTHOR_ID = String(row.author_id || "").trim();
 
-        const likeCount = await getLikeCount(CURRENT_POST_ID).catch(() => 0);
+        // ✅ paralel çekim
+        const likeP = getLikeCount(CURRENT_POST_ID).catch(() => 0);
+        const followP = row.author_id ? isFollowingUser(row.author_id).catch(() => false) : Promise.resolve(false);
+        const commentsP = loadComments(CURRENT_POST_ID).catch(() => []);
 
-        let following = false;
-        try {
-            if (row.author_id) following = await isFollowingUser(row.author_id);
-        } catch {}
+        const [likeCount, following, list] = await Promise.all([likeP, followP, commentsP]);
 
         postBox.innerHTML = renderPostView(row, likeCount, following);
 
-        // expand handler
+        // expand
         const pvText = document.getElementById("pvText");
         const pvExpandBtn = document.getElementById("pvExpandBtn");
         pvExpandBtn?.addEventListener("click", () => {
@@ -439,7 +478,7 @@ async function loadAll() {
             pvExpandBtn.textContent = pvText?.classList.contains("isClamp") ? "Expand" : "Collapse";
         });
 
-        // like handler
+        // like
         const likeBtn = document.getElementById("pvLikeBtn");
         likeBtn?.addEventListener("click", async () => {
             likeBtn.disabled = true;
@@ -455,7 +494,7 @@ async function loadAll() {
             }
         });
 
-        // follow handler
+        // follow
         const followBtn = document.getElementById("pvFollowBtn");
         followBtn?.addEventListener("click", async () => {
             if (!row.author_id) return;
@@ -484,21 +523,24 @@ async function loadAll() {
             }
         });
 
-        // comments load
-        const list = await loadComments(CURRENT_POST_ID);
+        // comments
         if (cCount) cCount.textContent = `${list.length}`;
 
         _profilesForComments = await loadProfiles(list.map((x) => x.user_id));
         renderComments(list, _profilesForComments);
 
+        stopLoadingSoft();
         setMsg("");
     } catch (err) {
         console.error(err);
+        stopLoadingSoft();
         setMsg("❌ " + (err?.message || "unknown"));
     }
 }
 
-// comment submit
+// =========================
+// COMMENT SUBMIT (no full reload)
+// =========================
 commentForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!CURRENT_POST_ID) return;
@@ -510,15 +552,40 @@ commentForm?.addEventListener("submit", async (e) => {
     if (btn) btn.disabled = true;
 
     try {
-        // ✅ DB insert + socket emit function içinde var
+        // post
         await addComment(CURRENT_POST_ID, text);
         if (commentInput) commentInput.value = "";
 
-        // ✅ fallback refresh (socket gelmese de)
-        const list = await loadComments(CURRENT_POST_ID);
-        if (cCount) cCount.textContent = `${list.length}`;
-        _profilesForComments = await loadProfiles(list.map((x) => x.user_id));
-        renderComments(list, _profilesForComments);
+        // ✅ Realtime genelde zaten ekleyecek.
+        // ✅ Fallback: 800ms sonra en son yorumu çek, UI'da yoksa ekle.
+        setTimeout(async () => {
+            try {
+                const latest = await loadLatestComment(CURRENT_POST_ID);
+                if (!latest) return;
+
+                const cid = String(latest.id || "").trim();
+                if (!cid) return;
+                if (commentsList?.querySelector(`[data-comment-id="${CSS.escape(cid)}"]`)) return;
+
+                // profile map'i genişlet (tek kullanıcı)
+                const uid = String(latest.user_id || "").trim();
+                if (uid && !_profilesForComments?.has(uid)) {
+                    const m = await loadProfiles([uid]);
+                    m.forEach((v, k) => _profilesForComments.set(k, v));
+                }
+
+                addCommentToUI(
+                    {
+                        post_id: CURRENT_POST_ID,
+                        comment_id: latest.id,
+                        user_id: latest.user_id,
+                        content: latest.content,
+                        created_at: latest.created_at || new Date().toISOString(),
+                    },
+                    _profilesForComments
+                );
+            } catch {}
+        }, 800);
     } catch (err) {
         alert("❌ " + (err?.message || err));
     } finally {
@@ -532,8 +599,6 @@ window.addEventListener("sm:comment_new", async (e) => {
     const postId = String(p.post_id || "").trim();
     if (!CURRENT_POST_ID || postId !== CURRENT_POST_ID) return;
 
-    // yeni yorum ekranda yoksa ekle
-    // profil bilgisi yoksa da sorun değil (uid yazar)
     addCommentToUI(
         {
             post_id: postId,
@@ -563,17 +628,14 @@ window.addEventListener("sm:follow_update", async (e) => {
     const target = String(p.target_user_id || "").trim();
     if (!CURRENT_AUTHOR_ID || target !== CURRENT_AUTHOR_ID) return;
 
-    // bu sayfada follow button sadece author içindi, güncelleyebiliriz:
     const btn = document.getElementById("pvFollowBtn");
     if (!btn) return;
 
-    // actor benim mi? (benim takip/çıkma)
     try {
         const myId = await getMyUserId();
         const actor = String(p.actor_user_id || "").trim();
-        if (actor && myId && actor !== myId) return; // başkasının follow'uysa benim butonumu değiştirme
+        if (actor && myId && actor !== myId) return;
     } catch {
-        // login değilse dokunma
         return;
     }
 

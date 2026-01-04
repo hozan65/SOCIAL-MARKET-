@@ -1,10 +1,12 @@
 /* =========================
-  VIEW PAGE
+  VIEW PAGE – CLEAN / NO SHADOW
+  ✅ ID'ler bozulmaz
+  ✅ Comments kutusuz (flat)
 ========================= */
 
 .viewWrap{
     margin-top: 18px;
-    margin-bottom: 26px;
+    margin-bottom: 22px;
 }
 
 .backLink{
@@ -14,7 +16,7 @@
     text-decoration: none;
     opacity: .85;
 }
-.backLink:hover{ opacity: 1; text-decoration: underline; }
+.backLink:hover{ opacity:1; text-decoration: underline; }
 
 .viewGrid{
     display:grid;
@@ -31,11 +33,12 @@
 .postBox{
     border-radius: 16px;
     overflow:hidden;
-    border: 1px solid rgba(0,0,0,.08);
-    background: rgba(255,255,255,.92);
-    box-shadow: 0 12px 34px rgba(0,0,0,.08);
+    border: 1px solid rgba(0,0,0,.10);
+    background: rgba(255,255,255,.96);
+    box-shadow: none; /* ✅ shadow yok */
 }
 
+/* "loading..." hissi yok; sadece hata mesajı vs */
 .viewMsg{
     margin-top: 10px;
     font-weight: 900;
@@ -46,7 +49,7 @@
 .pvMedia{
     width: 100%;
     aspect-ratio: 16/9;
-    background: rgba(0,0,0,.05);
+    background: rgba(0,0,0,.04);
     border-bottom: 1px solid rgba(0,0,0,.06);
 }
 .pvImg{
@@ -77,7 +80,7 @@
     margin-top: 6px;
     font-weight: 900;
     font-size: 13px;
-    opacity: .78;
+    opacity: .75;
 }
 .pvSub{
     margin-top: 10px;
@@ -91,7 +94,7 @@
     opacity: .75;
 }
 .pvMono{
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
 }
 
 /* Actions */
@@ -105,13 +108,13 @@
     padding: 9px 12px;
     border-radius: 12px;
     border: 1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.85);
+    background: #fff; /* sade */
     font-weight: 1000;
     cursor:pointer;
 }
 .pvBtn:disabled{ opacity:.6; cursor:not-allowed; }
 .pvBtn.isFollowing{
-    background: rgba(0,0,0,.06);
+    background: rgba(0,0,0,.04);
     border-color: rgba(0,0,0,.14);
 }
 
@@ -155,22 +158,25 @@
     overflow:hidden;
 }
 
-/* RIGHT (comments) */
+/* RIGHT (comments) – ✅ kutusuz flat */
 .viewRight{
-    border-radius: 16px;
-    overflow:hidden;
-    border: 1px solid rgba(0,0,0,.08);
-    background: rgba(255,255,255,.92);
-    box-shadow: 0 12px 34px rgba(0,0,0,.08);
-    padding: 12px;
+    border-radius: 0;         /* ✅ kare/kutu hissi yok */
+    overflow: visible;
+    border: none;             /* ✅ kutu yok */
+    background: transparent;  /* ✅ panel yok */
+    box-shadow: none;         /* ✅ shadow yok */
+    padding: 0;               /* ✅ sade */
 }
 
+/* Comments header */
 .cHead{
     display:flex;
     align-items:center;
     justify-content:space-between;
     gap:10px;
     margin-bottom: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,.08);
 }
 .cTitle{
     font-weight: 1100;
@@ -181,17 +187,20 @@
     opacity: .8;
 }
 
+/* List */
 .commentsList{
     display:flex;
     flex-direction:column;
-    gap: 10px;
+    gap: 0;                   /* ✅ araya boş kutu yok */
     max-height: 520px;
     overflow:auto;
     padding-right: 6px;
 }
+
+/* scrollbar */
 .commentsList::-webkit-scrollbar{ width: 8px; }
 .commentsList::-webkit-scrollbar-thumb{
-    background: rgba(0,0,0,.12);
+    background: rgba(0,0,0,.10);
     border-radius: 999px;
 }
 .commentsList::-webkit-scrollbar-track{ background: transparent; }
@@ -202,19 +211,22 @@
     padding: 10px 0;
 }
 
-/* comment item */
+/* ✅ comment item: düz satır + alt çizgi */
 .cItem{
     display:flex;
     gap: 10px;
     align-items:flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(0,0,0,.07);
 }
+
 .cAvatar{
-    width: 36px;
-    height: 36px;
+    width: 34px;
+    height: 34px;
     border-radius: 999px;
     overflow:hidden;
-    flex: 0 0 36px;
-    background: rgba(0,0,0,.06);
+    flex: 0 0 34px;
+    background: rgba(0,0,0,.05);
     border: 1px solid rgba(0,0,0,.08);
     display:grid;
     place-items:center;
@@ -248,13 +260,13 @@
 .cTime{
     font-weight: 900;
     font-size: 11px;
-    opacity: .7;
+    opacity: .65;
     flex:0 0 auto;
 }
 .cText{
     margin-top: 6px;
     font-weight: 850;
-    line-height: 1.35;
+    line-height: 1.38;
     opacity: .95;
     white-space: pre-wrap;
 }
@@ -264,21 +276,23 @@
     margin-top: 12px;
     display:flex;
     gap: 10px;
+    padding-top: 12px;
 }
 .commentInput{
     flex: 1;
     height: 42px;
     border-radius: 14px;
     border: 1px solid rgba(0,0,0,.10);
-    background: rgba(255,255,255,.9);
+    background: #fff;
     padding: 0 12px;
     font-weight: 900;
     outline:none;
 }
 .commentInput:focus{
     border-color: rgba(37,99,235,.35);
-    box-shadow: 0 0 0 3px rgba(37,99,235,.14);
+    box-shadow: none; /* ✅ focus glow yok */
 }
+
 .commentBtn{
     height: 42px;
     padding: 0 14px;
@@ -290,18 +304,22 @@
 }
 .commentBtn:disabled{ opacity:.6; cursor:not-allowed; }
 
+/* =========================
+   SOFT LOADING (only if slow)
+========================= */
+html.isLoading #postBox,
+html.isLoading #commentsList{
+    opacity: .55;
+}
 
 /* =========================
    MOBILE FIX (no horizontal scroll)
 ========================= */
-
-/* 1) Sayfada sağa kaymayı tamamen kapat */
 html, body{
     width: 100%;
     overflow-x: hidden;
 }
 
-/* 2) Container / grid taşmasını engelle */
 .viewWrap,
 .viewGrid,
 .viewLeft,
@@ -310,44 +328,26 @@ html, body{
     min-width: 0;
 }
 
-/* 3) Resim ve kartlar taşmasın */
 .pvMedia,
 .pvImg{
     max-width: 100%;
 }
 
-/* 4) Uzun author id / metinler taşmasın */
 .pvMono,
 .cName,
 .cText,
 .pvText{
-    overflow-wrap: anywhere;  /* uzun string kır */
+    overflow-wrap: anywhere;
     word-break: break-word;
 }
 
-/* 5) Mobilde grid tek kolon + daha kompakt */
 @media (max-width: 900px){
-    .viewGrid{
-        grid-template-columns: 1fr;
-    }
+    .viewGrid{ grid-template-columns: 1fr; }
 
-    .viewRight{
-        padding: 10px;
-    }
-
-    .pvHead{
-        padding: 12px 12px 8px;
-    }
-
-    .pvContent{
-        padding: 0 12px 12px;
-    }
+    .pvHead{ padding: 12px 12px 8px; }
+    .pvContent{ padding: 0 12px 12px; }
 }
 
-/* 6) Yorum formu mobilde sığsın */
-.commentForm{
-    min-width: 0;
-}
-.commentInput{
-    min-width: 0;
-}
+/* comment form mobile */
+.commentForm{ min-width:0; }
+.commentInput{ min-width:0; }
