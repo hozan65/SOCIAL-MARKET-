@@ -1,4 +1,17 @@
-
+/* =========================
+  FEED.JS (NO MODULE / NO IMPORT)
+  - Supabase CDN (READ ONLY)
+  - Like / Follow: Netlify Functions (Appwrite JWT)
+  - News slider (Supabase news table)
+  - Post card: TradingView-like
+  - Whole card click -> /view/view.html?id=POST_ID (buttons 제외)
+  - Follow state hydrate on refresh:
+     - cache first
+     - definitive check via Netlify function is_following (JWT)
+  ✅ LCP FIX:
+     - first news image: eager + fetchpriority high + width/height
+     - first post image: eager + fetchpriority high
+========================= */
 
 console.log("✅ feed.js running");
 
@@ -33,7 +46,9 @@ rtOn("post:like:update", ({ postId, likeCount }) => {
         const pid = String(postId || "").trim();
         if (!pid) return;
 
-        const btns = document.querySelectorAll(`.likeBtn[data-post-id="${CSS.escape(pid)}"]`);
+        const btns = document.querySelectorAll(
+            `.likeBtn[data-post-id="${CSS.escape(pid)}"]`
+        );
         btns.forEach((b) => {
             const span = b.querySelector(".likeCount");
             if (span) span.textContent = String(likeCount ?? 0);
@@ -244,10 +259,20 @@ async function isFollowingUser(targetUserId) {
 }
 
 // =========================
-// RENDER POST (TradingView-like)
+// POSTS SHOW MORE (6 by 6)
+// =========================
+const POSTS_STEP = 6;
+let postsPage = 0;
+let postsBusy = false;
+let postsHasMore = true;
+
+// =========================
+// RENDER POST (TradingView-like) + LCP FIX
 // =========================
 function renderPost(row, index = 0) {
-    const isFirst = (postsPage === 0 && index === 0); // LCP FIX
+    const isFirst = postsPage === 0 && index === 0; // ✅ first card (potential LCP)
+
+    const postIdRaw = String(row.id || "").trim();          // ✅ FIX: vardı, kaybolmuştu
     const authorIdRaw = String(row.author_id || "").trim();
 
     const postId = esc(postIdRaw);
@@ -268,12 +293,15 @@ function renderPost(row, index = 0) {
         `${market}${market && category ? " • " : ""}${category}` +
         `${(market || category) && timeframe ? " • " : ""}${timeframe}`;
 
+    const loading = isFirst ? "eager" : "lazy";
+    const fetchp = isFirst ? ' fetchpriority="high"' : "";
+
     return `
   <article class="tvCard" data-post-id="${postId}">
     <div class="tvMedia">
       ${
         imgUrl
-            ? `<img src="${esc(imgUrl)}" alt="" loading="lazy" decoding="async">`
+            ? `<img src="${esc(imgUrl)}" alt="" decoding="async" loading="${loading}"${fetchp}>`
             : `<div class="tvNoImg">NO IMAGE</div>`
     }
     </div>
@@ -316,7 +344,9 @@ async function hydrateNewPosts(justAddedRows) {
             const postId = String(r.id);
             const c = await getLikeCount(postId);
 
-            const btn = grid.querySelector(`.likeBtn[data-post-id="${CSS.escape(postId)}"]`);
+            const btn = grid.querySelector(
+                `.likeBtn[data-post-id="${CSS.escape(postId)}"]`
+            );
             const span = btn?.querySelector(".likeCount");
             if (span) span.textContent = String(c);
 
@@ -330,7 +360,9 @@ async function hydrateNewPosts(justAddedRows) {
             const authorId = String(r.author_id || "").trim();
             if (!authorId) continue;
 
-            const btn = grid.querySelector(`.followBtn[data-user-id="${CSS.escape(authorId)}"]`);
+            const btn = grid.querySelector(
+                `.followBtn[data-user-id="${CSS.escape(authorId)}"]`
+            );
             if (!btn || btn.disabled) continue;
 
             try {
@@ -351,13 +383,8 @@ async function hydrateNewPosts(justAddedRows) {
 }
 
 // =========================
-// POSTS SHOW MORE (6 by 6)
+// POSTS UI (Show more)
 // =========================
-const POSTS_STEP = 6;
-let postsPage = 0;
-let postsBusy = false;
-let postsHasMore = true;
-
 function ensurePostsMoreUI() {
     if (!grid) return;
 
@@ -387,7 +414,7 @@ function setPostsMoreLoading() {
 async function loadFeed(reset = false) {
     if (!grid) return;
     if (!sb) {
-        setMsg(" Supabase CDN not loaded");
+        setMsg("❌ Supabase CDN not loaded");
         return;
     }
 
@@ -431,7 +458,12 @@ async function loadFeedMore() {
             return;
         }
 
-        grid.insertAdjacentHTML("beforeend", rows.map(renderPost).join(""));
+        // ✅ FIX: index geç (renderPost(row, index))
+        grid.insertAdjacentHTML(
+            "beforeend",
+            rows.map((r, i) => renderPost(r, i)).join("")
+        );
+
         await hydrateNewPosts(rows);
 
         // ✅ card click => view (butonlar hariç)
@@ -465,7 +497,7 @@ async function loadFeedMore() {
         setMsg("");
     } catch (err) {
         console.error(err);
-        setMsg(" Feed error: " + (err?.message || "unknown"));
+        setMsg("❌ Feed error: " + (err?.message || "unknown"));
         ensurePostsMoreUI();
     } finally {
         postsBusy = false;
@@ -473,7 +505,7 @@ async function loadFeedMore() {
 }
 
 // =========================
-// NEWS (Supabase -> Slider)
+// NEWS (Supabase -> Slider) + LCP FIX
 // =========================
 async function fetchNews(limit = 6) {
     if (!sb) throw new Error("Supabase CDN not loaded");
@@ -488,7 +520,6 @@ async function fetchNews(limit = 6) {
     return data || [];
 }
 
-// ✅ DEĞİŞTİR: renderNewsSlide (LCP FIX)
 function renderNewsSlide(n, active = false, isFirst = false) {
     const title = esc(n.title || "");
     const img = esc(n.image_url || "");
@@ -496,11 +527,10 @@ function renderNewsSlide(n, active = false, isFirst = false) {
     const source = esc(n.source || "");
     const time = esc(formatTime(n.created_at));
 
-    // ✅ İlk görsel LCP: eager + fetchpriority high
     const loading = isFirst ? "eager" : "lazy";
     const fetchp = isFirst ? ' fetchpriority="high"' : "";
 
-    // ✅ CLS için yer ayır (reserve)
+    // CLS reserve (approx 16:9)
     const wh = ' width="1200" height="675"';
 
     return `
@@ -546,14 +576,13 @@ async function loadNews() {
             return;
         }
 
-        // ✅ DEĞİŞTİR: map satırı (ilk slide isFirst=true)
         newsSlider.innerHTML = items
             .map((n, i) => renderNewsSlide(n, i === 0, i === 0))
             .join("");
 
         startNewsAutoRotate();
     } catch (err) {
-        console.error(" News error:", err);
+        console.error("❌ News error:", err);
         newsSlider.innerHTML = `<div class="newsSlideSkeleton">News unavailable</div>`;
     }
 }
@@ -564,7 +593,6 @@ document.addEventListener("click", (e) => {
     const url = slide.dataset.url;
     if (url && url !== "#") window.open(url, "_blank", "noopener");
 });
-
 
 // =========================
 // EVENTS (Like/Follow)
@@ -581,7 +609,7 @@ document.addEventListener("click", async (e) => {
         const prevLiked = likeBtn.classList.contains("isLiked");
         const nextLiked = !prevLiked;
 
-        // ✅ OPTIMISTIC (ANINDA)
+        // ✅ OPTIMISTIC
         likeBtn.classList.toggle("isLiked", nextLiked);
         if (countSpan) {
             const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
@@ -592,7 +620,6 @@ document.addEventListener("click", async (e) => {
         likeBtn.classList.add("isLoading");
 
         try {
-            // ✅ server truth: toggle_like zaten { liked, likes_count } döndürüyor
             const out = await toggleLike(postId);
             const liked = !!out?.liked;
             const likesCount = Number(out?.likes_count || 0);
@@ -600,13 +627,11 @@ document.addEventListener("click", async (e) => {
             likeBtn.classList.toggle("isLiked", liked);
             if (countSpan) countSpan.textContent = String(likesCount);
 
-            // ✅ REALTIME: herkese yayın
             let userId = "";
             try { userId = await getMyUserId(); } catch {}
             rtEmit("like:toggle", { postId: String(postId), userId, likeCount: likesCount });
 
         } catch (err) {
-            // ❌ rollback
             console.error("❌ toggleLike failed:", err);
             likeBtn.classList.toggle("isLiked", prevLiked);
             if (countSpan) countSpan.textContent = String(Math.max(0, prevCount));
@@ -618,18 +643,15 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
-
-    // ✅✅✅ OPTIMISTIC FOLLOW (FIX)
+    // ✅ OPTIMISTIC FOLLOW
     const followBtn = e.target.closest(".followBtn");
     if (followBtn && !followBtn.disabled) {
         const targetUserId = String(followBtn.dataset.userId || "").trim();
         if (!targetUserId) return;
 
-        // snapshot
         const prevText = followBtn.textContent;
         const prevFollowing = followBtn.classList.contains("isFollowing");
 
-        // optimistic apply (ANINDA)
         const nextFollowing = !prevFollowing;
         followBtn.textContent = nextFollowing ? "Following" : "Follow";
         followBtn.classList.toggle("isFollowing", nextFollowing);
@@ -641,11 +663,9 @@ document.addEventListener("click", async (e) => {
             const r = await toggleFollow(targetUserId);
             const isFollowing = !!r?.following;
 
-            // server truth
             followBtn.textContent = isFollowing ? "Following" : "Follow";
             followBtn.classList.toggle("isFollowing", isFollowing);
 
-            // cache update
             try {
                 const myId = await getMyUserId();
                 const set = getFollowingSetFromCache(myId);
@@ -654,7 +674,6 @@ document.addEventListener("click", async (e) => {
                 saveFollowingSetToCache(myId, set);
             } catch {}
         } catch (err) {
-            // rollback
             console.error("❌ toggleFollow failed:", err);
             followBtn.textContent = prevText;
             followBtn.classList.toggle("isFollowing", prevFollowing);
