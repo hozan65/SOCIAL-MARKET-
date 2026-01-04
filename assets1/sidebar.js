@@ -1,5 +1,5 @@
 // /assets1/sidebar.js
-console.log("✅ sidebar.js loaded (FINAL STABLE)");
+console.log("✅ sidebar.js loaded (MOBILE FIXED CLOSE + NO OVERLAP)");
 
 /* =======================
    AUTH HELPERS
@@ -67,8 +67,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             const fa = document.createElement("link");
             fa.id = "faCDN";
             fa.rel = "stylesheet";
-            fa.href =
-                "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css";
+            fa.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css";
             document.head.appendChild(fa);
         }
 
@@ -92,15 +91,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         const pinBtn = document.getElementById("smSbPinBtn");
 
         const backdrop = document.getElementById("smSbBackdrop");
-        const closeBtn = document.getElementById("smSbClose");
-        const hamb = document.getElementById("smSbMobileHamb");
+        const closeBtn = document.getElementById("smSbClose");      // X
+        const hamb = document.getElementById("smSbMobileHamb");     // hamburger
 
         const profileBtn = document.getElementById("smSbProfileBtn");
         const menu = document.getElementById("smSbMenu");
 
         /* Restore pin */
         const pinned = localStorage.getItem("sm_sidebar_pinned") === "1";
-        sidebar.classList.toggle("isPinned", pinned);
+        sidebar?.classList.toggle("isPinned", pinned);
         pinBtn?.setAttribute("aria-pressed", pinned ? "true" : "false");
 
         pinBtn?.addEventListener("click", (e) => {
@@ -143,19 +142,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         menu?.addEventListener("click", (e) => e.stopPropagation());
         document.addEventListener("click", () => toggleMenu(false));
 
-        /* Mobile */
+        /* =======================
+           MOBILE DRAWER (FIXED)
+        ======================= */
         const openMobile = () => {
+            if (!sidebar) return;
+
             sidebar.classList.add("mobileOpen");
-            backdrop.classList.add("open");
-            closeBtn.classList.add("open");
+            backdrop?.classList.add("open");
+
+            // ✅ X butonu sidebar içinde absolute -> class gerek yok ama istersen dursun
+            closeBtn?.classList.add("open");
+
+            // ✅ hamburger üst üste binmesin
+            document.body.classList.add("smSbOpen");
+
+            // ✅ scroll kilidi
             document.documentElement.style.overflow = "hidden";
             toggleMenu(false);
         };
 
         const closeMobile = () => {
-            sidebar.classList.remove("mobileOpen");
-            backdrop.classList.remove("open");
-            closeBtn.classList.remove("open");
+            sidebar?.classList.remove("mobileOpen");
+            backdrop?.classList.remove("open");
+            closeBtn?.classList.remove("open");
+
+            document.body.classList.remove("smSbOpen");
             document.documentElement.style.overflow = "";
             toggleMenu(false);
         };
@@ -166,7 +178,12 @@ document.addEventListener("DOMContentLoaded", async () => {
             sidebar.classList.contains("mobileOpen") ? closeMobile() : openMobile();
         });
 
-        closeBtn?.addEventListener("click", closeMobile);
+        closeBtn?.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeMobile();
+        });
+
         backdrop?.addEventListener("click", closeMobile);
         document.addEventListener("keydown", (e) => e.key === "Escape" && closeMobile());
 
@@ -191,7 +208,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
 
-        console.log("✅ sidebar ready (FULL STABLE)");
+        console.log("✅ sidebar ready (MOBILE CLOSE FIXED)");
     } catch (err) {
         console.error("sidebar error:", err);
     }
@@ -199,6 +216,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 /* =======================
    AI SUPPORT LOADER
+   (Widget zaten feed değilse çalışmıyor)
 ======================= */
 (() => {
     if (document.getElementById("smSupportLoader")) return;
