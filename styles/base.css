@@ -24,6 +24,26 @@ html[data-theme="dark"] body{
 
 
 /* =========================
+   CLS FIX — Cookie bar space
+   (cookie görünürken sayfa zıplamasın)
+========================= */
+:root{ --cookie-h: 160px; } /* desktop */
+@media (max-width: 860px){
+    :root{ --cookie-h: 220px; } /* mobile’de daha yüksek */
+}
+
+/* cookie çıkınca alttan yer ayır */
+body.smCookiePending{
+    padding-bottom: var(--cookie-h);
+}
+
+/* cookie kabul/ret sonrası geri al */
+body.smCookieDone{
+    padding-bottom: 0 !important;
+}
+
+
+/* =========================
    COOKIE BAR — SkySports-like
 ========================= */
 

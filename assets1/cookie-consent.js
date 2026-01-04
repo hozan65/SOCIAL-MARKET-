@@ -40,6 +40,19 @@ console.log("✅ cookie-consent.js loaded (SkySports-like)");
         bar.hidden = true;
     };
 
+
+    function showCookieBar(){
+        document.body.classList.add("smCookiePending");
+        document.body.classList.remove("smCookieDone");
+        // mevcut show kodların (bar.hidden=false, bar.classList.add("show") vs) aynen kalsın
+    }
+
+    function doneCookieBar(){
+        document.body.classList.remove("smCookiePending");
+        document.body.classList.add("smCookieDone");
+        // mevcut hide kodların aynen kalsın
+    }
+
     // Already decided?
     if (!load()) show();
 
@@ -58,3 +71,4 @@ console.log("✅ cookie-consent.js loaded (SkySports-like)");
         hide();
     });
 })();
+

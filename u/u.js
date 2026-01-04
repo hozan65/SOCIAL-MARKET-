@@ -207,6 +207,37 @@ function renderPosts(posts) {
     }).join("");
 }
 
+function renderLinks(p){
+    const el = document.getElementById("uLinks");
+    if (!el) return;
+
+    const links = [];
+
+    // 1) array links (get_profile.js -> profile.links)
+    const arr = Array.isArray(p?.links) ? p.links : [];
+    for (const x of arr) {
+        const url = String(x?.url || x?.href || "").trim();
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            links.push({ url, label: String(x?.label || "").trim() });
+        }
+    }
+
+    // 2) fallback: profile.website varsa onu da link yap
+    const w = String(p?.website || "").trim();
+    if (w.startsWith("http://") || w.startsWith("https://")) {
+        // aynı url’i iki kere basma
+        if (!links.some(l => l.url === w)) links.push({ url: w, label: "" });
+    }
+
+    if (!links.length) { el.innerHTML = ""; return; }
+
+    el.innerHTML = links.map(l => {
+        const label = (l.label || l.url.replace(/^https?:\/\//, ""));
+        return `<a class="uLink" href="${l.url}" target="_blank" rel="noopener">${label}</a>`;
+    }).join("");
+}
+
+
 function renderProfile(p) {
     if (!p) return;
     if ($name) $name.textContent = p.username || "—";
