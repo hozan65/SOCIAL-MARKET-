@@ -10,7 +10,7 @@
 
     // ---- guard: Supabase CDN must be loaded first
     if (!window.supabase?.createClient) {
-        console.error("❌ Supabase CDN not loaded. Add this before sb.js:");
+        console.error(" Supabase CDN not loaded. Add this before sb.js:");
         console.error('   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>');
         return;
     }

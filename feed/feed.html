@@ -127,17 +127,14 @@
     </div>
 </section>
 
-
-<!-- ================= SCRIPTS ================= -->
-
 <!-- Supabase CDN (read-only feed için) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<!-- Header -->
+<!-- ✅ Supabase client (window.sb)  - MUTLAKA textnews'ten ÖNCE -->
+<script src="/assets/sb.js"></script>
+
+<!-- Sidebar (menü) -->
 <script src="/assets1/sidebar.js"></script>
-<script src="/assets1/ai_support_widget.js"></script>
-
-
 
 <!-- Auth (JWT) -->
 <script type="module" src="/assets/auth-ui.js"></script>
@@ -151,17 +148,20 @@
     window.SOCKET_URL = "https://socket.chriontoken.com";
 </script>
 
-<!-- ✅ Realtime bridge (TEK socket burada) -->
+<!-- ✅ Realtime bridge -->
 <script src="/assets1/realtime.js"></script>
 
-<!-- Page JS (like / follow vs) -->
+<!-- Page JS -->
 <script src="/feed/feed.js"></script>
 
-<!-- Diğer UI scriptleri -->
+<!-- UI scriptleri -->
 <script src="/assets1/crypto-tabs.js"></script>
 <script src="/assets1/heatmap.js"></script>
 <script src="/assets1/cookie-consent.js?v=9"></script>
+
+<!-- ✅ textnews (sb hazır olduktan sonra) -->
 <script src="/textnews/textnews-feed.js"></script>
+
 
 </body>
 </html>

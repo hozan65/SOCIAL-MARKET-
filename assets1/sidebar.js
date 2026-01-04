@@ -1,23 +1,34 @@
 // /assets1/sidebar.js
-console.log("✅ sidebar.js loaded (MOBILE FIXED CLOSE + NO OVERLAP)");
+console.log("✅ sidebar.js loaded (MOBILE FIXED CLOSE + USER HYDRATE)");
 
 /* =======================
    AUTH HELPERS
 ======================= */
+async function smGetUserSafe() {
+    try {
+        const mod = await import("/assets/appwrite.js");
+        if (!mod?.account?.get) return null;
+        const u = await mod.account.get(); // 401 -> throw
+        return u || null;
+    } catch {
+        return null;
+    }
+}
+
 async function smIsLoggedIn() {
+    // hızlı local check
     const uid = localStorage.getItem("sm_uid");
     if (uid) return true;
 
-    try {
-        const mod = await import("/assets/appwrite.js");
-        if (mod?.account?.get) {
-            const u = await mod.account.get();
-            if (u?.$id) {
-                localStorage.setItem("sm_uid", u.$id);
-                return true;
-            }
-        }
-    } catch {}
+    // gerçek check
+    const u = await smGetUserSafe();
+    if (u?.$id) {
+        localStorage.setItem("sm_uid", u.$id);
+        // cache
+        if (u?.name) localStorage.setItem("sm_name", u.name);
+        if (u?.email) localStorage.setItem("sm_email", u.email);
+        return true;
+    }
     return false;
 }
 
@@ -52,6 +63,61 @@ function smSetBtnMode(btn, loggedIn) {
         if (icon) icon.className = "fa-solid fa-right-from-bracket";
         btn.dataset.mode = "logout";
     }
+}
+
+/* =======================
+   USER -> SIDEBAR UI
+======================= */
+function pickInitial(name, email) {
+    const a = (name || "").trim();
+    if (a) return a[0].toUpperCase();
+    const b = (email || "").trim();
+    if (b) return b[0].toUpperCase();
+    return "U";
+}
+
+async function smHydrateSidebarUser() {
+    const elAvatar = document.getElementById("smSbAvatar");
+    const elName = document.getElementById("smSbName");
+    const elMail = document.getElementById("smSbMail");
+
+    if (!elAvatar || !elName || !elMail) return;
+
+    // default: boş kalsın (senin istediğin gibi)
+    elName.textContent = "";
+    elMail.textContent = "";
+    elAvatar.textContent = "";
+
+    // önce cache (hızlı)
+    const cachedName = localStorage.getItem("sm_name") || "";
+    const cachedEmail = localStorage.getItem("sm_email") || "";
+    if (cachedName || cachedEmail) {
+        elName.textContent = cachedName || "";
+        elMail.textContent = cachedEmail || "";
+        elAvatar.textContent = pickInitial(cachedName, cachedEmail);
+    }
+
+    // sonra gerçek Appwrite (doğrulama)
+    const u = await smGetUserSafe();
+    if (!u?.$id) {
+        // login yoksa boş (tam istediğin)
+        elName.textContent = "";
+        elMail.textContent = "";
+        elAvatar.textContent = "";
+        return;
+    }
+
+    localStorage.setItem("sm_uid", u.$id);
+
+    const name = (u.name || "").trim();
+    const email = (u.email || "").trim();
+
+    if (name) localStorage.setItem("sm_name", name);
+    if (email) localStorage.setItem("sm_email", email);
+
+    elName.textContent = name || "";
+    elMail.textContent = email || "";
+    elAvatar.textContent = pickInitial(name, email);
 }
 
 /* =======================
@@ -91,8 +157,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const pinBtn = document.getElementById("smSbPinBtn");
 
         const backdrop = document.getElementById("smSbBackdrop");
-        const closeBtn = document.getElementById("smSbClose");      // X
-        const hamb = document.getElementById("smSbMobileHamb");     // hamburger
+        const closeBtn = document.getElementById("smSbClose");
+        const hamb = document.getElementById("smSbMobileHamb");
 
         const profileBtn = document.getElementById("smSbProfileBtn");
         const menu = document.getElementById("smSbMenu");
@@ -143,21 +209,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         document.addEventListener("click", () => toggleMenu(false));
 
         /* =======================
-           MOBILE DRAWER (FIXED)
+           MOBILE DRAWER
         ======================= */
         const openMobile = () => {
             if (!sidebar) return;
-
             sidebar.classList.add("mobileOpen");
             backdrop?.classList.add("open");
-
-            // ✅ X butonu sidebar içinde absolute -> class gerek yok ama istersen dursun
             closeBtn?.classList.add("open");
-
-            // ✅ hamburger üst üste binmesin
             document.body.classList.add("smSbOpen");
-
-            // ✅ scroll kilidi
             document.documentElement.style.overflow = "hidden";
             toggleMenu(false);
         };
@@ -166,7 +225,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             sidebar?.classList.remove("mobileOpen");
             backdrop?.classList.remove("open");
             closeBtn?.classList.remove("open");
-
             document.body.classList.remove("smSbOpen");
             document.documentElement.style.overflow = "";
             toggleMenu(false);
@@ -199,7 +257,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 e.preventDefault();
                 e.stopPropagation();
 
-                const mode = logoutBtn.dataset.mode;
+                const mode = logoutBtn.dataset.mode || "login";
                 if (mode === "login") {
                     location.href = "/auth/login.html";
                 } else {
@@ -208,7 +266,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
 
-        console.log("✅ sidebar ready (MOBILE CLOSE FIXED)");
+        /* ✅ USER NAME / EMAIL / AVATAR (boştu, şimdi dolacak) */
+        await smHydrateSidebarUser();
+
+        console.log("✅ sidebar ready (USER HYDRATE OK)");
     } catch (err) {
         console.error("sidebar error:", err);
     }
@@ -216,7 +277,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 /* =======================
    AI SUPPORT LOADER
-   (Widget zaten feed değilse çalışmıyor)
 ======================= */
 (() => {
     if (document.getElementById("smSupportLoader")) return;
