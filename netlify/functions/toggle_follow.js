@@ -1,90 +1,95 @@
 // netlify/functions/toggle_follow.js
-import { createClient } from "@supabase/supabase-js";
+// ✅ FINAL - Appwrite JWT verify + sm-api toggle (NO Supabase)
+
 import { getAppwriteUser } from "./_appwrite_user.js";
+
+const SM_API_BASE_URL = (process.env.SM_API_BASE_URL || "").trim();
+const SM_API_TIMEOUT_MS = Number(process.env.SM_API_TIMEOUT_MS || "6500") || 6500;
 
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        const SUPABASE_URL = process.env.SUPABASE_URL;
-        const SUPABASE_KEY =
-            process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE;
+        if (!SM_API_BASE_URL) return json(500, { error: "Missing SM_API_BASE_URL env" });
 
-        if (!SUPABASE_URL || !SUPABASE_KEY) {
-            return json(500, { error: "Missing SUPABASE env" });
-        }
-
-        const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        // 🔐 Appwrite auth
+        // 🔐 Appwrite auth (my uid)
         const { user } = await getAppwriteUser(event);
         if (!user?.$id) return json(401, { error: "Unauthorized" });
-        const myUid = user.$id;
+        const myUid = String(user.$id).trim();
 
         let body = {};
         try { body = JSON.parse(event.body || "{}"); } catch {}
 
-        const following_uid = String(body.following_uid || "").trim();
+        const following_uid = String(body.following_uid || body.target_user_id || "").trim();
         if (!following_uid) return json(400, { error: "Missing following_uid" });
         if (following_uid === myUid) return json(400, { error: "Cannot follow yourself" });
 
-        // ✅ FK FIX — profiles.appwrite_user_id
-        const p1 = await sb.from("profiles").upsert(
-            [{ appwrite_user_id: myUid }],
-            { onConflict: "appwrite_user_id" }
+        // ✅ call sm-api
+        const out = await smPost(
+            "/api/follow/toggle",
+            myUid,
+            { target_user_id: following_uid }
         );
-        if (p1.error) return json(500, { error: `profiles upsert (me) failed: ${p1.error.message}` });
 
-        const p2 = await sb.from("profiles").upsert(
-            [{ appwrite_user_id: following_uid }],
-            { onConflict: "appwrite_user_id" }
-        );
-        if (p2.error) return json(500, { error: `profiles upsert (target) failed: ${p2.error.message}` });
+        // normalize response for current frontend
+        const following = !!(out?.following ?? out?.is_following ?? out?.data?.following ?? false);
 
-        // 🔎 existing follow?
-        const { data: existing, error: e1 } = await sb
-            .from("follows")
-            .select("id")
-            .eq("follower_uid", myUid)
-            .eq("following_uid", following_uid)
-            .maybeSingle();
-
-        if (e1) return json(500, { error: e1.message });
-
-        let following = false;
-
-        if (existing?.id) {
-            const { error } = await sb.from("follows").delete().eq("id", existing.id);
-            if (error) return json(500, { error: error.message });
-            following = false;
-        } else {
-            const { error } = await sb.from("follows").insert([
-                { follower_uid: myUid, following_uid }
-            ]);
-            if (error) return json(500, { error: error.message });
-            following = true;
-        }
-
-        const [a, b] = await Promise.all([
-            sb.from("follows").select("*", { count: "exact", head: true }).eq("following_uid", following_uid),
-            sb.from("follows").select("*", { count: "exact", head: true }).eq("follower_uid", myUid),
-        ]);
-
-        if (a.error) return json(500, { error: a.error.message });
-        if (b.error) return json(500, { error: b.error.message });
+        // counts (optional)
+        const followers_count =
+            numOrZero(out?.followers_count ?? out?.counts?.followers ?? out?.data?.followers_count);
+        const following_count =
+            numOrZero(out?.following_count ?? out?.counts?.following ?? out?.data?.following_count);
 
         return json(200, {
             ok: true,
             following,
-            followers_count: Number(a.count || 0),
-            following_count: Number(b.count || 0),
+            followers_count,
+            following_count,
         });
     } catch (e) {
         console.error("toggle_follow crash:", e);
-        return json(500, { error: String(e?.message || e) });
+        const msg = String(e?.message || e);
+        const low = msg.toLowerCase();
+        const status =
+            low.includes("jwt") || low.includes("unauthorized") || low.includes("invalid") ? 401 : 500;
+        return json(status, { error: msg });
     }
 };
+
+function numOrZero(v) {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+}
+
+async function smPost(path, myUid, body) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), SM_API_TIMEOUT_MS);
+
+    try {
+        const r = await fetch(`${SM_API_BASE_URL}${path}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-User-Id": String(myUid || "").trim(),
+            },
+            body: JSON.stringify(body || {}),
+            signal: ctrl.signal,
+        });
+
+        const txt = await r.text().catch(() => "");
+        let j = {};
+        try { j = txt ? JSON.parse(txt) : {}; } catch { j = { raw: txt }; }
+
+        if (!r.ok) throw new Error(j?.error || j?.message || `sm-api POST ${path} failed (${r.status})`);
+        return j;
+    } catch (e) {
+        if (String(e?.name || "").toLowerCase() === "aborterror") throw new Error("sm-api timeout");
+        throw e;
+    } finally {
+        clearTimeout(t);
+    }
+}
 
 function json(statusCode, body) {
     return {
@@ -93,7 +98,7 @@ function json(statusCode, body) {
             "Content-Type": "application/json",
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT, x-jwt, X-User-Id",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
         body: JSON.stringify(body),

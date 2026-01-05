@@ -1,7 +1,12 @@
-// netlify/functions/_auth_user.js (CJS - NO extra file needed)
+// netlify/functions/_auth_user.js (CJS - self-contained)
+// ✅ Robust JWT extraction (Authorization / X-Appwrite-JWT / x-jwt)
+// ✅ Timeout protection
+// ✅ Exposes handler + authUser helper
 
-const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT;
-const APPWRITE_PROJECT_ID = process.env.APPWRITE_PROJECT_ID;
+const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "").trim();
+const APPWRITE_PROJECT_ID = (process.env.APPWRITE_PROJECT_ID || "").trim();
+
+const DEFAULT_TIMEOUT_MS = 6500;
 
 exports.handler = async (event) => {
     try {
@@ -22,12 +27,20 @@ exports.handler = async (event) => {
     } catch (e) {
         const msg = String(e?.message || e);
         const low = msg.toLowerCase();
-        const status = low.includes("jwt") || low.includes("unauthorized") || low.includes("invalid") ? 401 : 500;
+
+        const status =
+            low.includes("jwt") ||
+            low.includes("unauthorized") ||
+            low.includes("invalid") ||
+            low.includes("not authorized")
+                ? 401
+                : 500;
+
         return json(status, { error: msg });
     }
 };
 
-// add_comment gibi yerler için helper
+// ✅ add_comment gibi yerler için helper
 async function authUser(jwt) {
     const user = await fetchUser(jwt);
     const uid = String(user?.$id || "").trim();
@@ -36,44 +49,85 @@ async function authUser(jwt) {
 }
 module.exports.authUser = authUser;
 
-async function fetchUser(jwt) {
+async function fetchUser(jwt, { timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
     if (!APPWRITE_ENDPOINT || !APPWRITE_PROJECT_ID) {
         throw new Error("Missing APPWRITE_ENDPOINT or APPWRITE_PROJECT_ID env");
     }
 
-    const r = await fetch(`${APPWRITE_ENDPOINT}/account`, {
-        method: "GET",
-        headers: {
-            "Content-Type": "application/json",
-            "X-Appwrite-Project": APPWRITE_PROJECT_ID,
-            "X-Appwrite-JWT": jwt,
-        },
-    });
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
 
-    const txt = await r.text().catch(() => "");
-    let data = null;
-    try { data = txt ? JSON.parse(txt) : null; } catch {}
+    try {
+        const r = await fetch(`${APPWRITE_ENDPOINT}/account`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "X-Appwrite-Project": APPWRITE_PROJECT_ID,
+                "X-Appwrite-JWT": jwt,
+            },
+            signal: ctrl.signal,
+        });
 
-    if (!r.ok) {
-        const msg = data?.message || data?.error || `Appwrite /account failed: HTTP ${r.status}`;
-        throw new Error(msg);
+        const txt = await r.text().catch(() => "");
+        let data = null;
+        try { data = txt ? JSON.parse(txt) : null; } catch { data = null; }
+
+        if (!r.ok) {
+            const msg =
+                data?.message ||
+                data?.error ||
+                data?.errors?.[0]?.message ||
+                `Appwrite /account failed: HTTP ${r.status}`;
+            throw new Error(msg);
+        }
+
+        if (!data?.$id) throw new Error("Invalid JWT");
+        return data;
+    } catch (e) {
+        if (String(e?.name || "").toLowerCase() === "aborterror") {
+            throw new Error("Appwrite /account timeout");
+        }
+        throw e;
+    } finally {
+        clearTimeout(t);
     }
-
-    if (!data?.$id) throw new Error("Invalid JWT");
-    return data;
 }
 
 function extractJWT(event) {
     const h = event?.headers || {};
-    const auth = h.authorization || h.Authorization || "";
-    const xjwt = h["x-appwrite-jwt"] || h["X-Appwrite-JWT"] || h["X-APPWRITE-JWT"] || "";
+    const mvh = event?.multiValueHeaders || {};
+
+    const getHeader = (name) => {
+        const lower = String(name).toLowerCase();
+
+        // multiValueHeaders first
+        for (const k of Object.keys(mvh || {})) {
+            if (String(k).toLowerCase() === lower) {
+                const v = mvh[k];
+                if (Array.isArray(v) && v[0]) return String(v[0]);
+                if (typeof v === "string") return v;
+            }
+        }
+
+        // headers
+        for (const k of Object.keys(h || {})) {
+            if (String(k).toLowerCase() === lower) return String(h[k] ?? "");
+        }
+
+        return "";
+    };
+
+    const auth = getHeader("authorization");
+    const xjwt = getHeader("x-appwrite-jwt") || getHeader("x-jwt") || getHeader("sm-jwt");
 
     if (auth) {
         const m = auth.match(/Bearer\s+(.+)/i);
         if (m?.[1]) return m[1].trim();
         return auth.trim();
     }
+
     if (xjwt) return String(xjwt).trim();
+
     return "";
 }
 
@@ -84,7 +138,7 @@ function json(statusCode, body) {
             "Content-Type": "application/json",
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT, x-jwt",
             "Access-Control-Allow-Methods": "GET, OPTIONS",
         },
         body: JSON.stringify(body),

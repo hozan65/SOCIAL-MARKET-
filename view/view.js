@@ -1,27 +1,27 @@
 /* =========================
   VIEW.JS (FAST + NO REFRESH COMMENTS + USERNAME FIX)
-  - No module / no import
+  - NO supabase
+  - NO netlify functions
+  - sm-api only (/api/*)
 ========================= */
 
-console.log("✅ view.js running (FAST)");
+console.log("✅ view.js running (sm-api)");
 
 /* =========================
-   SUPABASE (READ ONLY)
+   API ROUTES (adjust if needed)
 ========================= */
-const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
+const API_POST = (id) => `/api/posts/${encodeURIComponent(id)}`;
+const API_LIKES_COUNT = (id) => `/api/posts/${encodeURIComponent(id)}/likes_count`;
+const API_LIKE_TOGGLE = (id) => `/api/posts/${encodeURIComponent(id)}/like_toggle`;
 
-const sb = window.supabase?.createClient
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
+const API_COMMENTS_LIST = (id) => `/api/posts/${encodeURIComponent(id)}/comments?limit=200`;
+const API_COMMENT_ADD = (id) => `/api/posts/${encodeURIComponent(id)}/comments`;
 
-/* =========================
-   NETLIFY FUNCTIONS
-========================= */
-const FN_TOGGLE_LIKE = "/.netlify/functions/toggle_like";
-const FN_ADD_COMMENT = "/.netlify/functions/add_comment";
-const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";
-const FN_AUTH_USER = "/.netlify/functions/auth_user"; // ✅ underscore yok: auth_user.js olmalı
+const API_IS_FOLLOWING = (authorId) => `/api/follow/is_following?id=${encodeURIComponent(authorId)}`;
+const API_TOGGLE_FOLLOW = `/api/follow/toggle`;
+
+const API_ME = `/api/me`; // (opsiyonel) varsa kullanır
+const API_PROFILES = (idsCsv) => `/api/profiles?ids=${encodeURIComponent(idsCsv)}`; // opsiyonel
 
 /* =========================
    DOM
@@ -67,11 +67,11 @@ function getPostIdFromQuery() {
     return String(u.searchParams.get("id") || "").trim();
 }
 
-function resolveImageUrl(image_path) {
-    const p = String(image_path ?? "").trim();
-    if (!p) return "";
-    if (p.startsWith("http://") || p.startsWith("https://")) return p;
-    return `${SUPABASE_URL}/storage/v1/object/public/analysis-images/${p}`;
+function safeUrl(u) {
+    const s = String(u || "").trim();
+    if (!s) return "";
+    if (s.startsWith("http://") || s.startsWith("https://")) return s;
+    return "";
 }
 
 /* =========================
@@ -83,22 +83,29 @@ function getJWT() {
     return jwt;
 }
 
-async function fnGet(url) {
-    const jwt = getJWT();
-    const r = await fetch(url, {
-        headers: { Authorization: `Bearer ${jwt}` },
-    });
-    const txt = await r.text();
-    let j = null;
-    try { j = JSON.parse(txt); } catch {}
-    if (!r.ok) throw new Error(j?.error || `${r.status}`);
-    return j;
+async function fetchJson(url, options = {}, timeoutMs = 8000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+        const r = await fetch(url, { ...options, signal: ctrl.signal });
+        const txt = await r.text();
+        let j = {};
+        try { j = txt ? JSON.parse(txt) : {}; } catch { j = { raw: txt }; }
+        if (!r.ok) throw new Error(j?.error || `Request failed (${r.status})`);
+        return j;
+    } finally {
+        clearTimeout(t);
+    }
 }
 
-async function fnPost(url, body) {
+async function apiGet(url) {
     const jwt = getJWT();
+    return fetchJson(url, { method: "GET", headers: { Authorization: `Bearer ${jwt}` } });
+}
 
-    const r = await fetch(url, {
+async function apiPost(url, body) {
+    const jwt = getJWT();
+    return fetchJson(url, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -106,54 +113,40 @@ async function fnPost(url, body) {
         },
         body: JSON.stringify(body || {}),
     });
-
-    const txt = await r.text();
-    let j = null;
-    try { j = JSON.parse(txt); } catch {}
-
-    if (!r.ok) {
-        console.error("❌ fnPost error:", url, "status:", r.status, "body:", txt);
-        throw new Error(j?.error || `Request failed (${r.status})`);
-    }
-    return j;
 }
 
 /* =========================
-   API calls
-========================= */
-const toggleLike = (postId) => fnPost(FN_TOGGLE_LIKE, { post_id: String(postId) });
-
-const addComment = (postId, text) => {
-    const content = String(text || "").trim();
-    if (!content) throw new Error("Empty comment");
-    return fnPost(FN_ADD_COMMENT, { post_id: String(postId), content });
-};
-
-const toggleFollow = (targetUserId) => {
-    const id = String(targetUserId || "").trim();
-    if (!id) throw new Error("Author id missing");
-    return fnPost(FN_TOGGLE_FOLLOW, { following_uid: id });
-};
-
-/* =========================
-   CURRENT USER (CACHE)
+   ME (CACHE)
 ========================= */
 let _meCache = null;
 
 async function getMyUserId() {
     if (_meCache) return _meCache;
 
-    // ✅ auth_user endpoint
-    const j = await fnGet(FN_AUTH_USER);
-    const myUserId = String(j?.user?.$id || j?.uid || j?.user_id || "").trim();
-    if (!myUserId) throw new Error("My user id missing");
+    // 1) localStorage hızlı
+    const ls = String(localStorage.getItem("sm_uid") || "").trim();
+    if (ls) {
+        _meCache = ls;
+        return ls;
+    }
 
-    _meCache = myUserId;
-    return myUserId;
+    // 2) /api/me varsa kullan
+    try {
+        const j = await apiGet(API_ME);
+        const id = String(j?.id || j?.user_id || j?.uid || j?.user?.id || "").trim();
+        if (id) {
+            _meCache = id;
+            try { localStorage.setItem("sm_uid", id); } catch {}
+            return id;
+        }
+    } catch {}
+
+    // 3) yoksa patlat
+    throw new Error("My user id missing");
 }
 
 /* =========================
-   FOLLOW CACHE (fallback)
+   FOLLOW CACHE
 ========================= */
 function followCacheKey(myId) {
     return `sm_following:${myId}`;
@@ -178,93 +171,44 @@ async function isFollowingUser(targetUserId) {
     const target = String(targetUserId || "").trim();
     if (!target) return false;
 
-    // ✅ hızlı cache
+    // fast cache
     try {
         const myId = await getMyUserId();
         const set = getFollowingSetFromCache(myId);
         if (set.has(target)) return true;
     } catch {}
 
-    // ✅ db check (supabase read)
-    if (sb) {
-        try {
-            const myId = await getMyUserId();
-            const { data, error } = await sb
-                .from("follows")
-                .select("id")
-                .eq("follower_uid", myId)
-                .eq("following_uid", target)
-                .limit(1);
-
-            if (!error) return !!(data && data.length);
-        } catch {}
+    // server check
+    try {
+        const r = await apiGet(API_IS_FOLLOWING(target));
+        return !!(r?.is_following ?? r?.following);
+    } catch {
+        return false;
     }
+}
 
-    return false;
+async function toggleFollow(targetUserId) {
+    const id = String(targetUserId || "").trim();
+    if (!id) throw new Error("Author id missing");
+    return apiPost(API_TOGGLE_FOLLOW, { following_uid: id });
 }
 
 /* =========================
-   SUPABASE READS
+   PROFILES (USERNAME/AVATAR)
 ========================= */
-async function getPostById(postId) {
-    if (!sb) throw new Error("Supabase CDN not loaded");
-
-    const { data, error } = await sb
-        .from("analyses")
-        .select("id, author_id, market, category, timeframe, content, pairs, image_path, created_at")
-        .eq("id", postId)
-        .maybeSingle();
-
-    if (error) throw error;
-    return data || null;
-}
-
-async function getLikeCount(postId) {
-    if (!sb) throw new Error("Supabase CDN not loaded");
-    const { count, error } = await sb
-        .from("post_likes")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", postId);
-
-    if (error) throw error;
-    return count || 0;
-}
-
-async function loadComments(postId, limit = 100) {
-    if (!sb) throw new Error("Supabase CDN not loaded");
-    const { data, error } = await sb
-        .from("post_comments")
-        .select("id, user_id, content, created_at")
-        .eq("post_id", postId)
-        .order("created_at", { ascending: true })
-        .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-}
-
-/* =========================
-   PROFILES (USERNAME FIX)
-   profiles.appwrite_user_id is the key
-========================= */
-const PROFILES_TABLE = "profiles";
-const PROFILE_ID_COL = "appwrite_user_id";
-
 async function loadProfiles(userIds) {
     const ids = Array.from(new Set((userIds || []).map((x) => String(x).trim()).filter(Boolean)));
-    if (!ids.length || !sb) return new Map();
+    if (!ids.length) return new Map();
 
+    // Backend list already include profiles? (optional)
+    // We'll fetch via /api/profiles?ids=...
     try {
-        const { data, error } = await sb
-            .from(PROFILES_TABLE)
-            .select(`${PROFILE_ID_COL}, username, avatar_url`)
-            .in(PROFILE_ID_COL, ids);
-
-        if (error) return new Map();
-
+        const j = await apiGet(API_PROFILES(ids.join(",")));
+        const arr = j?.list || j?.data || j?.profiles || j;
+        const list = Array.isArray(arr) ? arr : [];
         const m = new Map();
-        (data || []).forEach((p) => {
-            const k = String(p?.[PROFILE_ID_COL] || "").trim();
+        list.forEach((p) => {
+            const k = String(p?.id || p?.user_id || p?.uid || p?.appwrite_user_id || "").trim();
             if (k) m.set(k, p);
         });
         return m;
@@ -274,18 +218,58 @@ async function loadProfiles(userIds) {
 }
 
 /* =========================
+   API READS (sm-api)
+========================= */
+async function getPostById(postId) {
+    const j = await apiGet(API_POST(postId));
+    return j?.post || j?.data || j || null;
+}
+
+async function getLikeCount(postId) {
+    const j = await apiGet(API_LIKES_COUNT(postId));
+    const c = Number(j?.count ?? j?.likes ?? j?.likes_count ?? 0);
+    return Number.isFinite(c) ? c : 0;
+}
+
+async function loadComments(postId) {
+    const j = await apiGet(API_COMMENTS_LIST(postId));
+    const arr = j?.list || j?.data || j?.comments || j;
+    return Array.isArray(arr) ? arr : [];
+}
+
+async function addComment(postId, text) {
+    const content = String(text || "").trim();
+    if (!content) throw new Error("Empty comment");
+    const j = await apiPost(API_COMMENT_ADD(postId), { content });
+    return j;
+}
+
+async function toggleLike(postId) {
+    return apiPost(API_LIKE_TOGGLE(postId), { ok: true });
+}
+
+/* =========================
    RENDER
 ========================= */
-function renderPostView(row, likeCount, following, hideFollowBtn) {
-    const img = esc(resolveImageUrl(row.image_path));
+function resolveImageUrlFromPost(row) {
+    // backend ideally returns full image_url
+    const url = safeUrl(row?.image_url || row?.image || row?.image_path || "");
+    return url || "";
+}
+
+function renderPostView(row, likeCount, following, hideFollowBtn, authorProfile) {
+    const img = esc(resolveImageUrlFromPost(row));
     const pairsText = esc(formatPairs(row.pairs));
     const created = esc(formatTime(row.created_at));
 
     const market = esc(row.market || "");
     const category = esc(row.category || "");
     const timeframe = esc(row.timeframe || "");
-    const authorId = esc(row.author_id || "");
-    const content = esc(String(row.content || "").trim());
+
+    const authorId = String(row.author_id || row.user_id || "").trim();
+
+    const authorName = authorProfile?.username || authorProfile?.name || authorProfile?.display_name || authorId || "-";
+    const content = esc(String(row.content || row.body || "").trim());
 
     return `
     <div class="pvMedia">
@@ -303,7 +287,7 @@ function renderPostView(row, likeCount, following, hideFollowBtn) {
     }${timeframe}</div>
 
       <div class="pvSub">
-        <div class="pvAuthor">Author: <span class="pvMono">${authorId || "-"}</span></div>
+        <div class="pvAuthor">Author: <span class="pvMono">${esc(authorName)}</span></div>
         <div class="pvTime">${created}</div>
       </div>
 
@@ -341,29 +325,29 @@ function renderComments(list, profilesMap) {
 
     commentsList.innerHTML = list
         .map((c) => {
-            const uid = String(c.user_id || "").trim();
+            const uid = String(c.user_id || c.author_id || "").trim();
             const p = profilesMap?.get(uid);
-            const name = esc(p?.username || "user");
-            const avatar = esc(p?.avatar_url || "");
+            const name = esc(p?.username || p?.name || "user");
+            const avatar = esc(safeUrl(p?.avatar_url || p?.avatar || ""));
 
             return `
-      <div class="cItem" data-comment-id="${esc(c.id)}">
-        <div class="cAvatar">
-          ${
+        <div class="cItem" data-comment-id="${esc(c.id)}">
+          <div class="cAvatar">
+            ${
                 avatar
                     ? `<img src="${avatar}" alt="" loading="lazy" decoding="async">`
                     : `<div class="cAvatarFallback">${esc(name.slice(0, 1).toUpperCase())}</div>`
             }
-        </div>
-
-        <div class="cBody">
-          <div class="cRow">
-            <div class="cName">${name}</div>
-            <div class="cTime">${esc(formatTime(c.created_at))}</div>
           </div>
-          <div class="cText">${esc(c.content)}</div>
-        </div>
-      </div>`;
+
+          <div class="cBody">
+            <div class="cRow">
+              <div class="cName">${name}</div>
+              <div class="cTime">${esc(formatTime(c.created_at))}</div>
+            </div>
+            <div class="cText">${esc(c.content)}</div>
+          </div>
+        </div>`;
         })
         .join("");
 }
@@ -378,8 +362,8 @@ function addCommentToUI(comment, profilesMap) {
 
     const uid = String(comment.user_id || "").trim();
     const p = profilesMap?.get(uid);
-    const name = esc(p?.username || "user");
-    const avatar = esc(p?.avatar_url || "");
+    const name = esc(p?.username || p?.name || "user");
+    const avatar = esc(safeUrl(p?.avatar_url || p?.avatar || ""));
 
     const html = `
     <div class="cItem" data-comment-id="${esc(cid)}">
@@ -428,48 +412,53 @@ async function loadAll() {
         setMsg("❌ Missing id");
         return;
     }
-    if (!sb) {
-        setMsg("❌ Supabase CDN not loaded");
-        return;
-    }
     if (!postBox) {
         setMsg("❌ postBox not found in view.html");
         return;
     }
 
-    setMsg(""); // ✅ loading yazma
+    setMsg("");
 
     try {
-        // ✅ paralel çek: post + likes + comments
-        const [row, likeCount, list] = await Promise.all([
+        const [post, likeCount, list] = await Promise.all([
             getPostById(CURRENT_POST_ID),
             getLikeCount(CURRENT_POST_ID).catch(() => 0),
             loadComments(CURRENT_POST_ID).catch(() => []),
         ]);
 
-        if (!row) {
+        if (!post) {
             setMsg("❌ Post not found");
             return;
         }
 
-        CURRENT_AUTHOR_ID = String(row.author_id || "").trim();
+        CURRENT_AUTHOR_ID = String(post.author_id || post.user_id || "").trim();
 
-        // ✅ benim uid (follow gizlemek için)
+        // my id for follow hide
         let myId = "";
         try { myId = await getMyUserId(); } catch {}
 
         const hideFollowBtn = !!(myId && CURRENT_AUTHOR_ID && myId === CURRENT_AUTHOR_ID);
 
-        // ✅ following state (kendi postum değilse)
+        // following state
         let following = false;
-        try {
-            if (!hideFollowBtn && CURRENT_AUTHOR_ID) following = await isFollowingUser(CURRENT_AUTHOR_ID);
-        } catch {}
+        if (!hideFollowBtn && CURRENT_AUTHOR_ID) {
+            try { following = await isFollowingUser(CURRENT_AUTHOR_ID); } catch {}
+        }
 
-        // ✅ render post
-        postBox.innerHTML = renderPostView(row, likeCount, following, hideFollowBtn);
+        // profiles for author + commenters
+        const idsNeeded = [
+            CURRENT_AUTHOR_ID,
+            ...list.map((x) => x.user_id || x.author_id).filter(Boolean),
+        ].map(String);
 
-        // ✅ expand
+        _profilesForComments = await loadProfiles(idsNeeded);
+
+        const authorProfile = _profilesForComments.get(CURRENT_AUTHOR_ID);
+
+        // render post
+        postBox.innerHTML = renderPostView(post, likeCount, following, hideFollowBtn, authorProfile);
+
+        // expand
         const pvText = document.getElementById("pvText");
         const pvExpandBtn = document.getElementById("pvExpandBtn");
         pvExpandBtn?.addEventListener("click", () => {
@@ -477,12 +466,12 @@ async function loadAll() {
             pvExpandBtn.textContent = pvText?.classList.contains("isClamp") ? "Expand" : "Collapse";
         });
 
-        // ✅ like optimistic
+        // like optimistic
         const likeBtn = document.getElementById("pvLikeBtn");
         likeBtn?.addEventListener("click", async () => {
             const span = document.getElementById("pvLikeCount");
             const old = Number(span?.textContent || "0") || 0;
-            if (span) span.textContent = String(old + 1); // ✅ anında his
+            if (span) span.textContent = String(old + 1);
 
             likeBtn.disabled = true;
             try {
@@ -490,7 +479,6 @@ async function loadAll() {
                 const c = await getLikeCount(CURRENT_POST_ID).catch(() => old + 1);
                 if (span) span.textContent = String(c);
             } catch (err) {
-                // rollback
                 if (span) span.textContent = String(old);
                 alert("❌ " + (err?.message || err));
             } finally {
@@ -498,14 +486,14 @@ async function loadAll() {
             }
         });
 
-        // ✅ follow
+        // follow
         const followBtn = document.getElementById("pvFollowBtn");
         followBtn?.addEventListener("click", async () => {
             if (!CURRENT_AUTHOR_ID) return;
             followBtn.disabled = true;
             try {
                 const r = await toggleFollow(CURRENT_AUTHOR_ID);
-                const isF = !!r?.following;
+                const isF = !!(r?.following ?? r?.is_following);
                 followBtn.textContent = isF ? "Following" : "Follow";
                 followBtn.classList.toggle("isFollowing", isF);
 
@@ -524,9 +512,8 @@ async function loadAll() {
             }
         });
 
-        // ✅ comments render + profiles
+        // comments render
         if (cCount) cCount.textContent = `${list.length}`;
-        _profilesForComments = await loadProfiles(list.map((x) => x.user_id));
         renderComments(list, _profilesForComments);
 
     } catch (err) {
@@ -552,13 +539,10 @@ commentForm?.addEventListener("submit", async (e) => {
         const r = await addComment(CURRENT_POST_ID, text);
         if (commentInput) commentInput.value = "";
 
-        // ✅ response comment
-        const c = r?.comment || r?.data || null;
-
-        // profili yoksa bile UID yerine "user" yazar (ama loadProfiles fix ile artık username gelir)
+        const c = r?.comment || r?.data || r?.item || null;
         if (c) {
-            // profil map’e ekle (lazy): comment user varsa ve map’te yoksa çek
             const uid = String(c.user_id || "").trim();
+
             if (uid && !_profilesForComments.has(uid)) {
                 try {
                     const m = await loadProfiles([uid]);
@@ -571,7 +555,7 @@ commentForm?.addEventListener("submit", async (e) => {
                 {
                     id: c.id,
                     comment_id: c.id,
-                    post_id: c.post_id,
+                    post_id: c.post_id || CURRENT_POST_ID,
                     user_id: c.user_id,
                     content: c.content,
                     created_at: c.created_at || new Date().toISOString(),
@@ -587,7 +571,7 @@ commentForm?.addEventListener("submit", async (e) => {
 });
 
 /* =========================
-   REALTIME LISTENERS (optional)
+   REALTIME EVENTS (optional)
 ========================= */
 window.addEventListener("sm:comment_new", async (e) => {
     const p = e.detail || {};
@@ -625,27 +609,6 @@ window.addEventListener("sm:like_update", (e) => {
 
     const span = document.getElementById("pvLikeCount");
     if (span) span.textContent = String(likes);
-});
-
-window.addEventListener("sm:follow_update", async (e) => {
-    const p = e.detail || {};
-    const target = String(p.target_user_id || "").trim();
-    if (!CURRENT_AUTHOR_ID || target !== CURRENT_AUTHOR_ID) return;
-
-    const btn = document.getElementById("pvFollowBtn");
-    if (!btn) return;
-
-    try {
-        const myId = await getMyUserId();
-        const actor = String(p.actor_user_id || "").trim();
-        if (actor && myId && actor !== myId) return;
-    } catch {
-        return;
-    }
-
-    const following = !!p.following;
-    btn.textContent = following ? "Following" : "Follow";
-    btn.classList.toggle("isFollowing", following);
 });
 
 /* =========================

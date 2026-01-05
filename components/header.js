@@ -1,66 +1,69 @@
 // /assets1/header.js
-// HEADER LOADER + BEHAVIOR (SAFE)
+// HEADER LOADER + BEHAVIOR (SAFE + NO DOUBLE BIND)
 
-document.addEventListener("DOMContentLoaded", async () => {
-    const mount = document.getElementById("headerMount");
-    if (!mount) {
-        console.warn("headerMount yok → header yüklenmedi");
-        return;
-    }
+(() => {
+    if (window.__SM_HEADER_INIT__) return;
+    window.__SM_HEADER_INIT__ = true;
 
-    try {
-        /* ===============================
-           1️⃣ HEADER HTML YÜKLE
-        =============================== */
-        const res = await fetch("/components/header.html", { cache: "no-store" });
-        if (!res.ok) throw new Error("header.html bulunamadı");
+    document.addEventListener("DOMContentLoaded", async () => {
+        const mount = document.getElementById("headerMount");
+        if (!mount) return;
 
-        mount.innerHTML = await res.text();
+        try {
+            const res = await fetch("/components/header.html", { cache: "no-store" });
+            if (!res.ok) throw new Error("header.html not found");
 
-        /* ===============================
-           2️⃣ AKTİF MENÜ
-        =============================== */
-        const page = location.pathname.split("/")[1]; // feed, news, post...
-        mount.querySelectorAll("[data-page]").forEach(a => {
-            if (a.dataset.page === page) a.classList.add("active");
-        });
+            mount.innerHTML = await res.text();
 
-        /* ===============================
-           3️⃣ HAMBURGER / MOBILE MENU
-        =============================== */
-        const btn = document.getElementById("hamburgerBtn");
-        const menu = document.getElementById("mobileMenu");
-        const backdrop = document.getElementById("menuBackdrop");
+            // ✅ active menu (folder-based)
+            const seg = (location.pathname.split("/")[1] || "").toLowerCase();
 
-        if (!btn || !menu || !backdrop) return;
+            // optional mapping (if your data-page names differ)
+            const map = {
+                "u": "profile",
+                "view": "feed",         // post detail -> feed tab active (optional)
+                "textnews": "news",     // optional
+            };
+            const page = map[seg] || seg;
 
-        const open = () => {
-            menu.classList.add("open");
-            backdrop.classList.add("open");
-            btn.setAttribute("aria-expanded", "true");
-            menu.setAttribute("aria-hidden", "false");
-        };
+            mount.querySelectorAll("[data-page]").forEach((a) => {
+                a.classList.toggle("active", (a.dataset.page || "").toLowerCase() === page);
+            });
 
-        const close = () => {
-            menu.classList.remove("open");
-            backdrop.classList.remove("open");
-            btn.setAttribute("aria-expanded", "false");
-            menu.setAttribute("aria-hidden", "true");
-        };
+            // hamburger
+            const btn = document.getElementById("hamburgerBtn");
+            const menu = document.getElementById("mobileMenu");
+            const backdrop = document.getElementById("menuBackdrop");
 
-        btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            menu.classList.contains("open") ? close() : open();
-        });
+            if (!btn || !menu || !backdrop) return;
 
-        backdrop.addEventListener("click", close);
-        document.addEventListener("keydown", e => {
-            if (e.key === "Escape") close();
-        });
+            const open = () => {
+                menu.classList.add("open");
+                backdrop.classList.add("open");
+                btn.setAttribute("aria-expanded", "true");
+                menu.setAttribute("aria-hidden", "false");
+            };
 
-        console.log(" Header yüklendi:", page);
+            const close = () => {
+                menu.classList.remove("open");
+                backdrop.classList.remove("open");
+                btn.setAttribute("aria-expanded", "false");
+                menu.setAttribute("aria-hidden", "true");
+            };
 
-    } catch (err) {
-        console.error(" HEADER LOAD ERROR:", err);
-    }
-});
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                menu.classList.contains("open") ? close() : open();
+            });
+
+            backdrop.addEventListener("click", close);
+            document.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") close();
+            });
+
+            console.log("✅ Header loaded:", page);
+        } catch (err) {
+            console.error("❌ HEADER LOAD ERROR:", err);
+        }
+    });
+})();

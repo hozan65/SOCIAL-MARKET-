@@ -1,10 +1,12 @@
-// /news/news.js
-import { supabase } from "../netlify/functions/supabase.js";
+// /news/news.js (UPDATED - sm-api fetch, NO supabase import)
+// Uses API: GET /api/news?limit=80&cat=all (cat optional)
+// Expected item fields:
+// id, category, title, summary, url, image_url, source, published_at, created_at
 
 /* =========================
-   NEWS.JS (SUPABASE TABLE: news)
-   - Uses: id, category, title, summary, url, image_url, source, published_at, created_at
+   NEWS.JS
    - Filter tabs
+   - Chunked render
    - Fast modal open
 ========================= */
 
@@ -145,29 +147,47 @@ function openModal(item) {
     const titleEl = document.getElementById("modal-title");
     const textEl = document.getElementById("modal-text");
     const metaEl = document.getElementById("modal-meta");
+    const goBtn = document.getElementById("modal-go"); // ✅ optional button
 
     const img = item.image_url || DEFAULT_IMG;
-    imgEl.decoding = "async";
-    imgEl.loading = "eager";
-    imgEl.src = img;
+    if (imgEl) {
+        imgEl.decoding = "async";
+        imgEl.loading = "eager";
+        imgEl.src = img;
+    }
 
-    titleEl.textContent = item.title ?? "";
-    textEl.textContent = item.summary ?? "";
+    if (titleEl) titleEl.textContent = item.title ?? "";
+    if (textEl) textEl.textContent = item.summary ?? "";
 
     const when = item.published_at || item.created_at;
     const source = item.source ? ` • ${item.source}` : "";
-    metaEl.textContent = `${item.category ?? ""} • ${fmtDate(when)}${source}`;
+    if (metaEl) metaEl.textContent = `${item.category ?? ""} • ${fmtDate(when)}${source}`;
 
-    // optional: if url exists, open on click on image/title (you can add later)
-    modal.classList.add("open");
-    modal.setAttribute("aria-hidden", "false");
+    // ✅ if url exists, show button
+    if (goBtn) {
+        const u = (item.url || "").trim();
+        if (u) {
+            goBtn.hidden = false;
+            goBtn.onclick = () => window.open(u, "_blank", "noopener,noreferrer");
+        } else {
+            goBtn.hidden = true;
+            goBtn.onclick = null;
+        }
+    }
+
+    if (modal) {
+        modal.classList.add("open");
+        modal.setAttribute("aria-hidden", "false");
+    }
     document.body.style.overflow = "hidden";
 }
 
 function closeModal() {
     const modal = document.getElementById("news-modal");
-    modal.classList.remove("open");
-    modal.setAttribute("aria-hidden", "true");
+    if (modal) {
+        modal.classList.remove("open");
+        modal.setAttribute("aria-hidden", "true");
+    }
     document.body.style.overflow = "";
 }
 
@@ -204,29 +224,39 @@ function bindGridEvents() {
     });
 }
 
+// ✅ API fetch (sm-api behind netlify OR direct)
+async function fetchNews({ limit = 80 } = {}) {
+    // if you have a gateway route like /api/news (nginx -> sm-api), use it:
+    const url = `/api/news?limit=${encodeURIComponent(limit)}`;
+
+    const r = await fetch(url, { cache: "no-store" });
+    const out = await r.json().catch(() => ({}));
+
+    if (!r.ok) throw new Error(out?.error || `news fetch failed (${r.status})`);
+
+    // accepted shapes:
+    // { list: [...] } OR [...] OR { data:[...] }
+    const list = out?.list || out?.data || out;
+    return Array.isArray(list) ? list : [];
+}
+
 async function loadNews() {
     const grid = document.getElementById("news-grid");
     if (!grid) return;
 
     grid.innerHTML = `<div class="news-loading">News Loading...</div>`;
 
-    // IMPORTANT: your table columns include summary (not body)
-    const { data, error } = await supabase
-        .from("news")
-        .select("id,category,title,summary,url,image_url,source,published_at,created_at")
-        .order("created_at", { ascending: false })
-        .limit(80);
+    try {
+        const data = await fetchNews({ limit: 80 });
 
-    if (error) {
-        console.error("News load error:", error);
+        ALL_NEWS = data;
+        ITEM_BY_ID = new Map(ALL_NEWS.map((x) => [String(x.id), x]));
+
+        applyFilter();
+    } catch (e) {
+        console.error("News load error:", e);
         grid.innerHTML = `<div class="news-empty">Haberler yüklenemedi.</div>`;
-        return;
     }
-
-    ALL_NEWS = Array.isArray(data) ? data : [];
-    ITEM_BY_ID = new Map(ALL_NEWS.map((x) => [String(x.id), x]));
-
-    applyFilter();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

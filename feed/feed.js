@@ -1,25 +1,24 @@
 /* =========================
   FEED.JS (NO MODULE / NO IMPORT)
-  - Supabase CDN (READ ONLY)
-  - Like / Follow: Netlify Functions (Appwrite JWT)
-  - News slider (Supabase news table)
-  - Post card: TradingView-like
-  - Whole card click -> /view/view.html?id=POST_ID (buttons 제외)
-  - Follow state hydrate on refresh:
-     - cache first
-     - definitive check via Netlify function is_following (JWT)
-  ✅ LCP FIX:
-     - first news image: eager + fetchpriority high + width/height
-     - first post image: eager + fetchpriority high
+  - ✅ NO SUPABASE
+  - Feed: sm-api (/api/analyses)
+  - News: sm-api (/api/news)
+  - Like count: sm-api (/api/analyses/:id/likes_count)
+  - Like / Follow: şimdilik Netlify Functions (JWT) (sonra sm-api’ye taşırız)
+  - Realtime (Socket.IO) aynen
 ========================= */
 
-console.log("✅ feed.js running");
+console.log("✅ feed.js running (NO SUPABASE)");
+
+// =========================
+// API BASE
+// =========================
+const API_BASE = "https://api.chriontoken.com"; // prod domain
 
 // =========================
 // REALTIME (Socket.IO)
 // =========================
 function getSocket() {
-    // feed.html içine eklediğin: window.rt.socket
     return window.rt?.socket || null;
 }
 
@@ -40,7 +39,6 @@ function rtOn(eventName, handler) {
     } catch {}
 }
 
-// Like update geldiğinde UI güncelle
 rtOn("post:like:update", ({ postId, likeCount }) => {
     try {
         const pid = String(postId || "").trim();
@@ -57,17 +55,7 @@ rtOn("post:like:update", ({ postId, likeCount }) => {
 });
 
 // =========================
-// SUPABASE (READ ONLY)
-// =========================
-const SUPABASE_URL = "https://yzrhqduuqvllatliulqv.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_dN5E6cw7uaKj7Cmmpo7RJg_W4FWxjs_";
-
-const sb = window.supabase?.createClient
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
-
-// =========================
-// NETLIFY FUNCTIONS
+// NETLIFY FUNCTIONS (şimdilik)
 // =========================
 const FN_TOGGLE_LIKE = "/.netlify/functions/toggle_like";
 const FN_TOGGLE_FOLLOW = "/.netlify/functions/toggle_follow";
@@ -117,7 +105,11 @@ function resolveImageUrl(image_path) {
     const p = String(image_path ?? "").trim();
     if (!p) return "";
     if (p.startsWith("http://") || p.startsWith("https://")) return p;
-    return `${SUPABASE_URL}/storage/v1/object/public/analysis-images/${p}`;
+
+    // ✅ Yeni plan: image_path artık ya tam URL olur ya da "/uploads/..." gibi bir public path olur
+    // Eğer sadece "dosya.jpg" gelirse, varsayılan uploads klasörüne bağla:
+    if (p.startsWith("/")) return p;
+    return `/uploads/analysis-images/${p}`;
 }
 
 function openPost(postId) {
@@ -127,7 +119,7 @@ function openPost(postId) {
 }
 
 // =========================
-// AUTH (Appwrite JWT from /assets/jwt.js)
+// AUTH (JWT localStorage)
 // =========================
 function getJWT() {
     const jwt = window.SM_JWT || localStorage.getItem("sm_jwt");
@@ -156,7 +148,6 @@ async function toggleLike(postId) {
     return fnPost(FN_TOGGLE_LIKE, { post_id: String(postId) });
 }
 
-/** ✅ FIX: field name must be following_uid (not following_id) */
 async function toggleFollow(targetUserId) {
     const id = String(targetUserId || "").trim();
     if (!id) throw new Error("Author id missing");
@@ -172,7 +163,9 @@ async function getMyUserId() {
     if (_meCache) return _meCache;
 
     const jwt = getJWT();
-    const r = await fetch(FN_AUTH_USER, { headers: { Authorization: `Bearer ${jwt}` } });
+    const r = await fetch(FN_AUTH_USER, {
+        headers: { Authorization: `Bearer ${jwt}` },
+    });
     const j = await r.json().catch(() => null);
     if (!r.ok) throw new Error(j?.error || "Auth user failed");
 
@@ -201,28 +194,46 @@ function getFollowingSetFromCache(myId) {
 }
 function saveFollowingSetToCache(myId, set) {
     try {
-        localStorage.setItem(followCacheKey(myId), JSON.stringify(Array.from(set)));
+        localStorage.setItem(
+            followCacheKey(myId),
+            JSON.stringify(Array.from(set))
+        );
     } catch {}
 }
 
 // =========================
-// READ HELPERS (Supabase SELECT)
+// READ HELPERS (sm-api)
 // =========================
-async function getLikeCount(postId) {
-    if (!sb) throw new Error("Supabase CDN not loaded");
-    const { count, error } = await sb
-        .from("post_likes")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", postId);
+async function apiGet(path) {
+    const r = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`);
+    return j;
+}
 
-    if (error) throw error;
-    return count || 0;
+async function getLikeCount(analysisId) {
+    const id = String(analysisId || "").trim();
+    if (!id) return 0;
+    const out = await apiGet(`/api/analyses/${encodeURIComponent(id)}/likes_count`);
+    return Number(out?.likes_count || 0);
+}
+
+async function fetchAnalyses(limit, offset) {
+    const out = await apiGet(
+        `/api/analyses?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
+    );
+    return Array.isArray(out?.list) ? out.list : [];
+}
+
+async function fetchNews(limit = 6) {
+    const out = await apiGet(`/api/news?limit=${encodeURIComponent(limit)}`);
+    return Array.isArray(out?.list) ? out.list : [];
 }
 
 /**
  * Follow check (hydrate)
  * ✅ cache first
- * ✅ definitive check via Netlify is_following (JWT) because RLS blocks anon reads
+ * ✅ definitive check via Netlify is_following (JWT)
  */
 async function isFollowingUser(targetUserId) {
     const target = String(targetUserId || "").trim();
@@ -267,12 +278,12 @@ let postsBusy = false;
 let postsHasMore = true;
 
 // =========================
-// RENDER POST (TradingView-like) + LCP FIX
+// RENDER POST (TradingView-like)
 // =========================
 function renderPost(row, index = 0) {
-    const isFirst = postsPage === 0 && index === 0; // ✅ first card (potential LCP)
+    const isFirst = postsPage === 0 && index === 0;
 
-    const postIdRaw = String(row.id || "").trim();          // ✅ FIX: vardı, kaybolmuştu
+    const postIdRaw = String(row.id || "").trim();
     const authorIdRaw = String(row.author_id || "").trim();
 
     const postId = esc(postIdRaw);
@@ -408,15 +419,12 @@ function ensurePostsMoreUI() {
 
 function setPostsMoreLoading() {
     const wrap = document.getElementById("postsMoreWrap");
-    if (wrap) wrap.innerHTML = `<button class="postsMoreBtn" type="button" disabled>Loading…</button>`;
+    if (wrap)
+        wrap.innerHTML = `<button class="postsMoreBtn" type="button" disabled>Loading…</button>`;
 }
 
 async function loadFeed(reset = false) {
     if (!grid) return;
-    if (!sb) {
-        setMsg("❌ Supabase CDN not loaded");
-        return;
-    }
 
     if (reset) {
         postsPage = 0;
@@ -430,7 +438,7 @@ async function loadFeed(reset = false) {
 }
 
 async function loadFeedMore() {
-    if (!grid || !sb || postsBusy || !postsHasMore) return;
+    if (!grid || postsBusy || !postsHasMore) return;
     postsBusy = true;
     setMsg("");
 
@@ -439,17 +447,7 @@ async function loadFeedMore() {
         setPostsMoreLoading();
 
         const from = postsPage * POSTS_STEP;
-        const to = from + POSTS_STEP - 1;
-
-        const { data, error } = await sb
-            .from("analyses")
-            .select("id, author_id, market, category, timeframe, content, pairs, image_path, created_at")
-            .order("created_at", { ascending: false })
-            .range(from, to);
-
-        if (error) throw error;
-
-        const rows = data || [];
+        const rows = await fetchAnalyses(POSTS_STEP, from);
 
         if (postsPage === 0 && rows.length === 0) {
             setMsg("No analyses yet.");
@@ -458,7 +456,6 @@ async function loadFeedMore() {
             return;
         }
 
-        // ✅ FIX: index geç (renderPost(row, index))
         grid.insertAdjacentHTML(
             "beforeend",
             rows.map((r, i) => renderPost(r, i)).join("")
@@ -466,10 +463,12 @@ async function loadFeedMore() {
 
         await hydrateNewPosts(rows);
 
-        // ✅ card click => view (butonlar hariç)
+        // card click => view (butonlar hariç)
         for (const r of rows) {
             const pid = String(r.id || "").trim();
-            const card = grid.querySelector(`.tvCard[data-post-id="${CSS.escape(pid)}"]`);
+            const card = grid.querySelector(
+                `.tvCard[data-post-id="${CSS.escape(pid)}"]`
+            );
             if (!card || card.__bound) continue;
             card.__bound = true;
 
@@ -505,21 +504,8 @@ async function loadFeedMore() {
 }
 
 // =========================
-// NEWS (Supabase -> Slider) + LCP FIX
+// NEWS (sm-api -> Slider)
 // =========================
-async function fetchNews(limit = 6) {
-    if (!sb) throw new Error("Supabase CDN not loaded");
-
-    const { data, error } = await sb
-        .from("news")
-        .select("id, title, image_url, url, source, created_at")
-        .order("created_at", { ascending: false })
-        .limit(limit);
-
-    if (error) throw error;
-    return data || [];
-}
-
 function renderNewsSlide(n, active = false, isFirst = false) {
     const title = esc(n.title || "");
     const img = esc(n.image_url || "");
@@ -530,7 +516,6 @@ function renderNewsSlide(n, active = false, isFirst = false) {
     const loading = isFirst ? "eager" : "lazy";
     const fetchp = isFirst ? ' fetchpriority="high"' : "";
 
-    // CLS reserve (approx 16:9)
     const wh = ' width="1200" height="675"';
 
     return `
@@ -609,7 +594,7 @@ document.addEventListener("click", async (e) => {
         const prevLiked = likeBtn.classList.contains("isLiked");
         const nextLiked = !prevLiked;
 
-        // ✅ OPTIMISTIC
+        // OPTIMISTIC
         likeBtn.classList.toggle("isLiked", nextLiked);
         if (countSpan) {
             const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
@@ -628,9 +613,14 @@ document.addEventListener("click", async (e) => {
             if (countSpan) countSpan.textContent = String(likesCount);
 
             let userId = "";
-            try { userId = await getMyUserId(); } catch {}
-            rtEmit("like:toggle", { postId: String(postId), userId, likeCount: likesCount });
-
+            try {
+                userId = await getMyUserId();
+            } catch {}
+            rtEmit("like:toggle", {
+                postId: String(postId),
+                userId,
+                likeCount: likesCount,
+            });
         } catch (err) {
             console.error("❌ toggleLike failed:", err);
             likeBtn.classList.toggle("isLiked", prevLiked);
@@ -643,7 +633,7 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
-    // ✅ OPTIMISTIC FOLLOW
+    // OPTIMISTIC FOLLOW
     const followBtn = e.target.closest(".followBtn");
     if (followBtn && !followBtn.disabled) {
         const targetUserId = String(followBtn.dataset.userId || "").trim();

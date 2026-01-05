@@ -1,50 +1,65 @@
-(() => {
-    const p = new URLSearchParams(location.search);
-    const slug = p.get("slug");
+// /textnews/textnews-grid.js (NO SUPABASE - sm-api)
+// Renders small grid into #textNewsGrid
 
-    const sb = window.sb; // ✅ tek Supabase client
-    if (!sb) {
-        console.error("❌ window.sb yok. /assets/sb.js yüklenmemiş.");
-        return;
-    }
+(() => {
+    const grid = document.getElementById("textNewsGrid");
+    if (!grid) return;
 
     function fmt(t) {
-        return new Date(t).toLocaleString("tr-TR", {
-            dateStyle: "short",
-            timeStyle: "short",
-        });
+        try {
+            return new Date(t).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+        } catch {
+            return "";
+        }
     }
 
-    function setSafe(id, text) {
-        const el = document.getElementById(id);
-        if (el) el.textContent = text ?? "";
+    function esc(str) {
+        return String(str ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    async function fetchGrid(limit = 6) {
+        const r = await fetch(`/api/textnews?limit=${encodeURIComponent(limit)}`, { cache: "no-store" });
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out?.error || `textnews grid failed (${r.status})`);
+
+        const arr = out?.list || out?.data || out;
+        return Array.isArray(arr) ? arr : [];
     }
 
     async function load() {
+        grid.innerHTML = `<div class="textNewsItem"><div class="textNewsTitle">Loading...</div></div>`;
+
         try {
-            if (!slug) {
-                setSafe("tnTitle", "News not found");
-                setSafe("tnContent", "Missing slug.");
+            const data = await fetchGrid(6);
+
+            if (!data.length) {
+                grid.innerHTML = `<div class="textNewsItem"><div class="textNewsTitle">News unavailable</div></div>`;
                 return;
             }
 
-            const { data, error } = await sb
-                .from("news_feed")
-                .select("source,title,content,slug,published_at")
-                .eq("slug", slug)
-                .single();
-
-            if (error) throw error;
-            if (!data) throw new Error("Not found");
-
-            setSafe("tnTitle", data.title || "");
-            setSafe("tnSource", data.source || "");
-            setSafe("tnDate", data.published_at ? fmt(data.published_at) : "");
-            setSafe("tnContent", data.content || "");
+            grid.innerHTML = data
+                .map(
+                    (n) => `
+          <div class="textNewsItem">
+            <a class="textNewsLink" href="/textnews/textnews-detail.html?slug=${encodeURIComponent(n.slug)}">
+              <div class="textNewsTop">
+                <span class="textNewsSource">${esc(n.source)}</span>
+                <span>${esc(fmt(n.published_at))}</span>
+              </div>
+              <div class="textNewsTitle">${esc(n.title)}</div>
+            </a>
+          </div>
+        `
+                )
+                .join("");
         } catch (e) {
-            console.error("textnews detail load error:", e);
-            setSafe("tnTitle", "News unavailable");
-            setSafe("tnContent", "Could not load this news item.");
+            console.error("textNewsGrid load error:", e);
+            grid.innerHTML = `<div class="textNewsItem"><div class="textNewsTitle">News unavailable</div></div>`;
         }
     }
 

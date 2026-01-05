@@ -1,10 +1,175 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="tr">
 <head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Discover • Social Market</title>
+  <link rel="stylesheet" href="./discover.css" />
 </head>
 <body>
-$END$
+
+<!-- ✅ Animated triangle particles layer -->
+<div id="bgParticles"></div>
+
+<main class="container">
+
+  <!-- 1) HERO (Top big image + active users + get more) -->
+  <section class="hero">
+
+    <!-- ✅ HERO IMAGE: buraya src koyacaksın -->
+    <!-- Örn: ./img/hero.jpg -->
+    <img class="heroImg" src="hero.png" alt="Social Market Hero" />
+
+    <div class="heroOverlay"></div>
+
+    <div class="heroContent">
+      <h1>SOCIAL MARKET</h1>
+      <p class="heroSub">Discover • Watch • Earn • Boost</p>
+
+      <div class="activeBox">
+        <span id="activeUsers">0</span>+ ACTIVE USERS
+      </div>
+
+      <button class="primaryBtn" type="button">GET MORE</button>
+    </div>
+  </section>
+
+
+  <!-- 2) Split A (Left small image / Right text) -->
+  <section class="split">
+    <div class="splitImg">
+      <!-- ✅ LEFT IMAGE -->
+      <!-- Örn: ./img/feature-1.jpg -->
+      <img src="./img/feature-1.jpg" alt="Feature 1" />
+    </div>
+
+    <div class="splitText">
+      <h2>Reach More Potential Users</h2>
+      <p>
+        Discover content, watch videos, earn coins and boost your visibility inside one unified Social Market experience.
+      </p>
+
+      <ul>
+        <li>Watch & Earn system</li>
+        <li>Clean discovery flow</li>
+        <li>Boost with coins</li>
+      </ul>
+
+      <a class="textLink" href="#">Learn more →</a>
+    </div>
+  </section>
+
+
+  <!-- 3) Split B (Right small image / Left text) -->
+  <section class="split reverse">
+    <div class="splitImg">
+      <!-- ✅ RIGHT IMAGE -->
+      <!-- Örn: ./img/feature-2.jpg -->
+      <img src="./img/feature-2.jpg" alt="Feature 2" />
+    </div>
+
+    <div class="splitText">
+      <h2>Follow Signals & Traders</h2>
+      <p>
+        Follow top traders, discover trending signals and interact with community-driven trading content.
+      </p>
+
+      <ul>
+        <li>Live trading signals</li>
+        <li>Community comments</li>
+        <li>Trending sections</li>
+      </ul>
+
+      <a class="textLink" href="#">See how it works →</a>
+    </div>
+  </section>
+
+
+  <!-- 4) Center big image -->
+  <section class="centerImage">
+    <!-- ✅ CENTER IMAGE -->
+    <!-- Örn: ./img/center.jpg -->
+    <img src="./img/center.jpg" alt="Center Showcase" />
+  </section>
+
+
+  <!-- 5) Headline + sentence blocks -->
+  <section class="textBlocks">
+    <article>
+      <h3>One Unified Experience</h3>
+      <p>One clean platform to upload, discover, watch and boost your profile with coins.</p>
+    </article>
+
+    <article>
+      <h3>Grow With Real Engagement</h3>
+      <p>Real users, real watch time, real interaction — built for creators and traders.</p>
+    </article>
+
+    <article>
+      <h3>Marketplace Powered Growth</h3>
+      <p>Spend earned coins on visibility tools like views, likes and subscribers.</p>
+    </article>
+
+    <article>
+      <h3>Built For Speed</h3>
+      <p>Lightweight UI, fast load times and mobile-first experience.</p>
+    </article>
+  </section>
+
+
+  <!-- 6) Footer links (blogger like lots of links) -->
+  <footer class="footer">
+    <div class="footerGrid">
+
+      <div>
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Careers</a>
+        <a href="#">Press</a>
+        <a href="#">Partners</a>
+      </div>
+
+      <div>
+        <h4>Product</h4>
+        <a href="#">Discover</a>
+        <a href="#">Feed</a>
+        <a href="#">Tools</a>
+        <a href="#">Marketplace</a>
+      </div>
+
+      <div>
+        <h4>Resources</h4>
+        <a href="#">Blog</a>
+        <a href="#">Learning Hub</a>
+        <a href="#">Guides</a>
+        <a href="#">Community</a>
+      </div>
+
+      <div>
+        <h4>Support</h4>
+        <a href="#">Help Center</a>
+        <a href="#">Contact</a>
+        <a href="#">FAQ</a>
+        <a href="#">Report</a>
+      </div>
+
+      <div>
+        <h4>Legal</h4>
+        <a href="#">Terms</a>
+        <a href="#">Privacy</a>
+        <a href="#">Cookies</a>
+        <a href="#">Security</a>
+      </div>
+
+    </div>
+
+    <div class="footerBottom">
+      © <span id="year"></span> Social Market
+    </div>
+  </footer>
+
+</main>
+
+<script src="./discover.js"></script>
 </body>
 </html>

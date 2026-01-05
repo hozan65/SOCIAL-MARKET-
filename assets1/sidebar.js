@@ -1,291 +1,300 @@
 // /assets1/sidebar.js
+// ✅ SAFE: no body-null crash
+// ✅ GUARD: no double init
+// ✅ Faster: import Appwrite only if needed
+// ✅ Active page mapping option
+(() => {
+    if (window.__SM_SIDEBAR_INIT__) return;
+    window.__SM_SIDEBAR_INIT__ = true;
 
-document.body.classList.add("hasSidebar");
+    console.log("✅ sidebar.js loaded (SAFE + FAST)");
 
-console.log("✅ sidebar.js loaded (MOBILE FIXED CLOSE + USER HYDRATE)");
-
-/* =======================
-   AUTH HELPERS
-======================= */
-async function smGetUserSafe() {
-    try {
-        const mod = await import("/assets/appwrite.js");
-        if (!mod?.account?.get) return null;
-        const u = await mod.account.get(); // 401 -> throw
-        return u || null;
-    } catch {
-        return null;
+    /* =======================
+       AUTH HELPERS
+    ======================= */
+    let _appwriteModPromise = null;
+    function loadAppwriteMod() {
+        if (_appwriteModPromise) return _appwriteModPromise;
+        _appwriteModPromise = import("/assets/appwrite.js").catch(() => null);
+        return _appwriteModPromise;
     }
-}
 
-async function smIsLoggedIn() {
-    // hızlı local check
-    const uid = localStorage.getItem("sm_uid");
-    if (uid) return true;
-
-    // gerçek check
-    const u = await smGetUserSafe();
-    if (u?.$id) {
-        localStorage.setItem("sm_uid", u.$id);
-        // cache
-        if (u?.name) localStorage.setItem("sm_name", u.name);
-        if (u?.email) localStorage.setItem("sm_email", u.email);
-        return true;
-    }
-    return false;
-}
-
-async function smDoLogout() {
-    try {
-        const mod = await import("/assets/appwrite.js");
-        if (mod?.account?.deleteSession) {
-            await mod.account.deleteSession("current");
+    async function smGetUserSafe() {
+        try {
+            const mod = await loadAppwriteMod();
+            if (!mod?.account?.get) return null;
+            const u = await mod.account.get(); // 401 -> throw
+            return u || null;
+        } catch {
+            return null;
         }
-    } catch (e) {
-        console.warn("logout: deleteSession failed", e?.message || e);
     }
 
-    localStorage.removeItem("sm_uid");
-    localStorage.removeItem("sm_jwt");
-    localStorage.removeItem("sm_name");
-    localStorage.removeItem("sm_email");
+    async function smIsLoggedIn() {
+        const uid = (localStorage.getItem("sm_uid") || "").trim();
+        if (uid) return true;
 
-    location.href = "/auth/login.html";
-}
-
-function smSetBtnMode(btn, loggedIn) {
-    const label = btn.querySelector("span");
-    const icon = btn.querySelector("i");
-
-    if (!loggedIn) {
-        if (label) label.textContent = "Login";
-        if (icon) icon.className = "fa-solid fa-right-to-bracket";
-        btn.dataset.mode = "login";
-    } else {
-        if (label) label.textContent = "Logout";
-        if (icon) icon.className = "fa-solid fa-right-from-bracket";
-        btn.dataset.mode = "logout";
-    }
-}
-
-/* =======================
-   USER -> SIDEBAR UI
-======================= */
-function pickInitial(name, email) {
-    const a = (name || "").trim();
-    if (a) return a[0].toUpperCase();
-    const b = (email || "").trim();
-    if (b) return b[0].toUpperCase();
-    return "U";
-}
-
-async function smHydrateSidebarUser() {
-    const elAvatar = document.getElementById("smSbAvatar");
-    const elName = document.getElementById("smSbName");
-    const elMail = document.getElementById("smSbMail");
-
-    if (!elAvatar || !elName || !elMail) return;
-
-    // default: boş kalsın (senin istediğin gibi)
-    elName.textContent = "";
-    elMail.textContent = "";
-    elAvatar.textContent = "";
-
-    // önce cache (hızlı)
-    const cachedName = localStorage.getItem("sm_name") || "";
-    const cachedEmail = localStorage.getItem("sm_email") || "";
-    if (cachedName || cachedEmail) {
-        elName.textContent = cachedName || "";
-        elMail.textContent = cachedEmail || "";
-        elAvatar.textContent = pickInitial(cachedName, cachedEmail);
+        const u = await smGetUserSafe();
+        if (u?.$id) {
+            localStorage.setItem("sm_uid", u.$id);
+            if (u?.name) localStorage.setItem("sm_name", u.name);
+            if (u?.email) localStorage.setItem("sm_email", u.email);
+            return true;
+        }
+        return false;
     }
 
-    // sonra gerçek Appwrite (doğrulama)
-    const u = await smGetUserSafe();
-    if (!u?.$id) {
-        // login yoksa boş (tam istediğin)
+    async function smDoLogout() {
+        try {
+            const mod = await loadAppwriteMod();
+            if (mod?.account?.deleteSession) {
+                await mod.account.deleteSession("current");
+            }
+        } catch (e) {
+            console.warn("logout: deleteSession failed", e?.message || e);
+        }
+
+        localStorage.removeItem("sm_uid");
+        localStorage.removeItem("sm_jwt");
+        localStorage.removeItem("sm_name");
+        localStorage.removeItem("sm_email");
+
+        location.href = "/auth/login.html";
+    }
+
+    function smSetBtnMode(btn, loggedIn) {
+        const label = btn.querySelector("span");
+        const icon = btn.querySelector("i");
+
+        if (!loggedIn) {
+            if (label) label.textContent = "Login";
+            if (icon) icon.className = "fa-solid fa-right-to-bracket";
+            btn.dataset.mode = "login";
+        } else {
+            if (label) label.textContent = "Logout";
+            if (icon) icon.className = "fa-solid fa-right-from-bracket";
+            btn.dataset.mode = "logout";
+        }
+    }
+
+    /* =======================
+       USER -> SIDEBAR UI
+    ======================= */
+    function pickInitial(name, email) {
+        const a = (name || "").trim();
+        if (a) return a[0].toUpperCase();
+        const b = (email || "").trim();
+        if (b) return b[0].toUpperCase();
+        return "U";
+    }
+
+    async function smHydrateSidebarUser() {
+        const elAvatar = document.getElementById("smSbAvatar");
+        const elName = document.getElementById("smSbName");
+        const elMail = document.getElementById("smSbMail");
+        if (!elAvatar || !elName || !elMail) return;
+
+        // default blank
         elName.textContent = "";
         elMail.textContent = "";
         elAvatar.textContent = "";
-        return;
+
+        // fast cache
+        const cachedName = localStorage.getItem("sm_name") || "";
+        const cachedEmail = localStorage.getItem("sm_email") || "";
+        if (cachedName || cachedEmail) {
+            elName.textContent = cachedName;
+            elMail.textContent = cachedEmail;
+            elAvatar.textContent = pickInitial(cachedName, cachedEmail);
+        }
+
+        // if no uid cached, try real user
+        const u = await smGetUserSafe();
+        if (!u?.$id) {
+            elName.textContent = "";
+            elMail.textContent = "";
+            elAvatar.textContent = "";
+            return;
+        }
+
+        localStorage.setItem("sm_uid", u.$id);
+
+        const name = (u.name || "").trim();
+        const email = (u.email || "").trim();
+
+        if (name) localStorage.setItem("sm_name", name);
+        if (email) localStorage.setItem("sm_email", email);
+
+        elName.textContent = name;
+        elMail.textContent = email;
+        elAvatar.textContent = pickInitial(name, email);
     }
 
-    localStorage.setItem("sm_uid", u.$id);
+    /* =======================
+       SIDEBAR MOUNT
+    ======================= */
+    document.addEventListener("DOMContentLoaded", async () => {
+        // ✅ body safe now
+        document.body?.classList.add("hasSidebar");
 
-    const name = (u.name || "").trim();
-    const email = (u.email || "").trim();
+        const mount = document.getElementById("sidebarMount");
+        if (!mount) return;
 
-    if (name) localStorage.setItem("sm_name", name);
-    if (email) localStorage.setItem("sm_email", email);
-
-    elName.textContent = name || "";
-    elMail.textContent = email || "";
-    elAvatar.textContent = pickInitial(name, email);
-}
-
-/* =======================
-   SIDEBAR MOUNT
-======================= */
-document.addEventListener("DOMContentLoaded", async () => {
-    const mount = document.getElementById("sidebarMount");
-    if (!mount) return;
-
-    try {
-        /* Font Awesome */
-        if (!document.getElementById("faCDN")) {
-            const fa = document.createElement("link");
-            fa.id = "faCDN";
-            fa.rel = "stylesheet";
-            fa.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css";
-            document.head.appendChild(fa);
-        }
-
-        /* Sidebar CSS */
-        if (!document.getElementById("smSidebarCss")) {
-            const css = document.createElement("link");
-            css.id = "smSidebarCss";
-            css.rel = "stylesheet";
-            css.href = "/styles/sidebar.css";
-            document.head.appendChild(css);
-        }
-
-        /* Load sidebar HTML */
-        const res = await fetch("/components/sidebar.html", { cache: "no-store" });
-        if (!res.ok) throw new Error("sidebar.html not found");
-        mount.innerHTML = await res.text();
-
-        document.body.classList.add("hasSidebar");
-
-        const sidebar = document.getElementById("smSidebar");
-        const pinBtn = document.getElementById("smSbPinBtn");
-
-        const backdrop = document.getElementById("smSbBackdrop");
-        const closeBtn = document.getElementById("smSbClose");
-        const hamb = document.getElementById("smSbMobileHamb");
-
-        const profileBtn = document.getElementById("smSbProfileBtn");
-        const menu = document.getElementById("smSbMenu");
-
-        /* Restore pin */
-        const pinned = localStorage.getItem("sm_sidebar_pinned") === "1";
-        sidebar?.classList.toggle("isPinned", pinned);
-        pinBtn?.setAttribute("aria-pressed", pinned ? "true" : "false");
-
-        pinBtn?.addEventListener("click", (e) => {
-            e.preventDefault();
-            const next = !sidebar.classList.contains("isPinned");
-            sidebar.classList.toggle("isPinned", next);
-            localStorage.setItem("sm_sidebar_pinned", next ? "1" : "0");
-            pinBtn.setAttribute("aria-pressed", next ? "true" : "false");
-
-            menu?.classList.remove("open");
-            profileBtn?.setAttribute("aria-expanded", "false");
-            menu?.setAttribute("aria-hidden", "true");
-        });
-
-        /* Active page */
-        const path = location.pathname.replace(/\/+$/, "");
-        const seg = path.split("/")[1] || "feed";
-        const page = seg.endsWith(".html") ? seg.replace(".html", "") : seg;
-
-        document.querySelectorAll("#smSidebar [data-page]").forEach((a) => {
-            if ((a.dataset.page || "").toLowerCase() === page.toLowerCase()) {
-                a.classList.add("active");
+        try {
+            // Font Awesome
+            if (!document.getElementById("faCDN")) {
+                const fa = document.createElement("link");
+                fa.id = "faCDN";
+                fa.rel = "stylesheet";
+                fa.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css";
+                document.head.appendChild(fa);
             }
-        });
 
-        /* Profile dropdown */
-        const toggleMenu = (force) => {
-            if (!menu) return;
-            const open = force ?? !menu.classList.contains("open");
-            menu.classList.toggle("open", open);
-            profileBtn?.setAttribute("aria-expanded", open ? "true" : "false");
-            menu.setAttribute("aria-hidden", open ? "false" : "true");
-        };
+            // Sidebar CSS
+            if (!document.getElementById("smSidebarCss")) {
+                const css = document.createElement("link");
+                css.id = "smSidebarCss";
+                css.rel = "stylesheet";
+                css.href = "/styles/sidebar.css";
+                document.head.appendChild(css);
+            }
 
-        profileBtn?.addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleMenu();
-        });
+            // Load sidebar HTML
+            const res = await fetch("/components/sidebar.html", { cache: "no-store" });
+            if (!res.ok) throw new Error("sidebar.html not found");
+            mount.innerHTML = await res.text();
 
-        menu?.addEventListener("click", (e) => e.stopPropagation());
-        document.addEventListener("click", () => toggleMenu(false));
+            document.body?.classList.add("hasSidebar");
 
-        /* =======================
-           MOBILE DRAWER
-        ======================= */
-        const openMobile = () => {
-            if (!sidebar) return;
-            sidebar.classList.add("mobileOpen");
-            backdrop?.classList.add("open");
-            closeBtn?.classList.add("open");
-            document.body.classList.add("smSbOpen");
-            document.documentElement.style.overflow = "hidden";
-            toggleMenu(false);
-        };
+            const sidebar = document.getElementById("smSidebar");
+            const pinBtn = document.getElementById("smSbPinBtn");
 
-        const closeMobile = () => {
-            sidebar?.classList.remove("mobileOpen");
-            backdrop?.classList.remove("open");
-            closeBtn?.classList.remove("open");
-            document.body.classList.remove("smSbOpen");
-            document.documentElement.style.overflow = "";
-            toggleMenu(false);
-        };
+            const backdrop = document.getElementById("smSbBackdrop");
+            const closeBtn = document.getElementById("smSbClose");
+            const hamb = document.getElementById("smSbMobileHamb");
 
-        hamb?.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            sidebar.classList.contains("mobileOpen") ? closeMobile() : openMobile();
-        });
+            const profileBtn = document.getElementById("smSbProfileBtn");
+            const menu = document.getElementById("smSbMenu");
 
-        closeBtn?.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            closeMobile();
-        });
+            // Restore pin
+            const pinned = localStorage.getItem("sm_sidebar_pinned") === "1";
+            sidebar?.classList.toggle("isPinned", pinned);
+            pinBtn?.setAttribute("aria-pressed", pinned ? "true" : "false");
 
-        backdrop?.addEventListener("click", closeMobile);
-        document.addEventListener("keydown", (e) => e.key === "Escape" && closeMobile());
+            pinBtn?.addEventListener("click", (e) => {
+                e.preventDefault();
+                if (!sidebar || !pinBtn) return;
 
-        /* =======================
-           LOGIN / LOGOUT BUTTON
-        ======================= */
-        const logoutBtn = document.getElementById("smSbLogout");
-        if (logoutBtn) {
-            const loggedIn = await smIsLoggedIn();
-            smSetBtnMode(logoutBtn, loggedIn);
+                const next = !sidebar.classList.contains("isPinned");
+                sidebar.classList.toggle("isPinned", next);
+                localStorage.setItem("sm_sidebar_pinned", next ? "1" : "0");
+                pinBtn.setAttribute("aria-pressed", next ? "true" : "false");
 
-            logoutBtn.addEventListener("click", async (e) => {
+                menu?.classList.remove("open");
+                profileBtn?.setAttribute("aria-expanded", "false");
+                menu?.setAttribute("aria-hidden", "true");
+            });
+
+            // Active page mapping (optional)
+            const path = location.pathname.replace(/\/+$/, "");
+            const seg = (path.split("/")[1] || "feed").toLowerCase();
+            const map = {
+                "u": "profile",      // if sidebar uses data-page="profile"
+                "textnews": "news",  // optional
+                // "view": "feed",    // optional: post detail -> feed active
+            };
+            const page = map[seg] || seg;
+
+            document.querySelectorAll("#smSidebar [data-page]").forEach((a) => {
+                if ((a.dataset.page || "").toLowerCase() === page) a.classList.add("active");
+            });
+
+            // Profile dropdown
+            const toggleMenu = (force) => {
+                if (!menu) return;
+                const open = force ?? !menu.classList.contains("open");
+                menu.classList.toggle("open", open);
+                profileBtn?.setAttribute("aria-expanded", open ? "true" : "false");
+                menu.setAttribute("aria-hidden", open ? "false" : "true");
+            };
+
+            profileBtn?.addEventListener("click", (e) => {
+                e.stopPropagation();
+                toggleMenu();
+            });
+
+            menu?.addEventListener("click", (e) => e.stopPropagation());
+            document.addEventListener("click", () => toggleMenu(false));
+
+            // Mobile drawer
+            const openMobile = () => {
+                if (!sidebar) return;
+                sidebar.classList.add("mobileOpen");
+                backdrop?.classList.add("open");
+                closeBtn?.classList.add("open");
+                document.body?.classList.add("smSbOpen");
+                document.documentElement.style.overflow = "hidden";
+                toggleMenu(false);
+            };
+
+            const closeMobile = () => {
+                sidebar?.classList.remove("mobileOpen");
+                backdrop?.classList.remove("open");
+                closeBtn?.classList.remove("open");
+                document.body?.classList.remove("smSbOpen");
+                document.documentElement.style.overflow = "";
+                toggleMenu(false);
+            };
+
+            hamb?.addEventListener("click", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-
-                const mode = logoutBtn.dataset.mode || "login";
-                if (mode === "login") {
-                    location.href = "/auth/login.html";
-                } else {
-                    await smDoLogout();
-                }
+                sidebar?.classList.contains("mobileOpen") ? closeMobile() : openMobile();
             });
+
+            closeBtn?.addEventListener("click", (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                closeMobile();
+            });
+
+            backdrop?.addEventListener("click", closeMobile);
+            document.addEventListener("keydown", (e) => e.key === "Escape" && closeMobile());
+
+            // Login/Logout
+            const logoutBtn = document.getElementById("smSbLogout");
+            if (logoutBtn) {
+                const loggedIn = await smIsLoggedIn();
+                smSetBtnMode(logoutBtn, loggedIn);
+
+                logoutBtn.addEventListener("click", async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const mode = logoutBtn.dataset.mode || "login";
+                    if (mode === "login") location.href = "/auth/login.html";
+                    else await smDoLogout();
+                });
+            }
+
+            // user hydrate
+            await smHydrateSidebarUser();
+
+            console.log("✅ sidebar ready (SAFE + USER HYDRATE OK)");
+        } catch (err) {
+            console.error("sidebar error:", err);
         }
+    });
 
-        /* ✅ USER NAME / EMAIL / AVATAR (boştu, şimdi dolacak) */
-        await smHydrateSidebarUser();
-
-        console.log("✅ sidebar ready (USER HYDRATE OK)");
-    } catch (err) {
-        console.error("sidebar error:", err);
-    }
-});
-
-/* =======================
-   AI SUPPORT LOADER
-======================= */
-(() => {
-    if (document.getElementById("smSupportLoader")) return;
-    const s = document.createElement("script");
-    s.id = "smSupportLoader";
-    s.src = "/assets1/ai_support_widget.js";
-    s.defer = true;
-    document.head.appendChild(s);
+    /* =======================
+       AI SUPPORT LOADER
+    ======================= */
+    (() => {
+        if (document.getElementById("smSupportLoader")) return;
+        const s = document.createElement("script");
+        s.id = "smSupportLoader";
+        s.src = "/assets1/ai_support_widget.js";
+        s.defer = true;
+        document.head.appendChild(s);
+    })();
 })();

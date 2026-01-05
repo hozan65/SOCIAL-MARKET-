@@ -1,4 +1,4 @@
-// /messages/messages.js (FULL CLEAN - id/to/to_id support + dm_* api + realtime)
+// /messages/messages.js (UPDATED - stable optimistic dedupe + better me + throttled inbox refresh)
 // Requires: window.account.createJWT() available via /assets1/appwrite-init.js
 (() => {
     console.log("messages.js LOADED ✅", location.href);
@@ -38,18 +38,14 @@
     // URL helpers
     const params = () => new URL(location.href).searchParams;
 
-    // ✅ IMPORTANT: supports ?to_id= ?to= ?id=
-    const getURLPeerId = () =>
-        (params().get("to_id") || params().get("to") || params().get("id") || "").trim();
-
-    const getURLConvoId = () =>
-        (params().get("conversation_id") || "").trim();
+    // ✅ supports ?to_id= ?to= ?id=
+    const getURLPeerId = () => (params().get("to_id") || params().get("to") || params().get("id") || "").trim();
+    const getURLConvoId = () => (params().get("conversation_id") || "").trim();
 
     function setURL({ conversation_id, peer_id }) {
         const u = new URL(location.href);
 
         if (peer_id) {
-            // keep both for backward compatibility
             u.searchParams.set("to", peer_id);
             u.searchParams.set("id", peer_id);
             u.searchParams.delete("to_id");
@@ -68,12 +64,8 @@
             .replaceAll('"', "&quot;")
             .replaceAll("'", "&#039;");
 
-    const isMobile = () =>
-        window.matchMedia && window.matchMedia("(max-width: 860px)").matches;
-
-    const setMobileModeChat = (open) =>
-        document.body.classList.toggle("dmChatOpen", !!open);
-
+    const isMobile = () => window.matchMedia && window.matchMedia("(max-width: 860px)").matches;
+    const setMobileModeChat = (open) => document.body.classList.toggle("dmChatOpen", !!open);
     const clearMsgs = () => (msgList.innerHTML = "");
 
     function renderMsgRow({ from_id, text, created_at, _localKey }) {
@@ -81,9 +73,7 @@
         const cls = mine ? "mMine" : "mTheirs";
         const time = created_at ? new Date(created_at).toLocaleTimeString() : "";
 
-        const localAttr = _localKey
-            ? ` data-local="1" data-local-key="${esc(_localKey)}"`
-            : "";
+        const localAttr = _localKey ? ` data-local="1" data-local-key="${esc(_localKey)}"` : "";
 
         return `
       <div class="mRow ${cls}"${localAttr}>
@@ -100,12 +90,17 @@
         msgList.scrollTop = msgList.scrollHeight;
     }
 
-    function makeLocalKey({ conversation_id, from_id, to_id, text }) {
+    // ✅ stable local key (does NOT depend on conversation_id)
+    // timeBucket helps avoid collisions if same text spam
+    function makeLocalKey({ from_id, to_id, peer_id, text, created_at }) {
+        const t = created_at ? new Date(created_at).getTime() : Date.now();
+        const bucket = Math.floor(t / 3000); // 3s buckets
         return [
-            String(conversation_id || ""),
             String(from_id || ""),
             String(to_id || ""),
+            String(peer_id || ""),
             String(text || "").trim(),
+            String(bucket),
         ].join("|");
     }
 
@@ -138,15 +133,13 @@
         });
 
         const data = await r.json().catch(() => ({}));
-        if (!r.ok) {
-            throw new Error(data?.error || `${path} failed (${r.status})`);
-        }
+        if (!r.ok) throw new Error(data?.error || `${path} failed (${r.status})`);
         return data;
     }
 
     // State
     const state = {
-        me: localStorage.getItem("sm_uid") || window.APPWRITE_USER_ID || "",
+        me: (localStorage.getItem("sm_uid") || window.APPWRITE_USER_ID || "").trim(),
         peer_id: getURLPeerId(),
         conversation_id: getURLConvoId(),
         peer_name: "",
@@ -170,7 +163,7 @@
         }
     }
 
-    // Inbox item (expects dm_inbox -> list[] with fields below)
+    // Inbox item
     function renderInboxItem(it) {
         const peer_id = (it.peer_id || "").trim();
         const convo_id = (it.conversation_id || "").trim();
@@ -193,14 +186,18 @@
         const items = inboxList.querySelectorAll(".inboxItem");
 
         items.forEach((btn) => {
-            if (!q) {
-                btn.style.display = "";
-                return;
-            }
+            if (!q) return (btn.style.display = "");
             const title = (btn.querySelector(".inboxTitle")?.textContent || "").toLowerCase();
             const peer = (btn.getAttribute("data-peer") || "").toLowerCase();
             btn.style.display = title.includes(q) || peer.includes(q) ? "" : "none";
         });
+    }
+
+    // ✅ throttle inbox refresh (socket spam)
+    let _inboxTimer = null;
+    function scheduleInboxRefresh() {
+        clearTimeout(_inboxTimer);
+        _inboxTimer = setTimeout(() => loadInbox(), 250);
     }
 
     async function loadInbox() {
@@ -261,58 +258,45 @@
         state.peer_id = (peer_id || "").trim();
         state.conversation_id = (conversation_id || "").trim();
 
-        // try to hydrate name/avatar from inbox cache
+        // hydrate name/avatar from inbox
         const found = state.inboxRaw.find((x) => String(x.conversation_id) === String(state.conversation_id));
         if (found) {
             state.peer_name = found.peer_name || "";
             state.peer_avatar = found.peer_avatar || "";
         }
 
-        setPeerHeader({
-            id: state.peer_id,
-            name: state.peer_name,
-            avatar_url: state.peer_avatar,
-        });
+        setPeerHeader({ id: state.peer_id, name: state.peer_name, avatar_url: state.peer_avatar });
 
-        if (state.peer_id || state.conversation_id) {
-            setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
-        }
+        if (state.peer_id || state.conversation_id) setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
 
         if (isMobile()) setMobileModeChat(true);
 
-        if (state.conversation_id) {
-            await loadChat(state.conversation_id);
-        } else {
-            clearMsgs();
-        }
+        if (state.conversation_id) await loadChat(state.conversation_id);
+        else clearMsgs();
     }
 
     // Back (mobile)
     chatBackBtn?.addEventListener("click", () => {
         if (!isMobile()) return;
 
-        // 1) listeye dön
         setMobileModeChat(false);
 
-        // 2) state temizle
         state.peer_id = "";
         state.conversation_id = "";
         state.peer_name = "";
         state.peer_avatar = "";
 
-        // 3) UI temizle
         setPeerHeader({});
         clearMsgs();
 
-        // 4) URL temizle (en kritik)
-        try{
+        try {
             const u = new URL(location.href);
             u.searchParams.delete("to");
             u.searchParams.delete("id");
             u.searchParams.delete("to_id");
             u.searchParams.delete("conversation_id");
             history.replaceState(null, "", u.toString());
-        }catch(e){}
+        } catch {}
     });
 
     window.addEventListener("resize", () => {
@@ -322,21 +306,24 @@
     // Realtime (Socket.IO)
     const socket = window.rt?.socket;
     if (socket) {
+        // avoid double-bind
+        socket.off?.("dm_new");
         socket.on("dm_new", (p) => {
             const cid = (p.conversation_id || "").trim();
             if (!cid) return;
 
-            // If this is current chat, append
+            // current chat append
             if (cid === state.conversation_id) {
                 const isMine = String(p.from_id) === String(state.me);
 
-                // remove optimistic duplicate (if mine)
+                // ✅ dedupe optimistic (stable key)
                 if (isMine) {
                     const lk = makeLocalKey({
-                        conversation_id: cid,
                         from_id: p.from_id,
                         to_id: p.to_id,
+                        peer_id: state.peer_id,
                         text: p.text,
+                        created_at: p.created_at || new Date().toISOString(),
                     });
                     try {
                         const el = msgList.querySelector(`.mRow[data-local="1"][data-local-key="${CSS.escape(lk)}"]`);
@@ -351,8 +338,8 @@
                 });
             }
 
-            // refresh inbox list (preview/last_at)
-            loadInbox();
+            // refresh inbox preview
+            scheduleInboxRefresh();
         });
     } else {
         console.warn("⚠ realtime socket not ready (window.rt.socket missing)");
@@ -365,22 +352,23 @@
         const text = (msgInput.value || "").trim();
         if (!text) return;
 
-        msgInput.value = "";
-
-        const payload = { text };
-
-        if (state.conversation_id) payload.conversation_id = state.conversation_id;
-        else if (state.peer_id) payload.peer_id = state.peer_id;
-        else {
+        // require peer/convo
+        if (!state.conversation_id && !state.peer_id) {
             alert("Kime mesaj atacaksın? (URL'de id/to yok)");
             return;
         }
 
-        // optimistic
+        msgInput.value = "";
+
+        const payload = { text };
+        if (state.conversation_id) payload.conversation_id = state.conversation_id;
+        else payload.peer_id = state.peer_id;
+
+        // optimistic (stable key)
         const optimistic = {
-            conversation_id: state.conversation_id || "pending",
             from_id: state.me,
             to_id: state.peer_id,
+            peer_id: state.peer_id,
             text,
             created_at: new Date().toISOString(),
         };
@@ -394,6 +382,7 @@
             if (!state.conversation_id && d.conversation_id) {
                 state.conversation_id = d.conversation_id;
                 setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
+                scheduleInboxRefresh();
             }
         } catch (err) {
             console.error("dm_send error:", err);
@@ -406,10 +395,13 @@
         try {
             await ensureJWT();
 
-            // try cache uid if exists
-            if (!localStorage.getItem("sm_uid") && window.APPWRITE_USER_ID) {
+            // ✅ ensure me is set
+            const uidLS = (localStorage.getItem("sm_uid") || "").trim();
+            if (!uidLS && window.APPWRITE_USER_ID) {
                 localStorage.setItem("sm_uid", window.APPWRITE_USER_ID);
-                state.me = window.APPWRITE_USER_ID;
+                state.me = String(window.APPWRITE_USER_ID);
+            } else if (uidLS) {
+                state.me = uidLS;
             }
 
             await loadInbox();

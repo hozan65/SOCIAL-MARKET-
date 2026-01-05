@@ -1,14 +1,12 @@
 // netlify/functions/create_post.js
-// FINAL FULL - Appwrite JWT verify + Supabase insert (service key) + CORS/OPTIONS
-// Fixes: author_uid NOT NULL, pair NOT NULL, pairs normalization
+// ✅ FINAL - Appwrite JWT verify + sm-api insert (NO Supabase) + CORS/OPTIONS
+// Fixes: pair required, pairs normalization, robust JWT headers
 
-const { createClient } = require("@supabase/supabase-js");
-
-const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
-const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
-
-const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "").trim(); // e.g. https://cloud.appwrite.io/v1
+const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "").trim(); // https://cloud.appwrite.io/v1
 const APPWRITE_PROJECT_ID = (process.env.APPWRITE_PROJECT_ID || "").trim();
+
+const SM_API_BASE_URL = (process.env.SM_API_BASE_URL || "").trim();
+const SM_API_TIMEOUT_MS = Number(process.env.SM_API_TIMEOUT_MS || "6500") || 6500;
 
 function json(statusCode, bodyObj) {
     return {
@@ -17,17 +15,46 @@ function json(statusCode, bodyObj) {
             "Content-Type": "application/json",
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT, x-jwt",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
         body: JSON.stringify(bodyObj),
     };
 }
 
-function getBearerToken(event) {
-    const auth = event.headers.authorization || event.headers.Authorization || "";
-    if (!auth.startsWith("Bearer ")) return null;
-    return auth.slice(7).trim() || null;
+function extractJWT(event) {
+    const h = event?.headers || {};
+    const mvh = event?.multiValueHeaders || {};
+
+    const getHeader = (name) => {
+        const lower = String(name).toLowerCase();
+
+        for (const k of Object.keys(mvh || {})) {
+            if (String(k).toLowerCase() === lower) {
+                const v = mvh[k];
+                if (Array.isArray(v) && v[0]) return String(v[0]);
+                if (typeof v === "string") return v;
+            }
+        }
+        for (const k of Object.keys(h || {})) {
+            if (String(k).toLowerCase() === lower) return String(h[k] ?? "");
+        }
+        return "";
+    };
+
+    const auth = (getHeader("authorization") || "").trim();
+    if (auth) {
+        const m = auth.match(/^Bearer\s+(.+)$/i);
+        if (m?.[1]) return m[1].trim();
+        return auth.trim();
+    }
+
+    const xjwt =
+        (getHeader("x-appwrite-jwt") || "").trim() ||
+        (getHeader("x-jwt") || "").trim() ||
+        (getHeader("sm-jwt") || "").trim();
+
+    return xjwt || "";
 }
 
 async function getAppwriteUser(jwt) {
@@ -40,15 +67,18 @@ async function getAppwriteUser(jwt) {
     const r = await fetch(url, {
         method: "GET",
         headers: {
+            "Content-Type": "application/json",
             "X-Appwrite-Project": APPWRITE_PROJECT_ID,
             "X-Appwrite-JWT": jwt,
         },
     });
 
-    const j = await r.json().catch(() => null);
+    const txt = await r.text().catch(() => "");
+    let j = null;
+    try { j = txt ? JSON.parse(txt) : null; } catch { j = null; }
 
     if (!r.ok) {
-        const msg = j?.message || `Appwrite auth failed (${r.status})`;
+        const msg = j?.message || j?.error || `Appwrite auth failed (${r.status})`;
         throw new Error(msg);
     }
 
@@ -60,7 +90,7 @@ async function getAppwriteUser(jwt) {
 }
 
 function normalizePairs(pairs) {
-    // Accepts array or string. Returns a CSV string: "BTCUSDT,ETHUSDT"
+    // Accepts array or string. Returns CSV: "BTCUSDT,ETHUSDT"
     if (Array.isArray(pairs)) {
         return pairs
             .map((x) => String(x ?? "").trim())
@@ -75,64 +105,82 @@ function normalizePairs(pairs) {
         .join(",");
 }
 
+async function smApiCreatePost(uid, payload) {
+    if (!SM_API_BASE_URL) throw new Error("Missing SM_API_BASE_URL env");
+
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), SM_API_TIMEOUT_MS);
+
+    try {
+        const r = await fetch(`${SM_API_BASE_URL}/api/posts/create`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-User-Id": String(uid || "").trim(),
+            },
+            body: JSON.stringify(payload || {}),
+            signal: ctrl.signal,
+        });
+
+        const txt = await r.text().catch(() => "");
+        let j = {};
+        try { j = txt ? JSON.parse(txt) : {}; } catch { j = { raw: txt }; }
+
+        if (!r.ok) {
+            throw new Error(j?.error || j?.message || `sm-api create failed (${r.status})`);
+        }
+        return j;
+    } catch (e) {
+        if (String(e?.name || "").toLowerCase() === "aborterror") {
+            throw new Error("sm-api timeout");
+        }
+        throw e;
+    } finally {
+        clearTimeout(t);
+    }
+}
+
 exports.handler = async (event) => {
     try {
-        // ✅ CORS preflight
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
-
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        if (!SUPABASE_URL || !SERVICE_KEY) {
-            return json(500, { error: "Missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY" });
-        }
-
-        const jwt = getBearerToken(event);
+        const jwt = extractJWT(event);
         if (!jwt) return json(401, { error: "Missing JWT" });
 
         const user = await getAppwriteUser(jwt);
 
-        const body = JSON.parse(event.body || "{}");
+        let body = {};
+        try { body = JSON.parse(event.body || "{}"); } catch { body = {}; }
 
         const market = String(body.market || "").trim();
         const category = String(body.category || "").trim() || null;
         const timeframe = String(body.timeframe || "").trim();
         const content = String(body.content || "").trim();
+
         const pairs = normalizePairs(body.pairs);
-        const pair = pairs.split(",")[0] || pairs; // ✅ DB NOT NULL
+        const pair = pairs.split(",")[0] || pairs; // ✅ required
+
         const image_path = body.image_path ? String(body.image_path).trim() : null;
 
-        // ✅ strict required (based on your DB constraints + app needs)
         if (!market || !timeframe || !content || !pair) {
             return json(400, { error: "Missing fields (market/timeframe/content/pair)" });
         }
 
-        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+        const out = await smApiCreatePost(user.uid, {
+            market,
+            category,
+            timeframe,
+            content,
+            pairs,
+            pair,
+            image_path,
+        });
 
-        const { data, error } = await sb
-            .from("analyses")
-            .insert([
-                {
-                    // ✅ satisfy NOT NULL constraints
-                    author_uid: user.uid,
-                    pair: pair,
+        const id = out?.id || out?.post_id || out?.data?.id || null;
+        if (!id) return json(500, { error: "sm-api returned missing id" });
 
-                    // ✅ compatibility (your feed.js sometimes uses author_id/pairs)
-                    author_id: user.uid,
-                    pairs: pairs,
-
-                    market,
-                    category,
-                    timeframe,
-                    content,
-                    image_path,
-                },
-            ])
-            .select("id")
-            .single();
-
-        if (error) throw error;
-
-        return json(200, { ok: true, id: data.id });
+        return json(200, { ok: true, id });
     } catch (e) {
         console.error("create_post error:", e);
         return json(500, { error: e.message || "Server error" });

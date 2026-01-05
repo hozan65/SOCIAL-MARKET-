@@ -1,16 +1,16 @@
-// /textnews/textnews-list.js  (MODULE)
-
-import { supabase as sb } from "/netlify/functions/supabase.js";
+// /textnews/textnews-list.js  (NO SUPABASE - sm-api)
+// Renders list into #tnList
 
 (() => {
     const list = document.getElementById("tnList");
     if (!list) return;
 
     function fmt(t) {
-        return new Date(t).toLocaleString("tr-TR", {
-            dateStyle: "short",
-            timeStyle: "short",
-        });
+        try {
+            return new Date(t).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
+        } catch {
+            return "";
+        }
     }
 
     function esc(str) {
@@ -22,17 +22,28 @@ import { supabase as sb } from "/netlify/functions/supabase.js";
             .replaceAll("'", "&#039;");
     }
 
+    async function fetchList(limit = 100) {
+        const r = await fetch(`/api/textnews?limit=${encodeURIComponent(limit)}`, { cache: "no-store" });
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out?.error || `textnews list failed (${r.status})`);
+
+        // accepted shapes: {list:[...]}, {data:[...]}, [...]
+        const arr = out?.list || out?.data || out;
+        return Array.isArray(arr) ? arr : [];
+    }
+
     async function load() {
+        list.innerHTML = `<div class="tnRow"><div class="tnRowTitle">Loading...</div></div>`;
+
         try {
-            const { data, error } = await sb
-                .from("news_feed")
-                .select("source,title,published_at,slug")
-                .order("published_at", { ascending: false })
-                .limit(100);
+            const data = await fetchList(100);
 
-            if (error) throw error;
+            if (!data.length) {
+                list.innerHTML = `<div class="tnRow"><div class="tnRowTitle">News unavailable</div></div>`;
+                return;
+            }
 
-            list.innerHTML = (data || [])
+            list.innerHTML = data
                 .map((n) => `
           <div class="tnRow">
             <a href="/textnews/textnews-detail.html?slug=${encodeURIComponent(n.slug)}">
@@ -50,4 +61,3 @@ import { supabase as sb } from "/netlify/functions/supabase.js";
 
     load();
 })();
-

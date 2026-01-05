@@ -1,145 +1,156 @@
 // netlify/functions/account_delete_hard.js
 import { Client, Users } from "node-appwrite";
-import { createClient } from "@supabase/supabase-js";
 
-function json(statusCode, obj) {
+function json(statusCode, obj, extraHeaders = {}) {
     return {
         statusCode,
-        headers: { "content-type": "application/json" },
+        headers: {
+            "content-type": "application/json",
+            "cache-control": "no-store",
+            "access-control-allow-origin": "*",
+            "access-control-allow-headers": "Content-Type, Authorization, X-Appwrite-JWT, x-jwt",
+            "access-control-allow-methods": "POST, OPTIONS",
+            ...extraHeaders,
+        },
         body: JSON.stringify(obj),
     };
 }
 
-function getBearer(event) {
-    const h = event.headers || {};
-    const auth = h.authorization || h.Authorization || "";
-    const m = String(auth).match(/^Bearer\s+(.+)$/i);
-    return m ? m[1].trim() : null;
+function getJwtFromEvent(event) {
+    const h = event?.headers || {};
+    const mvh = event?.multiValueHeaders || {};
+
+    const pick = (name) => {
+        const lower = String(name).toLowerCase();
+
+        for (const k of Object.keys(mvh || {})) {
+            if (String(k).toLowerCase() === lower) {
+                const v = mvh[k];
+                if (Array.isArray(v) && v[0]) return String(v[0]);
+                if (typeof v === "string") return v;
+            }
+        }
+        for (const k of Object.keys(h || {})) {
+            if (String(k).toLowerCase() === lower) return String(h[k] ?? "");
+        }
+        return "";
+    };
+
+    const auth = (pick("authorization") || "").trim();
+    if (auth) {
+        const m = auth.match(/^Bearer\s+(.+)$/i);
+        if (m?.[1]) return m[1].trim();
+        return auth; // bearer yazmadan token atan clientlar
+    }
+
+    const xjwt =
+        (pick("x-appwrite-jwt") || "").trim() ||
+        (pick("x-jwt") || "").trim() ||
+        (pick("sm-jwt") || "").trim();
+
+    return xjwt || "";
 }
 
-/**
- * ⚠️ ÖNEMLİ:
- * Bu function "Bearer token" içinden user id çıkaramaz.
- * O yüzden client tarafı, user id'yi de göndermeli:
- * body: { confirm:true, userId: "6956..." }
- *
- * Çünkü senin sm_jwt token'ın custom görünüyor.
- * Eğer token'dan userId decode ediyorsan, burada decode eklenir.
- */
+async function appwriteMe(jwt) {
+    const endpoint = (process.env.APPWRITE_ENDPOINT || "").trim();
+    const projectId = (process.env.APPWRITE_PROJECT_ID || "").trim();
+    if (!endpoint || !projectId) throw new Error("Missing APPWRITE_ENDPOINT or APPWRITE_PROJECT_ID env");
+
+    const r = await fetch(`${endpoint}/account`, {
+        method: "GET",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Appwrite-Project": projectId,
+            "X-Appwrite-JWT": jwt,
+        },
+    });
+
+    const txt = await r.text().catch(() => "");
+    let data = null;
+    try { data = txt ? JSON.parse(txt) : null; } catch { data = null; }
+
+    if (!r.ok) {
+        const msg = data?.message || data?.error || `Appwrite /account failed: HTTP ${r.status}`;
+        throw new Error(msg);
+    }
+    if (!data?.$id) throw new Error("Invalid JWT");
+    return data;
+}
+
+async function smApiHardDeleteUser({ userId }) {
+    const base = (process.env.SM_API_BASE_URL || "").trim();
+    const adminKey = (process.env.SM_API_ADMIN_KEY || "").trim();
+    if (!base) throw new Error("Missing SM_API_BASE_URL env");
+    if (!adminKey) throw new Error("Missing SM_API_ADMIN_KEY env");
+
+    // ✅ sm-api'de bu endpointi senin backend’de yapacağız:
+    // POST /internal/user/hard_delete  { user_id }
+    const r = await fetch(`${base}/internal/user/hard_delete`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Key": adminKey,
+        },
+        body: JSON.stringify({ user_id: userId }),
+    });
+
+    const txt = await r.text().catch(() => "");
+    let data = {};
+    try { data = txt ? JSON.parse(txt) : {}; } catch { data = { raw: txt }; }
+
+    if (!r.ok) {
+        throw new Error(data?.error || data?.message || `sm-api hard_delete failed (${r.status})`);
+    }
+    return data;
+}
+
 export const handler = async (event) => {
     try {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        const APPWRITE_ENDPOINT = process.env.APPWRITE_ENDPOINT;
-        const APPWRITE_PROJECT_ID = process.env.APPWRITE_PROJECT_ID;
-        const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY;
-
-        const SUPABASE_URL = process.env.SUPABASE_URL;
-        const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-        // ✅ env check (en sık hata)
-        const miss = [];
-        if (!APPWRITE_ENDPOINT) miss.push("APPWRITE_ENDPOINT");
-        if (!APPWRITE_PROJECT_ID) miss.push("APPWRITE_PROJECT_ID");
-        if (!APPWRITE_API_KEY) miss.push("APPWRITE_API_KEY");
-        if (!SUPABASE_URL) miss.push("SUPABASE_URL");
-        if (!SUPABASE_SERVICE_ROLE_KEY) miss.push("SUPABASE_SERVICE_ROLE_KEY");
-        if (miss.length) return json(500, { error: "Missing envs", missing: miss });
-
-        // auth token var mı?
-        const token = getBearer(event);
-        if (!token) return json(401, { error: "Missing Authorization Bearer token" });
-
         let body = {};
         try { body = event.body ? JSON.parse(event.body) : {}; } catch {}
 
-        // ✅ client buraya userId gönderecek
-        const userId = body.userId || body.uid || null;
-        if (!userId) {
-            return json(400, {
-                error: "Missing userId in body",
-                hint: "Send {confirm:true, userId: localStorage.getItem('sm_uid') }",
-            });
+        if (body?.confirm !== true) {
+            return json(400, { error: "Missing confirm:true" });
         }
 
-        // 1) Supabase cleanup
-        const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        // ✅ 1) JWT doğrula -> UID sadece buradan gelir
+        const jwt = getJwtFromEvent(event);
+        if (!jwt) return json(401, { error: "Missing JWT" });
 
-        // senin tablolarına göre silme listesi (screenlerde görünenler)
-        // text alanlar: profiles.appwrite_user_id, follows.follower_uid/following_uid, conversations.user1_id/user2_id, messages.sender_id
-        // post_likes.user_id, post_comments.user_id, interactions.user_uid, analyses.author_uid
-        const deletions = [];
+        const me = await appwriteMe(jwt);
+        const userId = String(me.$id || "").trim();
+        if (!userId) return json(401, { error: "Invalid JWT" });
 
-        // profiles
-        deletions.push(sb.from("profiles").delete().eq("appwrite_user_id", userId));
+        // ✅ 2) sm-api (Postgres) tarafında user datasını sil
+        // (Supabase yok)
+        const smRes = await smApiHardDeleteUser({ userId });
 
-        // follows
-        deletions.push(sb.from("follows").delete().eq("follower_uid", userId));
-        deletions.push(sb.from("follows").delete().eq("following_uid", userId));
+        // ✅ 3) Appwrite user hard delete (admin)
+        const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "").trim();
+        const APPWRITE_PROJECT_ID = (process.env.APPWRITE_PROJECT_ID || "").trim();
+        const APPWRITE_API_KEY = (process.env.APPWRITE_API_KEY || "").trim();
 
-        // conversations + messages (FK var: messages.conversation_id -> conversations.id)
-        // önce messages, sonra conversations
-        // kullanıcının dahil olduğu conversation id'leri bul
-        const convRes = await sb
-            .from("conversations")
-            .select("id")
-            .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
-
-        if (convRes.error) {
-            return json(500, { error: "Supabase conversations select failed", details: convRes.error });
+        if (!APPWRITE_API_KEY) {
+            return json(500, { error: "Missing APPWRITE_API_KEY env" });
         }
 
-        const convIds = (convRes.data || []).map((x) => x.id).filter(Boolean);
-
-        if (convIds.length) {
-            deletions.push(sb.from("messages").delete().in("conversation_id", convIds));
-        }
-
-        deletions.push(sb.from("messages").delete().eq("sender_id", userId));
-        deletions.push(sb.from("conversations").delete().or(`user1_id.eq.${userId},user2_id.eq.${userId}`));
-
-        // interactions
-        deletions.push(sb.from("interactions").delete().eq("user_uid", userId));
-
-        // analyses
-        deletions.push(sb.from("analyses").delete().eq("author_uid", userId));
-
-        // likes/comments
-        deletions.push(sb.from("post_likes").delete().eq("user_id", userId));
-        deletions.push(sb.from("post_comments").delete().eq("user_id", userId));
-
-        // news / news_feed user bağlı değil (sende user alanı yok gibi) -> dokunmuyoruz
-
-        const delResults = await Promise.all(deletions);
-        const supabaseErrors = delResults
-            .map((r) => r.error)
-            .filter(Boolean);
-
-        if (supabaseErrors.length) {
-            return json(500, { error: "Supabase delete failed", details: supabaseErrors });
-        }
-
-        // 2) Appwrite user hard delete
         const client = new Client()
             .setEndpoint(APPWRITE_ENDPOINT)
             .setProject(APPWRITE_PROJECT_ID)
             .setKey(APPWRITE_API_KEY);
 
         const users = new Users(client);
+        await users.delete(userId);
 
-        // Appwrite'ta user sil
-        try {
-            await users.delete(userId);
-        } catch (e) {
-            return json(500, {
-                error: "Appwrite delete user failed",
-                details: e?.message || String(e),
-            });
-        }
-
-        return json(200, { ok: true, deleted: true, userId });
-
+        return json(200, {
+            ok: true,
+            deleted: true,
+            userId,
+            sm_api: smRes,
+        });
     } catch (e) {
         return json(500, { error: "Unhandled server error", details: e?.message || String(e) });
     }

@@ -1,13 +1,16 @@
-// netlify/functions/add_comment.js
-const { createClient } = require("@supabase/supabase-js");
-const { authUser } = require("./_auth_user");
+// netlify/functions/add_comment.js  (CJS)
+// ✅ Supabase REMOVED
+// ✅ Netlify -> sm-api
+// ✅ Keeps same response shape: { ok:true, comment: {...} }
 
-const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
-const SERVICE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+const { authUser } = require("./_auth_user");
 
 // socket emit
 const SOCKET_COMMENT_EMIT_URL = process.env.SOCKET_COMMENT_EMIT_URL || "";
 const SOCKET_SECRET = process.env.SOCKET_SECRET || "";
+
+// sm-api
+const SM_API_BASE_URL = (process.env.SM_API_BASE_URL || "").trim();
 
 function json(statusCode, bodyObj) {
     return {
@@ -16,16 +19,81 @@ function json(statusCode, bodyObj) {
             "Content-Type": "application/json",
             "Cache-Control": "no-store",
             "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Appwrite-JWT, x-jwt",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
         body: JSON.stringify(bodyObj),
     };
 }
 
-function getBearer(event) {
-    const h = event.headers.authorization || event.headers.Authorization || "";
-    return h.startsWith("Bearer ") ? h.slice(7).trim() : null;
+function extractJWT(event) {
+    const h = event?.headers || {};
+    const mvh = event?.multiValueHeaders || {};
+
+    const getHeader = (name) => {
+        const lower = String(name).toLowerCase();
+
+        for (const k of Object.keys(mvh || {})) {
+            if (String(k).toLowerCase() === lower) {
+                const v = mvh[k];
+                if (Array.isArray(v) && v[0]) return String(v[0]);
+                if (typeof v === "string") return v;
+            }
+        }
+        for (const k of Object.keys(h || {})) {
+            if (String(k).toLowerCase() === lower) return String(h[k] ?? "");
+        }
+        return "";
+    };
+
+    const auth = (getHeader("authorization") || "").trim();
+    if (auth) {
+        const m = auth.match(/^Bearer\s+(.+)$/i);
+        if (m?.[1]) return m[1].trim();
+        return auth.trim();
+    }
+
+    const xjwt =
+        (getHeader("x-appwrite-jwt") || "").trim() ||
+        (getHeader("x-jwt") || "").trim() ||
+        (getHeader("sm-jwt") || "").trim();
+
+    return xjwt || "";
+}
+
+async function smApiPost(path, { uid, body }, { timeoutMs = 6500 } = {}) {
+    if (!SM_API_BASE_URL) throw new Error("Missing SM_API_BASE_URL env");
+
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+    try {
+        const r = await fetch(`${SM_API_BASE_URL}${path}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-User-Id": String(uid || "").trim(),
+            },
+            body: JSON.stringify(body || {}),
+            signal: ctrl.signal,
+        });
+
+        const txt = await r.text().catch(() => "");
+        let data = {};
+        try { data = txt ? JSON.parse(txt) : {}; } catch { data = { raw: txt }; }
+
+        if (!r.ok) {
+            throw new Error(data?.error || data?.message || `sm-api ${path} failed (${r.status})`);
+        }
+        return data;
+    } catch (e) {
+        if (String(e?.name || "").toLowerCase() === "aborterror") {
+            throw new Error("sm-api timeout");
+        }
+        throw e;
+    } finally {
+        clearTimeout(t);
+    }
 }
 
 exports.handler = async (event) => {
@@ -33,11 +101,10 @@ exports.handler = async (event) => {
         if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
         if (event.httpMethod !== "POST") return json(405, { error: "Method not allowed" });
 
-        if (!SUPABASE_URL || !SERVICE_KEY) return json(500, { error: "Missing Supabase env" });
-
-        const jwt = getBearer(event);
+        const jwt = extractJWT(event);
         if (!jwt) return json(401, { error: "Missing JWT" });
 
+        // ✅ Appwrite JWT -> uid doğrula
         const { uid } = await authUser(jwt);
 
         let body = {};
@@ -49,26 +116,31 @@ exports.handler = async (event) => {
         if (!post_id) return json(400, { error: "Missing post_id" });
         if (!content) return json(400, { error: "Empty comment" });
 
-        const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+        // ✅ sm-api insert
+        // NOTE: endpoint adını sm-api’ye göre seçtik: /api/comments/add
+        const out = await smApiPost("/api/comments/add", {
+            uid,
+            body: { post_id, content },
+        });
 
-        const { data, error } = await sb
-            .from("post_comments")
-            .insert([{ post_id, user_id: uid, content }])
-            .select("id, post_id, user_id, content, created_at")
-            .single();
+        // normalize comment
+        const c = out?.comment || out?.data || out || null;
 
-        if (error) throw error;
+        if (!c?.id) {
+            // sm-api beklenen format dönmediyse
+            return json(500, { error: "sm-api returned invalid comment payload" });
+        }
 
         // fire-and-forget socket
         emitCommentSafe({
-            post_id: data.post_id,
-            comment_id: data.id,
-            user_id: data.user_id,
-            content: data.content,
-            created_at: data.created_at,
+            post_id: c.post_id || post_id,
+            comment_id: c.id,
+            user_id: c.user_id || uid,
+            content: c.content || content,
+            created_at: c.created_at || new Date().toISOString(),
         });
 
-        return json(200, { ok: true, comment: data });
+        return json(200, { ok: true, comment: c });
     } catch (e) {
         console.error("add_comment error:", e);
         return json(500, { error: e.message || "Server error" });

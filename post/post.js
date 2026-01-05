@@ -1,11 +1,12 @@
-// /post/post.js (FINAL - Appwrite JWT + create_post)
-// - Upload image to Supabase Storage (client via /service/supabase.js)
-// - Create analysis row via API (create_post)
+// /post/post.js (FINAL - NO SUPABASE)
+// ✅ Upload image -> sm-api (multipart)
+// ✅ Create analysis row -> sm-api
+//
+// Required API:
+// POST https://api.chriontoken.com/api/upload/analysis-image   (FormData: file)
+// POST https://api.chriontoken.com/api/analyses/create        (JSON: { me, market, category, timeframe, content, pairs, image_path })
 
-import { supabase } from "/services/supabase.js";
-
-const BUCKET = "analysis-images";
-const FN_CREATE_POST = "/.netlify/functions/create_post"; // sen backend endpointin buysa kalsın
+const API_BASE = "https://api.chriontoken.com";
 
 const form = document.getElementById("postForm");
 const msg = document.getElementById("formMsg");
@@ -26,57 +27,43 @@ function parsePairs(input) {
         .filter(Boolean);
 }
 
-function getJWT() {
-    const jwt = localStorage.getItem("sm_jwt");
-    if (!jwt) throw new Error("Login required");
-    return jwt;
+// ✅ Appwrite UID (login.js set ediyor: localStorage.setItem("sm_uid", user.$id))
+function getAppwriteUid() {
+    const uid = localStorage.getItem("sm_uid");
+    if (!uid) throw new Error("Login required");
+    return uid;
 }
 
-function guessExt(file) {
-    const byName = (file?.name || "").split(".").pop()?.toLowerCase();
-    if (byName) return byName;
-    const t = (file?.type || "").toLowerCase();
-    if (t.includes("png")) return "png";
-    if (t.includes("jpeg") || t.includes("jpg")) return "jpg";
-    if (t.includes("webp")) return "webp";
-    return "png";
-}
-
-async function uploadImage(file) {
+// ---------- 1) Upload image to sm-api ----------
+async function uploadImageToApi(file) {
     if (!file) throw new Error("Please select an image.");
 
-    const ext = guessExt(file);
-    const filePath = `posts/${Date.now()}-${Math.random().toString(16).slice(2)}.${ext}`;
+    const fd = new FormData();
+    fd.append("file", file);
 
-    const { error } = await supabase.storage.from(BUCKET).upload(filePath, file, {
-        upsert: false,
-        cacheControl: "3600",
-        contentType: file.type || "image/*",
+    const r = await fetch(`${API_BASE}/api/upload/analysis-image`, {
+        method: "POST",
+        body: fd,
     });
 
-    if (error) throw error;
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(j?.error || `upload failed (${r.status})`);
 
-    // Bucket PUBLIC ise:
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-    if (!data?.publicUrl) throw new Error("Image URL not available");
-
-    return data.publicUrl;
+    // j: { ok:true, image_path:"/uploads/analysis-images/xxx.webp" }
+    if (!j?.image_path) throw new Error("upload: image_path missing");
+    return j.image_path;
 }
 
-async function createPost(payload) {
-    const jwt = getJWT();
-
-    const r = await fetch(FN_CREATE_POST, {
+// ---------- 2) Create analysis row in DB ----------
+async function createAnalysis(payload) {
+    const r = await fetch(`${API_BASE}/api/analyses/create`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 
     const j = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(j?.error || `create_post failed (${r.status})`);
+    if (!r.ok) throw new Error(j?.error || `create failed (${r.status})`);
     return j; // { ok:true, id: ... }
 }
 
@@ -102,23 +89,23 @@ form?.addEventListener("submit", async (e) => {
         if (!pairs.length) throw new Error("Invalid pair format.");
 
         setMsg("Uploading image...");
-        const imageUrl = await uploadImage(file);
+        const image_path = await uploadImageToApi(file); // ✅ /uploads/analysis-images/...
 
         setMsg("Saving analysis...");
 
-        // ✅ create_post function already sets author_id from Appwrite userId
         const payload = {
+            me: getAppwriteUid(),          // ✅ Appwrite UID
             market,
             category: "Trend",
             timeframe,
             content,
             pairs,
-            image_path: imageUrl,
+            image_path,                   // ✅ public path
         };
 
-        console.log("CREATE_POST PAYLOAD:", payload);
+        console.log("CREATE ANALYSIS:", payload);
 
-        await createPost(payload);
+        await createAnalysis(payload);
 
         setMsg("Published successfully!");
         form.reset();

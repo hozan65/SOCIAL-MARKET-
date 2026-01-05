@@ -1,8 +1,8 @@
 /* /styles/sidebar.css */
 :root{
-    --sb-bg1:#0d0b14;
-    --sb-bg2:#100d1a;
-    --sb-edge:rgba(255,255,255,.08);
+    --sb-bg1: #10022e;
+    --sb-bg2: #1f0859;
+    --sb-edge: rgb(255, 255, 255);
 
     --sb-text:rgba(255,255,255,.92);
     --sb-muted:rgba(255,255,255,.58);
@@ -173,7 +173,7 @@
     left: 6px;
     right: 6px;
     bottom: 126px;
-    background: linear-gradient(180deg, #171426, var(--menu-bg));
+    background: linear-gradient(180deg, #301280, var(--menu-bg));
     border:1px solid rgba(255,255,255,.12);
     border-radius:16px;
     padding:10px;
