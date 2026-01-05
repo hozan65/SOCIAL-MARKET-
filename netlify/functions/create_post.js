@@ -180,7 +180,7 @@ exports.handler = async (event) => {
             category,
             timeframe,
             content,
-            pairs: pairsArr,      // ✅ ARRAY!
+            pairs: pairsArr,      
             image_path,
         });
 
