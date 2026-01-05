@@ -105,7 +105,7 @@ export const handler = async (event) => {
             .update({ updated_at: new Date().toISOString() })
             .eq("id", conversation_id);
 
-        // ✅ realtime DM push (socket-server emit)
+        // ✅ realtime DM push (sm-api emit)
         let emit_status = "skipped";
         try {
             const emitUrl = process.env.SOCKET_DM_EMIT_URL || ""; // 🔥 tek env ismi

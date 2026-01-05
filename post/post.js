@@ -1,118 +1,267 @@
-// /post/post.js (FINAL - NO SUPABASE)
-// ✅ Upload image -> sm-api (multipart)
-// ✅ Create analysis row -> sm-api
-//
-// Required API:
-// POST https://api.chriontoken.com/api/upload/analysis-image   (FormData: file)
-// POST https://api.chriontoken.com/api/analyses/create        (JSON: { me, market, category, timeframe, content, pairs, image_path })
+// /post/post.js  (FULL - Supabase removed, sm-api only)
+// ✅ Upload image (multipart) + client compress
+// ✅ Create post via sm-api
+// ✅ Strong errors + safe DOM handling
 
-const API_BASE = "https://api.chriontoken.com";
+console.log("✅ post.js loaded (sm-api only)");
 
-const form = document.getElementById("postForm");
-const msg = document.getElementById("formMsg");
-const publishBtn = document.getElementById("publishBtn");
+/* =========================
+   CONFIG
+========================= */
+const API_BASE = "https://api.chriontoken.com"; // <-- PROD API
+const EP_UPLOAD = `${API_BASE}/api/upload/analysis-image`;
+const EP_CREATE_POST = `${API_BASE}/api/posts`;
 
-function setMsg(text) {
-    if (msg) msg.textContent = text || "";
+// LocalStorage keys
+const LS_JWT = "sm_jwt"; // eğer farklıysa değiştir
+
+/* =========================
+   DOM HELPERS
+========================= */
+const $ = (id) => document.getElementById(id);
+
+function pickEl(...ids) {
+    for (const id of ids) {
+        const el = $(id);
+        if (el) return el;
+    }
+    return null;
 }
 
-function safeTrim(v) {
-    return String(v ?? "").trim();
+function setText(el, text) {
+    if (!el) return;
+    el.textContent = text || "";
 }
 
-function parsePairs(input) {
-    return safeTrim(input)
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+function setBusy(btn, busy, labelBusy = "Publishing...") {
+    if (!btn) return;
+    btn.disabled = !!busy;
+    if (!btn.dataset._label) btn.dataset._label = btn.textContent || "Publish";
+    btn.textContent = busy ? labelBusy : btn.dataset._label;
 }
 
-// ✅ Appwrite UID (login.js set ediyor: localStorage.setItem("sm_uid", user.$id))
-function getAppwriteUid() {
-    const uid = localStorage.getItem("sm_uid");
-    if (!uid) throw new Error("Login required");
-    return uid;
+function getJWT() {
+    const t = localJoker = localStorage.getItem(LS_JWT);
+    return (t || "").trim();
 }
 
-// ---------- 1) Upload image to sm-api ----------
-async function uploadImageToApi(file) {
-    if (!file) throw new Error("Please select an image.");
+/* =========================
+   IMAGE COMPRESS (client-side)
+========================= */
+async function resizeImageFile(file, { maxW = 1280, quality = 0.82 } = {}) {
+    if (!file || !file.type || !file.type.startsWith("image/")) return file;
+
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+
+    try {
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = url;
+        });
+
+        const ratio = Math.min(1, maxW / img.width);
+        const w = Math.max(1, Math.round(img.width * ratio));
+        const h = Math.max(1, Math.round(img.height * ratio));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const blob = await new Promise((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", quality)
+        );
+
+        if (!blob) return file;
+
+        const newName =
+            (file.name || "image").replace(/\.\w+$/, "") + ".jpg";
+
+        return new File([blob], newName, {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+        });
+    } finally {
+        URL.revokeObjectURL(url);
+    }
+}
+
+/* =========================
+   FETCH HELPERS
+========================= */
+async function safeText(res) {
+    try {
+        return await res.text();
+    } catch {
+        return "";
+    }
+}
+
+async function postJson(url, bodyObj, jwt) {
+    const res = await fetch(url, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+        },
+        body: JSON.stringify(bodyObj),
+    });
+
+    if (!res.ok) {
+        const t = await safeText(res);
+        throw new Error(`HTTP ${res.status} ${t || ""}`.trim());
+    }
+
+    return await res.json();
+}
+
+/* =========================
+   UPLOAD IMAGE
+========================= */
+async function uploadImageToApi(file, jwt) {
+    if (!file) return null;
+
+    // compress
+    const resized = await resizeImageFile(file, { maxW: 1280, quality: 0.82 });
+
+    // hard cap (client) - 6MB öneri
+    const MAX = 6 * 1024 * 1024;
+    if (resized.size > MAX) {
+        throw new Error(
+            `Image too large after compress: ${(resized.size / 1024 / 1024).toFixed(
+                2
+            )}MB (max ~6MB)`
+        );
+    }
 
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", resized);
 
-    const r = await fetch(`${API_BASE}/api/upload/analysis-image`, {
+    const res = await fetch(EP_UPLOAD, {
         method: "POST",
+        headers: {
+            // FormData -> Content-Type setleme
+            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+        },
         body: fd,
     });
 
-    const j = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(j?.error || `upload failed (${r.status})`);
+    if (!res.ok) {
+        const t = await safeText(res);
+        throw new Error(`Upload failed: ${res.status} ${t || ""}`.trim());
+    }
 
-    // j: { ok:true, image_path:"/uploads/analysis-images/xxx.webp" }
-    if (!j?.image_path) throw new Error("upload: image_path missing");
-    return j.image_path;
+    const data = await res.json(); // {url:"..."} beklenir
+    const url = data?.url || data?.publicUrl || data?.path || null;
+
+    if (!url) {
+        throw new Error("Upload response missing url");
+    }
+
+    return url;
 }
 
-// ---------- 2) Create analysis row in DB ----------
-async function createAnalysis(payload) {
-    const r = await fetch(`${API_BASE}/api/analyses/create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-    });
+/* =========================
+   MAIN: CREATE POST
+========================= */
+const form = pickEl("postForm", "createPostForm");
+const publishBtn = pickEl("publishBtn", "submitBtn");
+const msg = pickEl("formMsg", "postMsg", "msg");
 
-    const j = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(j?.error || `create failed (${r.status})`);
-    return j; // { ok:true, id: ... }
+// Inputs (farklı id/name ihtimali için çoklu fallback)
+const titleEl = pickEl("title", "postTitle");
+const contentEl = pickEl("content", "postContent", "text", "body");
+const tagsEl = pickEl("tags", "postTags");
+const imageEl =
+    document.querySelector('input[type="file"][name="image"]') ||
+    pickEl("image", "imageFile", "postImage");
+
+function getValue(el) {
+    return (el?.value ?? "").toString().trim();
 }
 
-form?.addEventListener("submit", async (e) => {
+function parseTags(raw) {
+    return (raw || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, 20);
+}
+
+function getFirstFile(input) {
+    const f = input?.files?.[0];
+    return f || null;
+}
+
+async function handleSubmit(e) {
     e.preventDefault();
-    setMsg("");
-    if (publishBtn) publishBtn.disabled = true;
+    setText(msg, "");
+
+    const jwt = getJWT();
+
+    // basic payload
+    const title = getValue(titleEl);
+    const content = getValue(contentEl);
+    const tags = parseTags(getValue(tagsEl));
+
+    if (!content && !title) {
+        setText(msg, "Title or content is required.");
+        return;
+    }
+
+    setBusy(publishBtn, true);
 
     try {
-        const market = safeTrim(document.getElementById("market")?.value);
-        const pairInput = safeTrim(document.getElementById("pair")?.value);
-        const timeframe = safeTrim(document.getElementById("timeframe")?.value);
-        const content = safeTrim(document.getElementById("description")?.value);
-        const file = document.getElementById("image")?.files?.[0];
+        // 1) optional upload
+        const file = getFirstFile(imageEl);
+        let imageUrl = null;
 
-        if (!market) throw new Error("Select market.");
-        if (!pairInput) throw new Error("Enter pair(s).");
-        if (!timeframe) throw new Error("Select timeframe.");
-        if (!content) throw new Error("Analysis text cannot be empty.");
-        if (!file) throw new Error("Please select a chart image.");
+        if (file) {
+            setText(msg, "Uploading image...");
+            imageUrl = await uploadImageToApi(file, jwt);
+        }
 
-        const pairs = parsePairs(pairInput);
-        if (!pairs.length) throw new Error("Invalid pair format.");
+        // 2) create post
+        setText(msg, "Publishing post...");
 
-        setMsg("Uploading image...");
-        const image_path = await uploadImageToApi(file); // ✅ /uploads/analysis-images/...
-
-        setMsg("Saving analysis...");
-
+        // Backend’in beklediği alanlar farklıysa burada map et.
         const payload = {
-            me: getAppwriteUid(),          // ✅ Appwrite UID
-            market,
-            category: "Trend",
-            timeframe,
+            title,
             content,
-            pairs,
-            image_path,                   // ✅ public path
+            tags,
+            image_url: imageUrl,     // snake_case
+            imageUrl: imageUrl,      // camelCase fallback (backend hangisini alıyorsa)
+            visibility: "public",
         };
 
-        console.log("CREATE ANALYSIS:", payload);
+        const created = await postJson(EP_CREATE_POST, payload, jwt);
 
-        await createAnalysis(payload);
+        setText(msg, "✅ Posted!");
 
-        setMsg("Published successfully!");
-        form.reset();
+        // 3) redirect (istersen kapat)
+        const newId = created?.id || created?.post?.id || created?.data?.id || null;
+        if (newId) {
+            // view page route'in buysa:
+            location.href = `/view/view.html?id=${encodeURIComponent(newId)}`;
+            return;
+        }
+
+        // id dönmüyorsa sadece resetle
+        form?.reset?.();
     } catch (err) {
         console.error("POST ERROR:", err);
-        setMsg("Error: " + (err?.message || "unknown"));
+        setText(msg, `❌ ${err?.message || "Post failed"}`);
     } finally {
-        if (publishBtn) publishBtn.disabled = false;
+        setBusy(publishBtn, false);
     }
-});
+}
+
+if (form) {
+    form.addEventListener("submit", handleSubmit);
+} else {
+    console.warn("⚠️ post form not found (expected #postForm)");
+}
