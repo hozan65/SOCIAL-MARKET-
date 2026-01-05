@@ -40,8 +40,9 @@ function setBusy(btn, busy, labelBusy = "Publishing...") {
     btn.textContent = busy ? labelBusy : btn.dataset._label;
 }
 
+/* ✅ FIXED */
 function getJWT() {
-    const t = localJoker = localStorage.getItem(LS_JWT);
+    const t = localStorage.getItem(LS_JWT);
     return (t || "").trim();
 }
 
@@ -78,8 +79,7 @@ async function resizeImageFile(file, { maxW = 1280, quality = 0.82 } = {}) {
 
         if (!blob) return file;
 
-        const newName =
-            (file.name || "image").replace(/\.\w+$/, "") + ".jpg";
+        const newName = (file.name || "image").replace(/\.\w+$/, "") + ".jpg";
 
         return new File([blob], newName, {
             type: "image/jpeg",
@@ -125,10 +125,8 @@ async function postJson(url, bodyObj, jwt) {
 async function uploadImageToApi(file, jwt) {
     if (!file) return null;
 
-    // compress
     const resized = await resizeImageFile(file, { maxW: 1280, quality: 0.82 });
 
-    // hard cap (client) - 6MB öneri
     const MAX = 6 * 1024 * 1024;
     if (resized.size > MAX) {
         throw new Error(
@@ -144,7 +142,6 @@ async function uploadImageToApi(file, jwt) {
     const res = await fetch(EP_UPLOAD, {
         method: "POST",
         headers: {
-            // FormData -> Content-Type setleme
             ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
         },
         body: fd,
@@ -155,13 +152,10 @@ async function uploadImageToApi(file, jwt) {
         throw new Error(`Upload failed: ${res.status} ${t || ""}`.trim());
     }
 
-    const data = await res.json(); // {url:"..."} beklenir
+    const data = await res.json();
     const url = data?.url || data?.publicUrl || data?.path || null;
 
-    if (!url) {
-        throw new Error("Upload response missing url");
-    }
-
+    if (!url) throw new Error("Upload response missing url");
     return url;
 }
 
@@ -172,7 +166,6 @@ const form = pickEl("postForm", "createPostForm");
 const publishBtn = pickEl("publishBtn", "submitBtn");
 const msg = pickEl("formMsg", "postMsg", "msg");
 
-// Inputs (farklı id/name ihtimali için çoklu fallback)
 const titleEl = pickEl("title", "postTitle");
 const contentEl = pickEl("content", "postContent", "text", "body");
 const tagsEl = pickEl("tags", "postTags");
@@ -202,8 +195,6 @@ async function handleSubmit(e) {
     setText(msg, "");
 
     const jwt = getJWT();
-
-    // basic payload
     const title = getValue(titleEl);
     const content = getValue(contentEl);
     const tags = parseTags(getValue(tagsEl));
@@ -216,7 +207,6 @@ async function handleSubmit(e) {
     setBusy(publishBtn, true);
 
     try {
-        // 1) optional upload
         const file = getFirstFile(imageEl);
         let imageUrl = null;
 
@@ -225,16 +215,14 @@ async function handleSubmit(e) {
             imageUrl = await uploadImageToApi(file, jwt);
         }
 
-        // 2) create post
         setText(msg, "Publishing post...");
 
-        // Backend’in beklediği alanlar farklıysa burada map et.
         const payload = {
             title,
             content,
             tags,
-            image_url: imageUrl,     // snake_case
-            imageUrl: imageUrl,      // camelCase fallback (backend hangisini alıyorsa)
+            image_url: imageUrl,
+            imageUrl: imageUrl,
             visibility: "public",
         };
 
@@ -242,15 +230,12 @@ async function handleSubmit(e) {
 
         setText(msg, "✅ Posted!");
 
-        // 3) redirect (istersen kapat)
         const newId = created?.id || created?.post?.id || created?.data?.id || null;
         if (newId) {
-            // view page route'in buysa:
             location.href = `/view/view.html?id=${encodeURIComponent(newId)}`;
             return;
         }
 
-        // id dönmüyorsa sadece resetle
         form?.reset?.();
     } catch (err) {
         console.error("POST ERROR:", err);
