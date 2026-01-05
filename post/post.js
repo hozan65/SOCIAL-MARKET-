@@ -1,11 +1,7 @@
-// /post/post.js (FINAL - sm-api upload + create analysis)
 console.log("✅ post.js loaded (sm-api only)");
 
 const API_BASE = "https://api.chriontoken.com";
-
-// endpoints
 const EP_UPLOAD = `${API_BASE}/api/upload/analysis-image`;
-const EP_CREATE = `${API_BASE}/api/analyses/create`;
 
 const form = document.getElementById("postForm");
 const msg = document.getElementById("formMsg");
@@ -22,70 +18,36 @@ function setMsg(t) {
 }
 
 function disable(b) {
-    if (publishBtn) publishBtn.disabled = !!b;
-    if (publishBtn) publishBtn.textContent = b ? "Publishing..." : "Publish";
+    if (publishBtn) {
+        publishBtn.disabled = !!b;
+        publishBtn.textContent = b ? "Publishing..." : "Publish";
+    }
 }
 
-// ✅ localStorage'dan JWT
-function getJWT() {
-    return localStorage.getItem("sm_jwt") || "";
-}
-
-// "BTCUSDT, ETHUSDT" -> ["BTCUSDT","ETHUSDT"]
 function parsePairs(str) {
     return String(str || "")
         .split(",")
-        .map((s) => s.trim())
+        .map(s => s.trim())
         .filter(Boolean);
 }
 
-/** Upload image (multipart/form-data, field: "file") -> returns public url */
+// ✅ TEK uploadImage — ÇAKIŞMA YOK
 async function uploadImage(file) {
     const fd = new FormData();
-    fd.append("file", file, file?.name || "image.png");
+    fd.append("file", file);
 
     const r = await fetch(EP_UPLOAD, {
         method: "POST",
-        body: fd,
+        body: fd
     });
 
-    const text = await r.text();
-    let data = {};
-    try { data = JSON.parse(text); } catch {}
+    const data = await r.json().catch(() => ({}));
 
-    if (!r.ok) {
-        // server json döndürmediyse text'i göster
-        throw new Error(data?.error || `Upload failed (${r.status}): ${text || r.statusText}`);
+    if (!r.ok || !data.ok || !data.url) {
+        throw new Error(data.error || `Upload failed (${r.status})`);
     }
-    if (!data?.ok || !data?.url) {
-        throw new Error(data?.error || "Upload response invalid");
-    }
+
     return data.url;
-}
-
-/** Create analysis row */
-async function createAnalysis(payload) {
-    const jwt = getJWT();
-
-    const r = await fetch(EP_CREATE, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
-        },
-        body: JSON.stringify(payload),
-    });
-
-    const text = await r.text();
-    let data = {};
-    try { data = JSON.parse(text); } catch {}
-
-    if (!r.ok) {
-        throw new Error(data?.error || `Create failed (${r.status}): ${text || r.statusText}`);
-    }
-
-    // API bazen {ok:true, analysis:{...}} bazen direkt {...} döndürebilir
-    return data?.analysis || data;
 }
 
 form?.addEventListener("submit", async (e) => {
@@ -97,46 +59,28 @@ form?.addEventListener("submit", async (e) => {
         const timeframe = String($timeframe?.value || "").trim();
         const pairs = parsePairs($pair?.value);
         const content = String($content?.value || "").trim();
-
-        const file = $image?.files?.[0] || null;
+        const file = $image?.files?.[0];
 
         if (!market) throw new Error("Market required");
         if (!timeframe) throw new Error("Timeframe required");
-        if (!pairs.length) throw new Error("Pair required (BTCUSDT, EURUSD...)");
-        if (!content) throw new Error("Analysis content required");
-        if (!file) throw new Error("Image required (please select a file)");
-
-        // ekstra güvenlik: client-side limit (server/nginx de limit var)
-        const maxMB = 9.5;
-        if (file.size > maxMB * 1024 * 1024) {
-            throw new Error(`Image too large (${(file.size/1024/1024).toFixed(2)}MB). Max ~${maxMB}MB`);
-        }
+        if (!pairs.length) throw new Error("Pair required");
+        if (!content) throw new Error("Content required");
+        if (!file) throw new Error("Image required");
 
         disable(true);
 
-        // 1) upload image
         const imageUrl = await uploadImage(file);
 
-        // 2) create analysis
-        const analysis = await createAnalysis({
-            market,
-            timeframe,
-            pairs,
-            content,
-            image_path: imageUrl, // serverın beklediği alan buysa kalsın
-        });
+        console.log("✅ IMAGE UPLOADED:", imageUrl);
+        setMsg("✅ Image uploaded successfully");
 
-        setMsg("✅ Published!");
-        console.log("✅ created analysis:", analysis);
+        // burada ister create analysis endpointine geçersin
+        // şimdilik upload test yeterli
 
         form.reset();
-
-        // istersen feed'e yönlendir:
-        // location.href = "/feed/feed.html";
-
     } catch (err) {
         console.error(err);
-        setMsg("❌ " + String(err?.message || err));
+        setMsg("❌ " + (err.message || err));
     } finally {
         disable(false);
     }
