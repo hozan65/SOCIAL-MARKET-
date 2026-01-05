@@ -52,25 +52,25 @@ async function uploadImage(file) {
     return data.url; // public url
 }
 
-async function createAnalysis(payload) {
-    // Eğer ilerde auth ekleyeceksen bu header hazır:
-    const jwt = getJWT();
+async function uploadImage(file) {
+    const fd = new FormData();
+    fd.append("file", file);
 
-    const r = await fetch(EP_CREATE, {
+    const r = await fetch("https://api.chriontoken.com/api/upload/analysis-image", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
-        },
-        body: JSON.stringify(payload),
+        body: fd
+        
     });
 
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok || !data?.ok) {
-        throw new Error(data?.error || `Create failed (${r.status})`);
-    }
-    return data.analysis;
+    const text = await r.text();
+    if (!r.ok) throw new Error(`Upload failed ${r.status}: ${text}`);
+
+    const data = JSON.parse(text);
+    if (!data.ok || !data.url) throw new Error("Upload response invalid");
+
+    return data.url;
 }
+
 
 form?.addEventListener("submit", async (e) => {
     e.preventDefault();
