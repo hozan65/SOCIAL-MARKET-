@@ -1,17 +1,9 @@
 {
-  "name": "social-market",
+  "name": "social-market-fe",
   "private": true,
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
-    "build": "echo \"no build\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.89.0",
-    "node-appwrite": "^12.0.1"
+    "build": "echo \"no build\""
   }
 }
-
