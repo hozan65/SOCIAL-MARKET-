@@ -2,9 +2,9 @@
   FEED.JS (NO MODULE / NO IMPORT)
   - ✅ NO SUPABASE
   - Feed: sm-api (/api/analyses)
-  - News: sm-api (/api/news)
+  - News: sm-api (/api/news)  ✅ (server.js’de bu endpoint mutlaka olmalı)
   - Like count: sm-api (/api/analyses/:id/likes_count)
-  - Like / Follow: şimdilik Netlify Functions (JWT) (sonra sm-api’ye taşırız)
+  - Like / Follow: Netlify Functions (JWT)
   - Realtime (Socket.IO) aynen
 ========================= */
 
@@ -13,7 +13,10 @@ console.log("✅ feed.js running (NO SUPABASE)");
 // =========================
 // API BASE
 // =========================
-const API_BASE = "https://api.chriontoken.com"; // prod domain
+const API_BASE = "https://api.chriontoken.com";
+
+// ✅ NEWS ENDPOINT (tek yerden değiştir)
+const NEWS_PATH = "/api/news"; // eğer server.js’de farklıysa burayı değiştir
 
 // =========================
 // REALTIME (Socket.IO)
@@ -21,7 +24,6 @@ const API_BASE = "https://api.chriontoken.com"; // prod domain
 function getSocket() {
     return window.rt?.socket || null;
 }
-
 function rtEmit(eventName, payload) {
     try {
         const s = getSocket();
@@ -29,7 +31,6 @@ function rtEmit(eventName, payload) {
         s.emit(eventName, payload);
     } catch {}
 }
-
 function rtOn(eventName, handler) {
     try {
         const s = getSocket();
@@ -38,15 +39,11 @@ function rtOn(eventName, handler) {
         s.on(eventName, handler);
     } catch {}
 }
-
 rtOn("post:like:update", ({ postId, likeCount }) => {
     try {
         const pid = String(postId || "").trim();
         if (!pid) return;
-
-        const btns = document.querySelectorAll(
-            `.likeBtn[data-post-id="${CSS.escape(pid)}"]`
-        );
+        const btns = document.querySelectorAll(`.likeBtn[data-post-id="${CSS.escape(pid)}"]`);
         btns.forEach((b) => {
             const span = b.querySelector(".likeCount");
             if (span) span.textContent = String(likeCount ?? 0);
@@ -101,15 +98,22 @@ function oneLineText(s) {
     return String(s ?? "").trim();
 }
 
+// ✅ FIX: image url resolve (uploads path’i doğru)
 function resolveImageUrl(image_path) {
     const p = String(image_path ?? "").trim();
     if (!p) return "";
+
+    // full url
     if (p.startsWith("http://") || p.startsWith("https://")) return p;
 
-    // ✅ Yeni plan: image_path artık ya tam URL olur ya da "/uploads/..." gibi bir public path olur
-    // Eğer sadece "dosya.jpg" gelirse, varsayılan uploads klasörüne bağla:
-    if (p.startsWith("/")) return p;
-    return `/uploads/analysis-images/${p}`;
+    // "/uploads/xxx.png" gibi path gelirse api domain’e bağla
+    if (p.startsWith("/uploads/")) return `${API_BASE}${p}`;
+
+    // sadece "analysis_xxx.png" gelirse uploads köküne koy
+    if (!p.startsWith("/")) return `${API_BASE}/uploads/${p}`;
+
+    // başka absolute path ise olduğu gibi bırak
+    return p;
 }
 
 function openPost(postId) {
@@ -129,7 +133,6 @@ function getJWT() {
 
 async function fnPost(url, body) {
     const jwt = getJWT();
-
     const r = await fetch(url, {
         method: "POST",
         headers: {
@@ -163,9 +166,7 @@ async function getMyUserId() {
     if (_meCache) return _meCache;
 
     const jwt = getJWT();
-    const r = await fetch(FN_AUTH_USER, {
-        headers: { Authorization: `Bearer ${jwt}` },
-    });
+    const r = await fetch(FN_AUTH_USER, { headers: { Authorization: `Bearer ${jwt}` } });
     const j = await r.json().catch(() => null);
     if (!r.ok) throw new Error(j?.error || "Auth user failed");
 
@@ -177,7 +178,7 @@ async function getMyUserId() {
 }
 
 // =========================
-// FOLLOW CACHE (fallback)
+// FOLLOW CACHE
 // =========================
 function followCacheKey(myId) {
     return `sm_following:${myId}`;
@@ -194,10 +195,7 @@ function getFollowingSetFromCache(myId) {
 }
 function saveFollowingSetToCache(myId, set) {
     try {
-        localStorage.setItem(
-            followCacheKey(myId),
-            JSON.stringify(Array.from(set))
-        );
+        localStorage.setItem(followCacheKey(myId), JSON.stringify(Array.from(set)));
     } catch {}
 }
 
@@ -212,53 +210,53 @@ async function apiGet(path) {
 }
 
 async function getLikeCount(analysisId) {
-    const id = String(analysisId || "").trim();
-    if (!id) return 0;
-    const out = await apiGet(`/api/analyses/${encodeURIComponent(id)}/likes_count`);
-    return Number(out?.likes_count || 0);
+    try {
+        const id = String(analysisId || "").trim();
+        if (!id) return 0;
+        const out = await apiGet(`/api/analyses/${encodeURIComponent(id)}/likes_count`);
+        return Number(out?.likes_count || 0);
+    } catch {
+        return 0; // like endpoint yoksa feed’i bozmasın
+    }
 }
 
 async function fetchAnalyses(limit, offset) {
-    const out = await apiGet(
-        `/api/analyses?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`
-    );
-    return Array.isArray(out?.list) ? out.list : [];
+    const out = await apiGet(`/api/analyses?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`);
+    return Array.isArray(out?.list)
+        ? out.list
+        : (Array.isArray(out?.items) ? out.items : []);
 }
 
 async function fetchNews(limit = 6) {
-    const out = await apiGet(`/api/news?limit=${encodeURIComponent(limit)}`);
-    return Array.isArray(out?.list) ? out.list : [];
+    const out = await apiGet(`${NEWS_PATH}?limit=${encodeURIComponent(limit)}`);
+    return Array.isArray(out?.list)
+        ? out.list
+        : (Array.isArray(out?.items) ? out.items : []);
 }
 
-/**
- * Follow check (hydrate)
- * ✅ cache first
- * ✅ definitive check via Netlify is_following (JWT)
- */
+
 async function isFollowingUser(targetUserId) {
     const target = String(targetUserId || "").trim();
     if (!target) return false;
 
-    // 1) fast cache
+    // cache
     try {
         const myId = await getMyUserId();
         const set = getFollowingSetFromCache(myId);
         if (set.has(target)) return true;
     } catch {}
 
-    // 2) definitive via function (JWT)
+    // definitive
     try {
         const jwt = getJWT();
         const r = await fetch(`${FN_IS_FOLLOWING}?id=${encodeURIComponent(target)}`, {
             headers: { Authorization: `Bearer ${jwt}` },
             cache: "no-store",
         });
-
         const out = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(out?.error || `HTTP ${r.status}`);
         return !!out.is_following;
     } catch {
-        // 3) fallback cache
         try {
             const myId = await getMyUserId();
             const set = getFollowingSetFromCache(myId);
@@ -270,7 +268,7 @@ async function isFollowingUser(targetUserId) {
 }
 
 // =========================
-// POSTS SHOW MORE (6 by 6)
+// POSTS SHOW MORE
 // =========================
 const POSTS_STEP = 6;
 let postsPage = 0;
@@ -278,7 +276,7 @@ let postsBusy = false;
 let postsHasMore = true;
 
 // =========================
-// RENDER POST (TradingView-like)
+// RENDER POST
 // =========================
 function renderPost(row, index = 0) {
     const isFirst = postsPage === 0 && index === 0;
@@ -344,20 +342,17 @@ function renderPost(row, index = 0) {
 }
 
 // =========================
-// HYDRATE LIKE + FOLLOW STATES
+// HYDRATE LIKE + FOLLOW
 // =========================
 async function hydrateNewPosts(justAddedRows) {
     if (!grid) return;
 
-    // like counts + realtime room join
     for (const r of justAddedRows) {
         try {
             const postId = String(r.id);
             const c = await getLikeCount(postId);
 
-            const btn = grid.querySelector(
-                `.likeBtn[data-post-id="${CSS.escape(postId)}"]`
-            );
+            const btn = grid.querySelector(`.likeBtn[data-post-id="${CSS.escape(postId)}"]`);
             const span = btn?.querySelector(".likeCount");
             if (span) span.textContent = String(c);
 
@@ -365,15 +360,12 @@ async function hydrateNewPosts(justAddedRows) {
         } catch {}
     }
 
-    // follow states
     for (const r of justAddedRows) {
         try {
             const authorId = String(r.author_id || "").trim();
             if (!authorId) continue;
 
-            const btn = grid.querySelector(
-                `.followBtn[data-user-id="${CSS.escape(authorId)}"]`
-            );
+            const btn = grid.querySelector(`.followBtn[data-user-id="${CSS.escape(authorId)}"]`);
             if (!btn || btn.disabled) continue;
 
             try {
@@ -394,7 +386,7 @@ async function hydrateNewPosts(justAddedRows) {
 }
 
 // =========================
-// POSTS UI (Show more)
+// POSTS UI
 // =========================
 function ensurePostsMoreUI() {
     if (!grid) return;
@@ -419,8 +411,7 @@ function ensurePostsMoreUI() {
 
 function setPostsMoreLoading() {
     const wrap = document.getElementById("postsMoreWrap");
-    if (wrap)
-        wrap.innerHTML = `<button class="postsMoreBtn" type="button" disabled>Loading…</button>`;
+    if (wrap) wrap.innerHTML = `<button class="postsMoreBtn" type="button" disabled>Loading…</button>`;
 }
 
 async function loadFeed(reset = false) {
@@ -456,19 +447,12 @@ async function loadFeedMore() {
             return;
         }
 
-        grid.insertAdjacentHTML(
-            "beforeend",
-            rows.map((r, i) => renderPost(r, i)).join("")
-        );
-
+        grid.insertAdjacentHTML("beforeend", rows.map((r, i) => renderPost(r, i)).join(""));
         await hydrateNewPosts(rows);
 
-        // card click => view (butonlar hariç)
         for (const r of rows) {
             const pid = String(r.id || "").trim();
-            const card = grid.querySelector(
-                `.tvCard[data-post-id="${CSS.escape(pid)}"]`
-            );
+            const card = grid.querySelector(`.tvCard[data-post-id="${CSS.escape(pid)}"]`);
             if (!card || card.__bound) continue;
             card.__bound = true;
 
@@ -504,7 +488,7 @@ async function loadFeedMore() {
 }
 
 // =========================
-// NEWS (sm-api -> Slider)
+// NEWS
 // =========================
 function renderNewsSlide(n, active = false, isFirst = false) {
     const title = esc(n.title || "");
@@ -515,7 +499,6 @@ function renderNewsSlide(n, active = false, isFirst = false) {
 
     const loading = isFirst ? "eager" : "lazy";
     const fetchp = isFirst ? ' fetchpriority="high"' : "";
-
     const wh = ' width="1200" height="675"';
 
     return `
@@ -560,11 +543,7 @@ async function loadNews() {
             newsSlider.innerHTML = `<div class="newsSlideSkeleton">No news yet.</div>`;
             return;
         }
-
-        newsSlider.innerHTML = items
-            .map((n, i) => renderNewsSlide(n, i === 0, i === 0))
-            .join("");
-
+        newsSlider.innerHTML = items.map((n, i) => renderNewsSlide(n, i === 0, i === 0)).join("");
         startNewsAutoRotate();
     } catch (err) {
         console.error("❌ News error:", err);
@@ -594,7 +573,6 @@ document.addEventListener("click", async (e) => {
         const prevLiked = likeBtn.classList.contains("isLiked");
         const nextLiked = !prevLiked;
 
-        // OPTIMISTIC
         likeBtn.classList.toggle("isLiked", nextLiked);
         if (countSpan) {
             const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
@@ -616,11 +594,7 @@ document.addEventListener("click", async (e) => {
             try {
                 userId = await getMyUserId();
             } catch {}
-            rtEmit("like:toggle", {
-                postId: String(postId),
-                userId,
-                likeCount: likesCount,
-            });
+            rtEmit("like:toggle", { postId: String(postId), userId, likeCount: likesCount });
         } catch (err) {
             console.error("❌ toggleLike failed:", err);
             likeBtn.classList.toggle("isLiked", prevLiked);
@@ -633,7 +607,6 @@ document.addEventListener("click", async (e) => {
         return;
     }
 
-    // OPTIMISTIC FOLLOW
     const followBtn = e.target.closest(".followBtn");
     if (followBtn && !followBtn.disabled) {
         const targetUserId = String(followBtn.dataset.userId || "").trim();

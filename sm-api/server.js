@@ -1,4 +1,4 @@
-// server.js (sm-api) - FULL minimal working
+// /opt/sm-api/server.js (FINAL - uploads + analyses feed + news feed)
 import express from "express";
 import cors from "cors";
 import multer from "multer";
@@ -11,9 +11,10 @@ const app = express();
 /* =========================
    ENV
 ========================= */
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3002); // ✅ nginx proxy ile uyumlu
+const PUBLIC_API = process.env.PUBLIC_API || "https://api.chriontoken.com";
 
-// allowed origins (prod domain + netlify preview ekleyebilirsin)
+// allowed origins
 const ALLOWED_ORIGINS = [
     "https://chriontoken.com",
     "https://www.chriontoken.com",
@@ -42,15 +43,15 @@ app.use(
         },
         credentials: true,
         allowedHeaders: ["Content-Type", "Authorization"],
-        methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     })
 );
 
 // preflight
-app.options("*", (req, res) => res.sendStatus(204));
+app.options("*", (_req, res) => res.sendStatus(204));
 
-// JSON limit (post create)
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
 
 /* =========================
    STATIC UPLOADS (disk)
@@ -58,7 +59,7 @@ app.use(express.json({ limit: "1mb" }));
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-// public file serving (image url döndürmek için)
+// public file serving
 app.use("/uploads", express.static(UPLOAD_DIR));
 
 /* =========================
@@ -67,7 +68,7 @@ app.use("/uploads", express.static(UPLOAD_DIR));
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
     filename: (_req, file, cb) => {
-        const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
+        const ext = (path.extname(file.originalname || "") || ".jpg").toLowerCase();
         const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
         const name = `analysis_${Date.now()}_${Math.random().toString(16).slice(2)}${safeExt}`;
         cb(null, name);
@@ -76,58 +77,194 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB server limit (nginx'i de aç!)
+    limits: { fileSize: 15 * 1024 * 1024 }, // ✅ 15MB (nginx client_max_body_size ile uyumlu)
     fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.startsWith("image/")) return cb(new Error("Only images allowed"));
+        if (!file.mimetype?.startsWith("image/")) return cb(new Error("Only images allowed"));
         cb(null, true);
     },
 });
+
+/* =========================
+   HELPERS
+========================= */
+async function q(sql, params = []) {
+    return pool.query(sql, params);
+}
 
 /* =========================
    ROUTES
 ========================= */
 app.get("/health", (_req, res) => res.json({ ok: true }));
 
-// 1) Upload image
+// 1) Upload image (FormData field: "file")
 app.post("/api/upload/analysis-image", upload.single("file"), (req, res) => {
     if (!req.file) return res.status(400).json({ ok: false, error: "file required" });
 
-    // public URL (nginx domainin bu ise)
-    const publicUrl = `https://api.chriontoken.com/uploads/${req.file.filename}`;
+    const publicUrl = `${PUBLIC_API}/uploads/${req.file.filename}`;
     res.json({ ok: true, url: publicUrl });
 });
 
-// 2) Create post
-app.post("/api/posts", async (req, res) => {
+/* =========================
+   ANALYSES
+========================= */
+
+// Create analysis
+// body: { market, timeframe, pairs:[], content, image_path? }
+app.post("/api/analyses/create", async (req, res) => {
     try {
-        const { title = "", content = "", tags = [], image_url = null, imageUrl = null } = req.body || {};
-        const img = image_url || imageUrl || null;
+        const market = String(req.body?.market || "").trim();
+        const timeframe = String(req.body?.timeframe || "").trim();
+        const content = String(req.body?.content || "").trim();
+        const pairs = Array.isArray(req.body?.pairs) ? req.body.pairs : [];
+        const image_path = req.body?.image_path ? String(req.body.image_path).trim() : null;
 
-        if (!String(title).trim() && !String(content).trim()) {
-            return res.status(400).json({ ok: false, error: "title or content required" });
-        }
+        if (!market) return res.status(400).json({ ok: false, error: "market required" });
+        if (!timeframe) return res.status(400).json({ ok: false, error: "timeframe required" });
+        if (!content) return res.status(400).json({ ok: false, error: "content required" });
+        if (!pairs.length) return res.status(400).json({ ok: false, error: "pairs required" });
 
-        // TODO: auth eklenecek. Şimdilik user_id fake / null.
-        // Senin tablona göre alan adlarını ayarla:
-        const q = `
-      INSERT INTO posts (title, content, tags, image_url)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, title, content, tags, image_url, created_at
-    `;
-        const vals = [
-            String(title).trim(),
-            String(content).trim(),
-            Array.isArray(tags) ? tags : [],
-            img,
-        ];
+        const r = await q(
+            `INSERT INTO analyses (market, timeframe, content, pairs, image_path)
+       VALUES ($1,$2,$3,$4,$5)
+       RETURNING id, market, timeframe, content, pairs, image_path, created_at`,
+            [market, timeframe, content, pairs, image_path]
+        );
 
-        const { rows } = await pool.query(q, vals);
-        res.json(rows[0]);
+        res.json({ ok: true, analysis: r.rows[0] });
     } catch (e) {
-        console.error("create post error:", e);
-        res.status(500).json({ ok: false, error: "server_error" });
+        console.error("analyses/create error:", e);
+        res.status(500).json({ ok: false, error: String(e.message || e) });
     }
 });
+
+// Feed list
+app.get("/api/analyses", async (req, res) => {
+    try {
+        const limit = Math.min(50, Math.max(1, Number(req.query.limit || 6)));
+        const offset = Math.max(0, Number(req.query.offset || 0));
+
+        const r = await q(
+            `SELECT id, market, timeframe, content, pairs, image_path, created_at
+       FROM analyses
+       ORDER BY created_at DESC
+       LIMIT $1 OFFSET $2`,
+            [limit, offset]
+        );
+
+        res.json({ list: r.rows, limit, offset });
+    } catch (e) {
+        console.error("analyses list error:", e);
+        res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+});
+
+// (opsiyonel) Like count endpoint - sende varsa DB’ye bağlarız.
+// Şimdilik 0 döndürür ki feed.js patlamasın.
+app.get("/api/analyses/:id/likes_count", async (_req, res) => {
+    res.json({ likes_count: 0 });
+});
+
+/* =========================
+   NEWS
+========================= */
+// Feed slider için:
+// tablo: news (id, title, image_url, url, source, created_at)
+app.get("/api/news", async (req, res) => {
+    try {
+        const limit = Math.min(50, Math.max(1, Number(req.query.limit || 6)));
+
+        const r = await q(
+            `SELECT id, title, image_url, url, source, created_at
+       FROM news
+       ORDER BY created_at DESC
+       LIMIT $1`,
+            [limit]
+        );
+
+        res.json({ list: r.rows, limit });
+    } catch (e) {
+        console.error("news list error:", e);
+        // tablo yoksa net hata dönsün:
+        res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+});
+
+
+// ✅ DM INBOX (Postgres)
+// GET /api/dm/inbox
+// Header: X-User-Id: <appwrite_uid>
+app.get("/api/dm/inbox", async (req, res) => {
+    try {
+        const uid = String(req.header("X-User-Id") || "").trim();
+        if (!uid) return res.status(401).json({ ok: false, error: "Missing X-User-Id" });
+
+        // conversations: (id, user1_id, user2_id, updated_at, created_at)
+        const convosR = await q(
+            `
+      SELECT id, user1_id, user2_id, updated_at, created_at
+      FROM conversations
+      WHERE user1_id = $1 OR user2_id = $1
+      ORDER BY COALESCE(updated_at, created_at) DESC
+      `,
+            [uid]
+        );
+
+        const convos = convosR.rows || [];
+        if (!convos.length) return res.json({ ok: true, list: [] });
+
+        const convoIds = convos.map(c => c.id);
+
+        // last message per convo
+        const msgsR = await q(
+            `
+      SELECT DISTINCT ON (conversation_id)
+        conversation_id, body, created_at
+      FROM messages
+      WHERE conversation_id = ANY($1::uuid[])
+      ORDER BY conversation_id, created_at DESC
+      `,
+            [convoIds]
+        );
+
+        const lastByConvo = new Map((msgsR.rows || []).map(m => [m.conversation_id, m]));
+
+        // peer ids
+        const peerIds = convos.map(c => (c.user1_id === uid ? c.user2_id : c.user1_id));
+
+        // profiles: appwrite_user_id, name, avatar_url
+        const profR = await q(
+            `
+      SELECT appwrite_user_id, name, avatar_url
+      FROM profiles
+      WHERE appwrite_user_id = ANY($1::uuid[])
+      `,
+            [peerIds]
+        );
+
+        const profByUid = new Map((profR.rows || []).map(p => [p.appwrite_user_id, p]));
+
+        const list = convos.map(c => {
+            const peer_id = c.user1_id === uid ? c.user2_id : c.user1_id;
+            const prof = profByUid.get(peer_id);
+            const last = lastByConvo.get(c.id);
+
+            return {
+                conversation_id: c.id,
+                peer_id,
+                peer_name: prof?.name || "Unknown user",
+                peer_avatar: prof?.avatar_url || null,
+                last_message: last?.body ? String(last.body) : "",
+                last_at: last?.created_at || c.updated_at || c.created_at || null,
+            };
+        });
+
+        res.json({ ok: true, list });
+    } catch (e) {
+        console.error("dm/inbox error:", e);
+        res.status(500).json({ ok: false, error: String(e?.message || e) });
+    }
+});
+
 
 /* =========================
    START

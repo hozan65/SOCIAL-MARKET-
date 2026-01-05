@@ -1,6 +1,9 @@
 // netlify/functions/create_post.js
-// ✅ FINAL - Appwrite JWT verify + sm-api insert (NO Supabase) + CORS/OPTIONS
-// Fixes: pair required, pairs normalization, robust JWT headers
+// ✅ FINAL - Appwrite JWT verify + sm-api insert (NO Supabase)
+// ✅ Uses /api/analyses/create
+// ✅ Sends pairs as ARRAY (text[])
+// ✅ Sends X-User-Id header for author_id
+// ✅ Robust JWT extraction + CORS/OPTIONS
 
 const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "").trim(); // https://cloud.appwrite.io/v1
 const APPWRITE_PROJECT_ID = (process.env.APPWRITE_PROJECT_ID || "").trim();
@@ -75,7 +78,11 @@ async function getAppwriteUser(jwt) {
 
     const txt = await r.text().catch(() => "");
     let j = null;
-    try { j = txt ? JSON.parse(txt) : null; } catch { j = null; }
+    try {
+        j = txt ? JSON.parse(txt) : null;
+    } catch {
+        j = null;
+    }
 
     if (!r.ok) {
         const msg = j?.message || j?.error || `Appwrite auth failed (${r.status})`;
@@ -89,30 +96,25 @@ async function getAppwriteUser(jwt) {
     return { uid, email };
 }
 
-function normalizePairs(pairs) {
-    // Accepts array or string. Returns CSV: "BTCUSDT,ETHUSDT"
+function toPairsArray(pairs) {
     if (Array.isArray(pairs)) {
-        return pairs
-            .map((x) => String(x ?? "").trim())
-            .filter(Boolean)
-            .join(",");
+        return pairs.map((x) => String(x ?? "").trim()).filter(Boolean);
     }
-
     return String(pairs || "")
         .split(",")
         .map((x) => x.trim())
-        .filter(Boolean)
-        .join(",");
+        .filter(Boolean);
 }
 
-async function smApiCreatePost(uid, payload) {
+async function smApiCreateAnalysis(uid, payload) {
     if (!SM_API_BASE_URL) throw new Error("Missing SM_API_BASE_URL env");
 
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), SM_API_TIMEOUT_MS);
 
     try {
-        const r = await fetch(`${SM_API_BASE_URL}/api/posts/create`, {
+        // ✅ correct endpoint
+        const r = await fetch(`${SM_API_BASE_URL.replace(/\/$/, "")}/api/analyses/create`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -124,11 +126,16 @@ async function smApiCreatePost(uid, payload) {
 
         const txt = await r.text().catch(() => "");
         let j = {};
-        try { j = txt ? JSON.parse(txt) : {}; } catch { j = { raw: txt }; }
+        try {
+            j = txt ? JSON.parse(txt) : {};
+        } catch {
+            j = { raw: txt };
+        }
 
         if (!r.ok) {
             throw new Error(j?.error || j?.message || `sm-api create failed (${r.status})`);
         }
+
         return j;
     } catch (e) {
         if (String(e?.name || "").toLowerCase() === "aborterror") {
@@ -151,34 +158,41 @@ exports.handler = async (event) => {
         const user = await getAppwriteUser(jwt);
 
         let body = {};
-        try { body = JSON.parse(event.body || "{}"); } catch { body = {}; }
-
-        const market = String(body.market || "").trim();
-        const category = String(body.category || "").trim() || null;
-        const timeframe = String(body.timeframe || "").trim();
-        const content = String(body.content || "").trim();
-
-        const pairs = normalizePairs(body.pairs);
-        const pair = pairs.split(",")[0] || pairs; // ✅ required
-
-        const image_path = body.image_path ? String(body.image_path).trim() : null;
-
-        if (!market || !timeframe || !content || !pair) {
-            return json(400, { error: "Missing fields (market/timeframe/content/pair)" });
+        try {
+            body = JSON.parse(event.body || "{}");
+        } catch {
+            body = {};
         }
 
-        const out = await smApiCreatePost(user.uid, {
+        const market = String(body.market || "").trim();
+        const category = String(body.category || "").trim() || "";
+        const timeframe = String(body.timeframe || "").trim();
+        const content = String(body.content || "").trim();
+        const image_path = body.image_path ? String(body.image_path).trim() : "";
+
+        const pairsArr = toPairsArray(body.pairs);
+        if (!market || !timeframe || !content || pairsArr.length === 0) {
+            return json(400, { error: "Missing fields (market/timeframe/content/pairs[])" });
+        }
+
+        const out = await smApiCreateAnalysis(user.uid, {
             market,
             category,
             timeframe,
             content,
-            pairs,
-            pair,
+            pairs: pairsArr,      // ✅ ARRAY!
             image_path,
         });
 
-        const id = out?.id || out?.post_id || out?.data?.id || null;
-        if (!id) return json(500, { error: "sm-api returned missing id" });
+        // sm-api might return { ok:true, analysis:{id...} } OR { ok:true, id }
+        const id =
+            out?.analysis?.id ||
+            out?.id ||
+            out?.post_id ||
+            out?.data?.id ||
+            null;
+
+        if (!id) return json(500, { error: "sm-api returned missing id", raw: out });
 
         return json(200, { ok: true, id });
     } catch (e) {
