@@ -5,8 +5,9 @@ const APPWRITE_ENDPOINT = (process.env.APPWRITE_ENDPOINT || "https://cloud.appwr
 const APPWRITE_PROJECT_ID = (process.env.APPWRITE_PROJECT_ID || "").trim();
 
 export function getBearer(req) {
-    const h = req.headers?.authorization || req.headers?.Authorization || "";
-    return String(h).startsWith("Bearer ") ? String(h).slice(7).trim() : "";
+    const h = String(req.headers?.authorization || req.headers?.Authorization || "").trim();
+    const m = h.match(/^Bearer\s+(.+)$/i);
+    return m ? m[1].trim() : "";
 }
 
 export async function getAppwriteUserFromJwt(jwt) {
@@ -19,6 +20,6 @@ export async function getAppwriteUserFromJwt(jwt) {
         .setJWT(jwt);
 
     const account = new sdk.Account(client);
-    const user = await account.get(); // throws if invalid/expired
-    return user;
+    const user = await account.get(); // invalid/expired => throw
+    return user; // { $id, email, name ... }
 }
