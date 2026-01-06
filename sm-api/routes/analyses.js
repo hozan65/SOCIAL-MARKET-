@@ -4,8 +4,6 @@ import { pool } from "../db.js";
 import { getBearer, getAppwriteUserFromJwt } from "../lib/appwrite-user.js";
 
 const router = express.Router();
-
-// JSON body
 router.use(express.json());
 
 // ✅ AUTH middleware (JWT mandatory)
@@ -24,12 +22,13 @@ async function requireUser(req, res, next) {
 
 /* =========================================================
    POST /api/analyses/create
-   - author_id comes from JWT user.$id (NOT header)
+   - UUID author_id must reference users(id)
+   - Appwrite uid (string) -> users.appwrite_uid -> users.id (uuid)
 ========================================================= */
 router.post("/create", requireUser, async (req, res) => {
     try {
-        const author_id = String(req.user?.$id || "").trim();
-        if (!author_id) return res.status(401).json({ ok: false, error: "Auth user missing id" });
+        const appwrite_uid = String(req.user?.$id || "").trim();
+        if (!appwrite_uid) return res.status(401).json({ ok: false, error: "Auth user missing id" });
 
         const market = String(req.body?.market || "").trim();
         const category = String(req.body?.category || "General").trim();
@@ -52,15 +51,25 @@ router.post("/create", requireUser, async (req, res) => {
         if (!content) return res.status(400).json({ ok: false, error: "content required" });
         if (!image_path) return res.status(400).json({ ok: false, error: "image_path required" });
 
-        // analyses table expected columns:
-        // id (uuid or serial), author_id, market, category, timeframe, content, pairs (text[]), image_path, created_at
+        // ✅ map appwrite uid -> users.id (uuid)
+        const ur = await pool.query(`SELECT id FROM users WHERE appwrite_uid = $1 LIMIT 1`, [appwrite_uid]);
+        const author_uuid = ur.rows?.[0]?.id;
+
+        if (!author_uuid) {
+            return res.status(400).json({
+                ok: false,
+                error: "user_not_found",
+                detail: "No row in users for this appwrite_uid. Ensure login/ensure_profile inserts users(appwrite_uid).",
+            });
+        }
+
         const q = await pool.query(
             `
       INSERT INTO analyses (author_id, market, category, timeframe, content, pairs, image_path)
       VALUES ($1,$2,$3,$4,$5,$6,$7)
       RETURNING id, author_id, market, category, timeframe, content, pairs, image_path, created_at
       `,
-            [author_id, market, category, timeframe, content, pairs, image_path]
+            [author_uuid, market, category, timeframe, content, pairs, image_path]
         );
 
         return res.json({ ok: true, analysis: q.rows[0] });
@@ -95,16 +104,12 @@ router.get("/", async (req, res) => {
 
 /* =========================================================
    GET /api/analyses/:id/likes_count
-   - Assumption: interactions table keeps likes
-   - If your schema differs, tell me columns and I'll edit 1 query.
 ========================================================= */
 router.get("/:id/likes_count", async (req, res) => {
     try {
         const id = String(req.params?.id || "").trim();
         if (!id) return res.status(400).json({ ok: false, error: "id required" });
 
-        // Example schema:
-        // interactions(post_id, user_id, kind) where kind='like'
         const q = await pool.query(
             `
       SELECT COUNT(*)::int AS likes_count
@@ -120,9 +125,9 @@ router.get("/:id/likes_count", async (req, res) => {
     }
 });
 
-export default router;
-
-// GET /api/analyses/:id  ✅ view.js için şart
+/* =========================================================
+   GET /api/analyses/:id  (view.js için)
+========================================================= */
 router.get("/:id", async (req, res) => {
     try {
         const id = String(req.params?.id || "").trim();
@@ -146,3 +151,5 @@ router.get("/:id", async (req, res) => {
         return res.status(500).json({ ok: false, error: e?.message || String(e) });
     }
 });
+
+export default router;

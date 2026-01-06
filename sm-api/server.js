@@ -95,6 +95,21 @@ function getUid(req) {
     return String(req.header("x-user-id") || req.header("X-User-Id") || "").trim();
 }
 
+function getBearer(req) {
+    const h = String(req.header("Authorization") || "").trim();
+    if (!h) return "";
+    const m = h.match(/^Bearer\s+(.+)$/i);
+    return m ? m[1].trim() : "";
+}
+
+// ✅ Appwrite JWT verify endpoint (Appwrite Cloud kullanıyorsan endpoint farklıysa senin mevcut lib’in neyse onu kullan)
+// Eğer sende zaten getAppwriteUserFromJwt varsa bunu kullanma, onu çağır.
+async function getAppwriteUserFromJwt(jwt) {
+    // Bu fonksiyon sende başka dosyada vardıysa (lib/appwrite-user.js),
+    // aynısını burada tekrar etme. Direkt import edip kullan.
+    throw new Error("getAppwriteUserFromJwt is not wired in server.js yet");
+}
+
 /* =========================
    ROUTES
 ========================= */
