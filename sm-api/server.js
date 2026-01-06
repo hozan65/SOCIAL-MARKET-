@@ -1,4 +1,5 @@
 // /opt/sm-api/server.js (FINAL - uploads + analyses feed + news feed)
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import multer from "multer";
@@ -109,54 +110,60 @@ app.post("/api/upload/analysis-image", upload.single("file"), (req, res) => {
 ========================= */
 
 // Create analysis
-// body: { market, timeframe, pairs:[], content, image_path? }
+// Header: X-User-Id (author_id)
 app.post("/api/analyses/create", async (req, res) => {
-    try {
-        const market = String(req.body?.market || "").trim();
-        const timeframe = String(req.body?.timeframe || "").trim();
-        const content = String(req.body?.content || "").trim();
-        const pairs = Array.isArray(req.body?.pairs) ? req.body.pairs : [];
-        const image_path = req.body?.image_path ? String(req.body.image_path).trim() : null;
+  try {
+    const author_id = String(req.header("X-User-Id") || "").trim();
 
-        if (!market) return res.status(400).json({ ok: false, error: "market required" });
-        if (!timeframe) return res.status(400).json({ ok: false, error: "timeframe required" });
-        if (!content) return res.status(400).json({ ok: false, error: "content required" });
-        if (!pairs.length) return res.status(400).json({ ok: false, error: "pairs required" });
+    const market = String(req.body?.market || "").trim();
+    const timeframe = String(req.body?.timeframe || "").trim();
+    const title = String(req.body?.title || "").trim();
+    const category = String(req.body?.category || "").trim();
+    const content = String(req.body?.content || "").trim();
+    const pairs = Array.isArray(req.body?.pairs) ? req.body.pairs : [];
+    const image_path = req.body?.image_path ? String(req.body.image_path).trim() : null;
 
-        const r = await q(
-            `INSERT INTO analyses (market, timeframe, content, pairs, image_path)
-       VALUES ($1,$2,$3,$4,$5)
-       RETURNING id, market, timeframe, content, pairs, image_path, created_at`,
-            [market, timeframe, content, pairs, image_path]
-        );
+    if (!author_id) return res.status(401).json({ ok: false, error: "Missing X-User-Id" });
+    if (!market) return res.status(400).json({ ok: false, error: "market required" });
+    if (!timeframe) return res.status(400).json({ ok: false, error: "timeframe required" });
+    if (!content) return res.status(400).json({ ok: false, error: "content required" });
+    if (!pairs.length) return res.status(400).json({ ok: false, error: "pairs required" });
 
-        res.json({ ok: true, analysis: r.rows[0] });
-    } catch (e) {
-        console.error("analyses/create error:", e);
-        res.status(500).json({ ok: false, error: String(e.message || e) });
-    }
+    const r = await q(
+      `INSERT INTO analyses (author_id, market, timeframe, title, category, content, pairs, image_path)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       RETURNING id, author_id, market, timeframe, title, category, content, pairs, image_path, created_at`,
+      [author_id, market, timeframe, title || null, category || null, content, pairs, image_path]
+    );
+
+    res.json({ ok: true, analysis: r.rows[0] });
+  } catch (e) {
+    console.error("analyses/create error:", e);
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
 });
 
 // Feed list
 app.get("/api/analyses", async (req, res) => {
-    try {
-        const limit = Math.min(50, Math.max(1, Number(req.query.limit || 6)));
-        const offset = Math.max(0, Number(req.query.offset || 0));
+  try {
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit || 6)));
+    const offset = Math.max(0, Number(req.query.offset || 0));
 
-        const r = await q(
-            `SELECT id, market, timeframe, content, pairs, image_path, created_at
+    const r = await q(
+      `SELECT id, author_id, market, timeframe, title, category, content, pairs, image_path, created_at
        FROM analyses
        ORDER BY created_at DESC
        LIMIT $1 OFFSET $2`,
-            [limit, offset]
-        );
+      [limit, offset]
+    );
 
-        res.json({ list: r.rows, limit, offset });
-    } catch (e) {
-        console.error("analyses list error:", e);
-        res.status(500).json({ ok: false, error: String(e.message || e) });
-    }
+    res.json({ list: r.rows, limit, offset });
+  } catch (e) {
+    console.error("analyses list error:", e);
+    res.status(500).json({ ok: false, error: String(e.message || e) });
+  }
 });
+
 
 // (opsiyonel) Like count endpoint - sende varsa DB’ye bağlarız.
 // Şimdilik 0 döndürür ki feed.js patlamasın.

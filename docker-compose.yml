@@ -1,0 +1,16 @@
+﻿services:
+  postgres:
+    image: postgres:16
+    container_name: sm_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sm_user
+      POSTGRES_PASSWORD: sm_strong_password_123
+      POSTGRES_DB: social_market
+    ports:
+      - "127.0.0.1:5432:5432"   #  dış dünyaya kapalı
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
