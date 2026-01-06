@@ -3,28 +3,50 @@
 (() => {
     const API_BASE = "https://api.chriontoken.com";
 
-    function getJWT() {
-        const jwt = (window.SM_JWT || localStorage.getItem("sm_jwt") || "").trim();
-        if (!jwt) throw new Error("Login required (missing sm_jwt)");
-        return jwt;
+    function getUID() {
+        return (localStorage.getItem("sm_uid") || "").trim();
+    }
+
+    function getJWTOptional() {
+        return (window.SM_JWT || localStorage.getItem("sm_jwt") || "").trim();
     }
 
     async function req(path, { method = "GET", body } = {}) {
-        const jwt = getJWT();
-
         const url = path.startsWith("http") ? path : `${API_BASE}${path}`;
+
+        const uid = getUID();
+        const jwt = getJWTOptional();
+
+        const headers = {};
+
+        // JSON body varsa
+        if (method !== "GET" && body !== undefined) {
+            headers["Content-Type"] = "application/json";
+        }
+
+        // ✅ server.js bunu bekliyor (analyses/create, dm/inbox, follows vs)
+        if (uid) {
+            headers["X-User-Id"] = uid;
+        }
+
+        // opsiyonel (şu an server verify etmiyor ama ileride edebilir)
+        if (jwt) {
+            headers["Authorization"] = `Bearer ${jwt}`;
+        }
+
         const r = await fetch(url, {
             method,
-            headers: {
-                ...(method === "GET" ? {} : { "Content-Type": "application/json" }),
-                Authorization: `Bearer ${jwt}`,
-            },
-            body: body ? JSON.stringify(body) : undefined,
+            headers,
+            body: body !== undefined ? JSON.stringify(body) : undefined,
             cache: "no-store",
         });
 
         const out = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(out?.error || out?.detail || `${method} ${path} failed (${r.status})`);
+
+        // server bazen {ok:false} dönüyor, bazen sadece status
+        if (!r.ok || out?.ok === false) {
+            throw new Error(out?.error || out?.detail || `${method} ${path} failed (${r.status})`);
+        }
         return out;
     }
 
@@ -32,5 +54,5 @@
     window.smPost = (path, body) => req(path, { method: "POST", body });
     window.smPut = (path, body) => req(path, { method: "PUT", body });
 
-    console.log("✅ sm-api helper ready");
+    console.log("✅ sm-api helper ready (uid+jwt compatible)");
 })();

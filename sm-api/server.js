@@ -32,24 +32,22 @@ const pool = new Pool({
 });
 
 /* =========================
-   CORS + PARSERS
+   CORS + PARSERS  ✅ FIXED
 ========================= */
-app.use(
-    cors({
-        origin(origin, cb) {
-            // curl/postman (no origin) allow
-            if (!origin) return cb(null, true);
-            if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-            return cb(new Error("CORS blocked: " + origin));
-        },
-        credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization", "X-User-Id"],
-        methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    })
-);
+const corsMw = cors({
+    origin(origin, cb) {
+        // curl/postman (no origin) allow
+        if (!origin) return cb(null, true);
+        if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+        return cb(new Error("CORS blocked: " + origin));
+    },
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization", "X-User-Id", "x-user-id"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+});
 
-// preflight
-app.options(/.*/, (_req, res) => res.sendStatus(204));
+app.use(corsMw);
+app.options(/.*/, corsMw); // ✅ preflight CORS ile doğru header’ları döner
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -78,7 +76,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: 15 * 1024 * 1024 }, // ✅ 15MB (nginx client_max_body_size ile uyumlu)
+    limits: { fileSize: 15 * 1024 * 1024 }, // ✅ 15MB
     fileFilter: (_req, file, cb) => {
         if (!file.mimetype?.startsWith("image/")) return cb(new Error("Only images allowed"));
         cb(null, true);
@@ -90,6 +88,11 @@ const upload = multer({
 ========================= */
 async function q(sql, params = []) {
     return pool.query(sql, params);
+}
+
+// helper: uid (both cases)
+function getUid(req) {
+    return String(req.header("x-user-id") || req.header("X-User-Id") || "").trim();
 }
 
 /* =========================
@@ -112,61 +115,59 @@ app.post("/api/upload/analysis-image", upload.single("file"), (req, res) => {
 // Create analysis
 // Header: X-User-Id (author_id)
 app.post("/api/analyses/create", async (req, res) => {
-  try {
-    const author_id = String(req.header("X-User-Id") || "").trim();
+    try {
+        const author_id = getUid(req);
 
-    const market = String(req.body?.market || "").trim();
-    const timeframe = String(req.body?.timeframe || "").trim();
-    const title = String(req.body?.title || "").trim();
-    const category = String(req.body?.category || "").trim();
-    const content = String(req.body?.content || "").trim();
-    const pairs = Array.isArray(req.body?.pairs) ? req.body.pairs : [];
-    const image_path = req.body?.image_path ? String(req.body.image_path).trim() : null;
+        const market = String(req.body?.market || "").trim();
+        const timeframe = String(req.body?.timeframe || "").trim();
+        const title = String(req.body?.title || "").trim();
+        const category = String(req.body?.category || "").trim();
+        const content = String(req.body?.content || "").trim();
+        const pairs = Array.isArray(req.body?.pairs) ? req.body.pairs : [];
+        const image_path = req.body?.image_path ? String(req.body.image_path).trim() : null;
 
-    if (!author_id) return res.status(401).json({ ok: false, error: "Missing X-User-Id" });
-    if (!market) return res.status(400).json({ ok: false, error: "market required" });
-    if (!timeframe) return res.status(400).json({ ok: false, error: "timeframe required" });
-    if (!content) return res.status(400).json({ ok: false, error: "content required" });
-    if (!pairs.length) return res.status(400).json({ ok: false, error: "pairs required" });
+        if (!author_id) return res.status(401).json({ ok: false, error: "Missing X-User-Id" });
+        if (!market) return res.status(400).json({ ok: false, error: "market required" });
+        if (!timeframe) return res.status(400).json({ ok: false, error: "timeframe required" });
+        if (!content) return res.status(400).json({ ok: false, error: "content required" });
+        if (!pairs.length) return res.status(400).json({ ok: false, error: "pairs required" });
 
-    const r = await q(
-      `INSERT INTO analyses (author_id, market, timeframe, title, category, content, pairs, image_path)
+        const r = await q(
+            `INSERT INTO analyses (author_id, market, timeframe, title, category, content, pairs, image_path)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING id, author_id, market, timeframe, title, category, content, pairs, image_path, created_at`,
-      [author_id, market, timeframe, title || null, category || null, content, pairs, image_path]
-    );
+            [author_id, market, timeframe, title || null, category || null, content, pairs, image_path]
+        );
 
-    res.json({ ok: true, analysis: r.rows[0] });
-  } catch (e) {
-    console.error("analyses/create error:", e);
-    res.status(500).json({ ok: false, error: String(e.message || e) });
-  }
+        res.json({ ok: true, analysis: r.rows[0] });
+    } catch (e) {
+        console.error("analyses/create error:", e);
+        res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
 });
 
 // Feed list
 app.get("/api/analyses", async (req, res) => {
-  try {
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit || 6)));
-    const offset = Math.max(0, Number(req.query.offset || 0));
+    try {
+        const limit = Math.min(50, Math.max(1, Number(req.query.limit || 6)));
+        const offset = Math.max(0, Number(req.query.offset || 0));
 
-    const r = await q(
-      `SELECT id, author_id, market, timeframe, title, category, content, pairs, image_path, created_at
+        const r = await q(
+            `SELECT id, author_id, market, timeframe, title, category, content, pairs, image_path, created_at
        FROM analyses
        ORDER BY created_at DESC
        LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+            [limit, offset]
+        );
 
-    res.json({ list: r.rows, limit, offset });
-  } catch (e) {
-    console.error("analyses list error:", e);
-    res.status(500).json({ ok: false, error: String(e.message || e) });
-  }
+        res.json({ list: r.rows, limit, offset });
+    } catch (e) {
+        console.error("analyses list error:", e);
+        res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
 });
 
-
-// (opsiyonel) Like count endpoint - sende varsa DB’ye bağlarız.
-// Şimdilik 0 döndürür ki feed.js patlamasın.
+// Like count endpoint placeholder
 app.get("/api/analyses/:id/likes_count", async (_req, res) => {
     res.json({ likes_count: 0 });
 });
@@ -174,8 +175,6 @@ app.get("/api/analyses/:id/likes_count", async (_req, res) => {
 /* =========================
    NEWS
 ========================= */
-// Feed slider için:
-// tablo: news (id, title, image_url, url, source, created_at)
 app.get("/api/news", async (req, res) => {
     try {
         const limit = Math.min(50, Math.max(1, Number(req.query.limit || 6)));
@@ -191,21 +190,18 @@ app.get("/api/news", async (req, res) => {
         res.json({ list: r.rows, limit });
     } catch (e) {
         console.error("news list error:", e);
-        // tablo yoksa net hata dönsün:
         res.status(500).json({ ok: false, error: String(e.message || e) });
     }
 });
 
-
-// ✅ DM INBOX (Postgres)
-// GET /api/dm/inbox
-// Header: X-User-Id: <appwrite_uid>
+/* =========================
+   DM INBOX (Postgres)
+========================= */
 app.get("/api/dm/inbox", async (req, res) => {
     try {
-        const uid = String(req.header("X-User-Id") || "").trim();
+        const uid = getUid(req);
         if (!uid) return res.status(401).json({ ok: false, error: "Missing X-User-Id" });
 
-        // conversations: (id, user1_id, user2_id, updated_at, created_at)
         const convosR = await q(
             `
       SELECT id, user1_id, user2_id, updated_at, created_at
@@ -219,9 +215,8 @@ app.get("/api/dm/inbox", async (req, res) => {
         const convos = convosR.rows || [];
         if (!convos.length) return res.json({ ok: true, list: [] });
 
-        const convoIds = convos.map(c => c.id);
+        const convoIds = convos.map((c) => c.id);
 
-        // last message per convo
         const msgsR = await q(
             `
       SELECT DISTINCT ON (conversation_id)
@@ -233,12 +228,10 @@ app.get("/api/dm/inbox", async (req, res) => {
             [convoIds]
         );
 
-        const lastByConvo = new Map((msgsR.rows || []).map(m => [m.conversation_id, m]));
+        const lastByConvo = new Map((msgsR.rows || []).map((m) => [m.conversation_id, m]));
 
-        // peer ids
-        const peerIds = convos.map(c => (c.user1_id === uid ? c.user2_id : c.user1_id));
+        const peerIds = convos.map((c) => (c.user1_id === uid ? c.user2_id : c.user1_id));
 
-        // profiles: appwrite_user_id, name, avatar_url
         const profR = await q(
             `
       SELECT appwrite_user_id, name, avatar_url
@@ -248,9 +241,9 @@ app.get("/api/dm/inbox", async (req, res) => {
             [peerIds]
         );
 
-        const profByUid = new Map((profR.rows || []).map(p => [p.appwrite_user_id, p]));
+        const profByUid = new Map((profR.rows || []).map((p) => [p.appwrite_user_id, p]));
 
-        const list = convos.map(c => {
+        const list = convos.map((c) => {
             const peer_id = c.user1_id === uid ? c.user2_id : c.user1_id;
             const prof = profByUid.get(peer_id);
             const last = lastByConvo.get(c.id);
@@ -271,7 +264,6 @@ app.get("/api/dm/inbox", async (req, res) => {
         res.status(500).json({ ok: false, error: String(e?.message || e) });
     }
 });
-
 
 /* =========================
    START
