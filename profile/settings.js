@@ -1,11 +1,17 @@
-// /profile/settings.js
-// ✅ NO IMPORT (normal script)
+// /profile/settings.js (FINAL - sm-api only, NO Netlify)
 // ✅ Tabs + delete modal + hard delete + password change
-// ✅ Settings load/save via window.smGet/window.smPut (or fallback fetch)
-// ✅ Uses sm_uid (not appwrite_uid)
+// ✅ Settings load/save via sm-api (JWT)
+// ✅ Uses sm_uid only for UI; server uses JWT for identity
 
 (() => {
     const $ = (id) => document.getElementById(id);
+
+    const API_BASE = "https://api.chriontoken.com";
+
+    // ✅ New endpoints (Hetzner / sm-api)
+    const API_DELETE_HARD = `${API_BASE}/api/account/delete_hard`;
+    const API_SETTINGS_ME_GET = `${API_BASE}/api/settings/me`;
+    const API_SETTINGS_ME_PUT = `${API_BASE}/api/settings/me`;
 
     // ------------------------
     // Tabs
@@ -39,6 +45,33 @@
     };
 
     // ------------------------
+    // Helpers
+    // ------------------------
+    function getJWT() {
+        const jwt = (window.SM_JWT || localStorage.getItem("sm_jwt") || "").trim();
+        if (!jwt) throw new Error("No token (sm_jwt). Logout/Login again.");
+        return jwt;
+    }
+
+    async function apiJson(url, { method = "GET", body } = {}) {
+        const jwt = getJWT();
+
+        const r = await fetch(url, {
+            method,
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + jwt,
+            },
+            body: body ? JSON.stringify(body) : undefined,
+            cache: "no-store",
+        });
+
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out?.error || out?.detail || `${method} failed (${r.status})`);
+        return out;
+    }
+
+    // ------------------------
     // Delete modal
     // ------------------------
     const modal = $("deleteModal");
@@ -50,37 +83,14 @@
     modal?.addEventListener("click", (e) => { if (e.target?.dataset?.close) closeM(); });
 
     // ------------------------
-    // Hard delete
+    // Hard delete (sm-api)
     // ------------------------
     $("confirmDeleteBtn")?.addEventListener("click", async () => {
-        const jwt = localStorage.getItem("sm_jwt");
-        const uid = localStorage.getItem("sm_uid"); // ✅ doğru key
-
-        if (!jwt) return setMsg("No token (sm_jwt). Logout/Login again.", true);
-        if (!uid) return setMsg("No user id (sm_uid). Logout/Login again.", true);
-
         try {
             setMsg("Deleting account...");
 
-            const res = await fetch("/.netlify/functions/account_delete_hard", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": "Bearer " + jwt,
-                },
-                body: JSON.stringify({ confirm: true, userId: uid }),
-            });
-
-            const raw = await res.text();
-            let data = {};
-            try { data = raw ? JSON.parse(raw) : {}; } catch { data = { raw }; }
-
-            if (!res.ok) {
-                return setMsg(
-                    `Delete failed (${res.status}): ${data.error || data.detail || data.raw || "Unknown"}`,
-                    true
-                );
-            }
+            // ✅ IMPORTANT: server MUST delete by JWT user (ignore any userId from client)
+            await apiJson(API_DELETE_HARD, { method: "POST", body: { confirm: true } });
 
             localStorage.clear();
             sessionStorage.clear();
@@ -95,7 +105,7 @@
     });
 
     // ------------------------
-    // Password change
+    // Password change (Appwrite)
     // ------------------------
     $("updatePasswordBtn")?.addEventListener("click", async () => {
         const cur = $("curPass")?.value?.trim() || "";
@@ -125,50 +135,14 @@
         }
     });
 
-    // ==========================================================
-    // SETTINGS (theme vs) - NO IMPORT
-    // ==========================================================
-    const me = localStorage.getItem("sm_uid") || localStorage.getItem("appwrite_uid") || "";
-
-    // fallback smGet/smPut yoksa fetch ile çalış
-    async function apiGet(path) {
-        if (window.smGet) return window.smGet(path);
-
-        const jwt = localStorage.getItem("sm_jwt");
-        const res = await fetch(path, {
-            headers: jwt ? { "Authorization": "Bearer " + jwt } : {}
-        });
-        const out = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(out?.error || `GET failed (${res.status})`);
-        return out;
-    }
-
-    async function apiPut(path, body) {
-        if (window.smPut) return window.smPut(path, body);
-
-        const jwt = localStorage.getItem("sm_jwt");
-        const res = await fetch(path, {
-            method: "PUT",
-            headers: {
-                "Content-Type": "application/json",
-                ...(jwt ? { "Authorization": "Bearer " + jwt } : {})
-            },
-            body: JSON.stringify(body || {})
-        });
-        const out = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(out?.error || `PUT failed (${res.status})`);
-        return out;
-    }
-
+    // ------------------------
+    // SETTINGS (theme)
+    // ------------------------
     async function loadSettings() {
-        if (!me) return;
-
         try {
-            const r = await apiGet(`/api/settings?me=${encodeURIComponent(me)}`);
-
+            const r = await apiJson(API_SETTINGS_ME_GET);
             const themeEl = $("theme");
             if (themeEl && r?.settings?.theme) themeEl.value = r.settings.theme;
-
         } catch (e) {
             console.warn("loadSettings failed:", e);
             // sessiz geçebiliriz
@@ -176,14 +150,12 @@
     }
 
     async function saveSettings() {
-        if (!me) return setMsg("Missing user id.", true);
-
         try {
             setMsg("Saving settings...");
 
-            await apiPut("/api/settings", {
-                me,
-                theme: $("theme")?.value || "system",
+            await apiJson(API_SETTINGS_ME_PUT, {
+                method: "PUT",
+                body: { theme: $("theme")?.value || "system" },
             });
 
             setMsg("Settings saved.");
@@ -195,11 +167,7 @@
         }
     }
 
-    // ✅ Save button varsa bağla
     $("saveSettingsBtn")?.addEventListener("click", saveSettings);
-
-    // theme değişince auto-save istersen:
-    // $("theme")?.addEventListener("change", saveSettings);
 
     loadSettings();
 })();

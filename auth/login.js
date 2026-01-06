@@ -1,4 +1,7 @@
+// /auth/login.js (FINAL - Appwrite auth + JWT + Hetzner user sync)
 import { account, ID } from "/assets/appwrite.js";
+import "/assets/jwt.js"; // provides SM_JWT_READY / SM_REFRESH_JWT / SM_JWT
+import { syncUser } from "/assets/user-sync.js";
 
 document.addEventListener("DOMContentLoaded", () => {
     const submitBtn = document.getElementById("submitBtn");
@@ -11,9 +14,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const firstNameEl = document.getElementById("firstName");
     const lastNameEl = document.getElementById("lastName");
     const regFields = document.getElementById("regFields");
-
-    // ✅ NEW: sm-api base
-    const SM_API_BASE = "https://api.chriontoken.com";
 
     let busy = false;
     let mode = "login";
@@ -59,35 +59,33 @@ document.addEventListener("DOMContentLoaded", () => {
     tabLogin?.addEventListener("click", () => setMode("login"));
     tabRegister?.addEventListener("click", () => setMode("register"));
 
-    // ✅ NEW: sm-api ping (ensure user + settings row)
-    async function ensureBackendReady(appwriteUid) {
-        const uid = String(appwriteUid || "").trim();
-        if (!uid) return;
-
-        try {
-            await fetch(`${SM_API_BASE}/api/settings?me=${encodeURIComponent(uid)}`, {
-                method: "GET",
-            });
-        } catch (e) {
-            // non-blocking
-            console.warn("sm-api ensure (non-blocking) failed:", e?.message || e);
-        }
-    }
-
-    async function afterLogin() {
+    async function afterLoginFlow() {
+        // 1) get user + cache uid
         const user = await account.get();
+        if (user?.$id) {
+            localStorage.setItem("sm_uid", user.$id);
+            window.APPWRITE_USER_ID = user.$id;
 
-        // Appwrite UID (frontend uses this for sm-api me=...)
-        localStorage.setItem("sm_uid", user.$id);
+            // realtime (if loaded) auth trigger
+            try {
+                window.dispatchEvent(new Event("sm:uid_ready"));
+            } catch {}
+        }
 
-        // JWT is optional (keep if your app uses it elsewhere)
+        // 2) ensure JWT exists (non-blocking hard-fail only if needed)
         try {
-            const jwtObj = await account.createJWT();
-            if (jwtObj?.jwt) localStorage.setItem("sm_jwt", jwtObj.jwt);
+            if (window.SM_JWT_READY) await window.SM_JWT_READY;
+            // if still missing, try refresh
+            if (!((window.SM_JWT || localStorage.getItem("sm_jwt") || "").trim()) && window.SM_REFRESH_JWT) {
+                await window.SM_REFRESH_JWT();
+            }
         } catch {}
 
-        // ✅ ensure user exists in Postgres (Hetzner) + settings row
-        await ensureBackendReady(user.$id);
+        // 3) sync user to Hetzner Postgres (profiles/settings etc.)
+        // non-blocking: if backend down, user can still browse UI, but features may fail later
+        try {
+            await syncUser();
+        } catch {}
     }
 
     function goFeed() {
@@ -100,6 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const { email, password } = getCreds();
         if (!email || !password) {
+            setMsg("Enter email + password");
             busy = false;
             return;
         }
@@ -125,7 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
 
             setMsg("Preparing session...");
-            await afterLogin();
+            await afterLoginFlow();
 
             setMsg("Done");
             goFeed();

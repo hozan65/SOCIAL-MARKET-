@@ -43,13 +43,13 @@ app.use(
             return cb(new Error("CORS blocked: " + origin));
         },
         credentials: true,
-        allowedHeaders: ["Content-Type", "Authorization"],
+        allowedHeaders: ["Content-Type", "Authorization", "X-User-Id"],
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     })
 );
 
 // preflight
-app.options("*", (_req, res) => res.sendStatus(204));
+app.options(/.*/, (_req, res) => res.sendStatus(204));
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));

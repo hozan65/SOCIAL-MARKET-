@@ -63,27 +63,25 @@
   </section>
 </main>
 
-<script>
-  window.APPWRITE_ENDPOINT = "https://cloud.appwrite.io/v1";
-  window.APPWRITE_PROJECT_ID = "694957a0001a0479bd64";
-</script>
+<!-- Auth guard (isteğe bağlı ama öneririm) -->
+<script type="module" src="/assets/auth-ui.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/appwrite@13.0.0"></script>
-<script src="/assets1/appwrite-init.js"></script>
+<!-- JWT hazırla (SM_JWT_READY / SM_JWT) -->
+<script type="module" src="/assets/jwt.js"></script>
 
-<!-- Header -->
-<script src="/assets1/sidebar.js"></script>
-
-
-<!-- (Opsiyonel) Socket.IO dosyaları — şimdilik kalsın ama messages.js Supabase realtime kullanıyor -->
+<!-- Socket.IO + realtime -->
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script>
   window.SOCKET_URL = "https://socket.chriontoken.com";
 </script>
-<script src="/assets1/realtime.js"></script>
+<script src="/assets/realtime.js"></script>
 
-<!-- Page JS -->
-<script type="module" src="/messages/messages.js"></script>
+<!-- Header / Sidebar -->
+<script src="/assets1/sidebar.js"></script>
+
+<!-- Page JS (NO MODULE sürümü kullanacaksınsa type ekleme) -->
+<script src="/messages/messages.js"></script>
+
 
 
 

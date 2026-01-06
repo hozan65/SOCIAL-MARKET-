@@ -1,15 +1,14 @@
 // /assets/user-sync.js
 // ✅ Client-side safe: DOES NOT write DB directly
-// ✅ Calls sm-api (NOT Netlify Functions)
+// ✅ Calls Hetzner sm-api
 // ✅ Uses Appwrite JWT (Bearer)
 
 import { account } from "/assets/appwrite.js";
 
-// ✅ sm-api endpoint (adjust if your route differs)
-const API_SYNC_USER = "/api/users/sync";
+const API_BASE = "https://api.chriontoken.com";
+const API_SYNC_USER = `${API_BASE}/api/users/sync`;
 
 async function ensureJwt() {
-    // if appwrite-init.js provided SM_JWT_READY / SM_REFRESH_JWT use them
     if (window.SM_JWT_READY) {
         try { await window.SM_JWT_READY; } catch {}
     }
@@ -19,28 +18,23 @@ async function ensureJwt() {
 
     if (window.SM_REFRESH_JWT) {
         jwt = await window.SM_REFRESH_JWT();
-        return jwt;
+        jwt = (jwt || "").trim();
+        if (jwt) return jwt;
     }
 
-    // fallback: createJWT via SDK directly (if init available)
-    if (window.account?.createJWT) {
-        const r = await window.account.createJWT();
-        jwt = (r?.jwt || "").trim();
-        if (!jwt) throw new Error("JWT create failed");
-        localStorage.setItem("sm_jwt", jwt);
-        window.SM_JWT = jwt;
-        return jwt;
-    }
-
-    throw new Error("Login required (missing JWT)");
+    // last resort: create JWT via imported account
+    const r = await account.createJWT();
+    jwt = (r?.jwt || "").trim();
+    if (!jwt) throw new Error("JWT create failed");
+    localStorage.setItem("sm_jwt", jwt);
+    window.SM_JWT = jwt;
+    return jwt;
 }
 
 export async function syncUser() {
     try {
-        // ensure session exists (throws if not logged)
-        const user = await account.get();
+        const user = await account.get(); // throws if not logged
 
-        // keep local uid for UI
         if (user?.$id) {
             localStorage.setItem("sm_uid", user.$id);
             window.APPWRITE_USER_ID = user.$id;
@@ -48,20 +42,19 @@ export async function syncUser() {
 
         const jwt = await ensureJwt();
 
-        const r = await fetch(API_SYNC_USER, {
+        const res = await fetch(API_SYNC_USER, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${jwt}`,
             },
-            body: JSON.stringify({}), // backend can ignore
+            body: JSON.stringify({}),
         });
 
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j?.error || `user sync failed (${r.status})`);
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(j?.error || `user sync failed (${res.status})`);
 
-        // expected: { ok:true, user_id:"...", created:true/false }
-        return j;
+        return j; // { ok:true, user_id:"...", created:true/false }
     } catch (err) {
         console.warn("User sync skipped:", err?.message || err);
         return null;

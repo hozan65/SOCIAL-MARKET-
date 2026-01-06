@@ -1,13 +1,12 @@
-// /messages/messages.js (UPDATED - stable optimistic dedupe + better me + throttled inbox refresh)
-// Requires: window.account.createJWT() available via /assets1/appwrite-init.js
+// /messages/messages.js (FINAL - sm-api DM, NO Netlify)
 (() => {
     console.log("messages.js LOADED ✅", location.href);
 
-    // Lock page scroll (only chat list scrolls)
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
 
-    // DOM
+    const API_BASE = "https://api.chriontoken.com";
+
     const inboxList = document.getElementById("inboxList");
     const inboxHint = document.getElementById("inboxHint");
     const chatBackBtn = document.getElementById("chatBackBtn");
@@ -16,46 +15,31 @@
     const peerSubEl = document.getElementById("peerSub");
     const peerAvaEl = document.getElementById("peerAva");
 
-    const msgList = document.getElementById("msgList");       // .msgBody
-    const msgForm = document.getElementById("msgForm");       // form
-    const msgInput = document.getElementById("msgInput");     // input
-    const leftSearch = document.getElementById("leftSearch"); // search
+    const msgList = document.getElementById("msgList");
+    const msgForm = document.getElementById("msgForm");
+    const msgInput = document.getElementById("msgInput");
+    const leftSearch = document.getElementById("leftSearch");
 
-    // Guard
     if (!inboxList || !inboxHint || !peerNameEl || !peerSubEl || !msgList || !msgForm || !msgInput) {
-        console.error("❌ Missing DOM", {
-            inboxList: !!inboxList,
-            inboxHint: !!inboxHint,
-            peerNameEl: !!peerNameEl,
-            peerSubEl: !!peerSubEl,
-            msgList: !!msgList,
-            msgForm: !!msgForm,
-            msgInput: !!msgInput,
-        });
+        console.error("❌ Missing DOM");
         return;
     }
 
-    // URL helpers
     const params = () => new URL(location.href).searchParams;
-
-    // ✅ supports ?to_id= ?to= ?id=
     const getURLPeerId = () => (params().get("to_id") || params().get("to") || params().get("id") || "").trim();
     const getURLConvoId = () => (params().get("conversation_id") || "").trim();
 
     function setURL({ conversation_id, peer_id }) {
         const u = new URL(location.href);
-
         if (peer_id) {
             u.searchParams.set("to", peer_id);
             u.searchParams.set("id", peer_id);
             u.searchParams.delete("to_id");
         }
         if (conversation_id) u.searchParams.set("conversation_id", conversation_id);
-
         history.replaceState(null, "", u.toString());
     }
 
-    // Utils
     const esc = (s) =>
         String(s ?? "")
             .replaceAll("&", "&amp;")
@@ -72,7 +56,6 @@
         const mine = String(from_id || "") === String(state.me || "");
         const cls = mine ? "mMine" : "mTheirs";
         const time = created_at ? new Date(created_at).toLocaleTimeString() : "";
-
         const localAttr = _localKey ? ` data-local="1" data-local-key="${esc(_localKey)}"` : "";
 
         return `
@@ -90,54 +73,35 @@
         msgList.scrollTop = msgList.scrollHeight;
     }
 
-    // ✅ stable local key (does NOT depend on conversation_id)
-    // timeBucket helps avoid collisions if same text spam
     function makeLocalKey({ from_id, to_id, peer_id, text, created_at }) {
         const t = created_at ? new Date(created_at).getTime() : Date.now();
-        const bucket = Math.floor(t / 3000); // 3s buckets
-        return [
-            String(from_id || ""),
-            String(to_id || ""),
-            String(peer_id || ""),
-            String(text || "").trim(),
-            String(bucket),
-        ].join("|");
+        const bucket = Math.floor(t / 3000);
+        return [from_id, to_id, peer_id, String(text || "").trim(), String(bucket)].join("|");
     }
 
-    // API (Netlify functions)
-    async function ensureJWT() {
-        let jwt = localStorage.getItem("sm_jwt");
-        if (jwt) return jwt;
-
-        if (!window.account?.createJWT) {
-            throw new Error("Appwrite account client not found (window.account missing).");
-        }
-
-        const r = await window.account.createJWT();
-        jwt = r?.jwt;
-        if (!jwt) throw new Error("JWT create failed");
-
-        localStorage.setItem("sm_jwt", jwt);
+    function getJWT() {
+        const jwt = (window.SM_JWT || localStorage.getItem("sm_jwt") || "").trim();
+        if (!jwt) throw new Error("Login required (sm_jwt missing)");
         return jwt;
     }
 
     async function api(path, { method = "GET", body } = {}) {
-        const jwt = await ensureJWT();
-        const r = await fetch(`/.netlify/functions/${path}`, {
+        const jwt = getJWT();
+        const r = await fetch(`${API_BASE}${path}`, {
             method,
             headers: {
-                "Content-Type": "application/json",
-                Authorization: "Bearer " + jwt,
+                ...(method === "GET" ? {} : { "Content-Type": "application/json" }),
+                Authorization: `Bearer ${jwt}`,
             },
             body: body ? JSON.stringify(body) : undefined,
+            cache: "no-store",
         });
 
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(data?.error || `${path} failed (${r.status})`);
-        return data;
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(out?.error || `${path} failed (${r.status})`);
+        return out;
     }
 
-    // State
     const state = {
         me: (localStorage.getItem("sm_uid") || window.APPWRITE_USER_ID || "").trim(),
         peer_id: getURLPeerId(),
@@ -147,13 +111,11 @@
         inboxRaw: [],
     };
 
-    // Header
     function setPeerHeader({ id, name, avatar_url } = {}) {
         peerNameEl.textContent = name || (id ? id : "Select a chat");
         peerSubEl.textContent = "Direct messages";
 
         if (!peerAvaEl) return;
-
         if (avatar_url) {
             peerAvaEl.style.backgroundImage = `url("${avatar_url}")`;
             peerAvaEl.classList.add("hasImg");
@@ -163,7 +125,6 @@
         }
     }
 
-    // Inbox item
     function renderInboxItem(it) {
         const peer_id = (it.peer_id || "").trim();
         const convo_id = (it.conversation_id || "").trim();
@@ -183,9 +144,7 @@
 
     function applySearch() {
         const q = (leftSearch?.value || "").trim().toLowerCase();
-        const items = inboxList.querySelectorAll(".inboxItem");
-
-        items.forEach((btn) => {
+        inboxList.querySelectorAll(".inboxItem").forEach((btn) => {
             if (!q) return (btn.style.display = "");
             const title = (btn.querySelector(".inboxTitle")?.textContent || "").toLowerCase();
             const peer = (btn.getAttribute("data-peer") || "").toLowerCase();
@@ -193,7 +152,6 @@
         });
     }
 
-    // ✅ throttle inbox refresh (socket spam)
     let _inboxTimer = null;
     function scheduleInboxRefresh() {
         clearTimeout(_inboxTimer);
@@ -203,8 +161,8 @@
     async function loadInbox() {
         inboxHint.textContent = " ";
         try {
-            const d = await api("dm_inbox");
-            const list = d.list || [];
+            const d = await api("/api/dm/inbox");
+            const list = d.items || d.list || [];
             state.inboxRaw = list;
 
             inboxList.innerHTML = list.map(renderInboxItem).join("");
@@ -221,20 +179,17 @@
     inboxList.addEventListener("click", (e) => {
         const btn = e.target.closest(".inboxItem");
         if (!btn) return;
-
-        const peer_id = (btn.getAttribute("data-peer") || "").trim();
-        const conversation_id = (btn.getAttribute("data-convo") || "").trim();
-
-        openChat({ peer_id, conversation_id });
+        openChat({
+            peer_id: (btn.getAttribute("data-peer") || "").trim(),
+            conversation_id: (btn.getAttribute("data-convo") || "").trim(),
+        });
     });
 
-    // Chat
     async function loadChat(conversation_id) {
         clearMsgs();
 
-        const d = await api(`dm_get?conversation_id=${encodeURIComponent(conversation_id)}`);
+        const d = await api(`/api/dm/get?conversation_id=${encodeURIComponent(conversation_id)}`);
 
-        // peer info
         if (d.peer) {
             state.peer_id = d.peer.id || state.peer_id;
             state.peer_name = d.peer.name || state.peer_name || "";
@@ -242,7 +197,7 @@
             setPeerHeader({ id: state.peer_id, name: state.peer_name, avatar_url: state.peer_avatar });
         }
 
-        const rows = d.list || [];
+        const rows = d.items || d.list || [];
         rows.forEach((m) => {
             appendMsg({
                 from_id: m.sender_id,
@@ -258,7 +213,6 @@
         state.peer_id = (peer_id || "").trim();
         state.conversation_id = (conversation_id || "").trim();
 
-        // hydrate name/avatar from inbox
         const found = state.inboxRaw.find((x) => String(x.conversation_id) === String(state.conversation_id));
         if (found) {
             state.peer_name = found.peer_name || "";
@@ -268,17 +222,14 @@
         setPeerHeader({ id: state.peer_id, name: state.peer_name, avatar_url: state.peer_avatar });
 
         if (state.peer_id || state.conversation_id) setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
-
         if (isMobile()) setMobileModeChat(true);
 
         if (state.conversation_id) await loadChat(state.conversation_id);
         else clearMsgs();
     }
 
-    // Back (mobile)
     chatBackBtn?.addEventListener("click", () => {
         if (!isMobile()) return;
-
         setMobileModeChat(false);
 
         state.peer_id = "";
@@ -303,20 +254,17 @@
         if (!isMobile()) setMobileModeChat(false);
     });
 
-    // Realtime (Socket.IO)
+    // realtime socket
     const socket = window.rt?.socket;
     if (socket) {
-        // avoid double-bind
         socket.off?.("dm_new");
         socket.on("dm_new", (p) => {
             const cid = (p.conversation_id || "").trim();
             if (!cid) return;
 
-            // current chat append
             if (cid === state.conversation_id) {
                 const isMine = String(p.from_id) === String(state.me);
 
-                // ✅ dedupe optimistic (stable key)
                 if (isMine) {
                     const lk = makeLocalKey({
                         from_id: p.from_id,
@@ -338,21 +286,18 @@
                 });
             }
 
-            // refresh inbox preview
             scheduleInboxRefresh();
         });
     } else {
         console.warn("⚠ realtime socket not ready (window.rt.socket missing)");
     }
 
-    // Send
     msgForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
         const text = (msgInput.value || "").trim();
         if (!text) return;
 
-        // require peer/convo
         if (!state.conversation_id && !state.peer_id) {
             alert("Kime mesaj atacaksın? (URL'de id/to yok)");
             return;
@@ -364,7 +309,6 @@
         if (state.conversation_id) payload.conversation_id = state.conversation_id;
         else payload.peer_id = state.peer_id;
 
-        // optimistic (stable key)
         const optimistic = {
             from_id: state.me,
             to_id: state.peer_id,
@@ -376,9 +320,8 @@
         appendMsg(optimistic);
 
         try {
-            const d = await api("dm_send", { method: "POST", body: payload });
+            const d = await api("/api/dm/send", { method: "POST", body: payload });
 
-            // if chat newly created
             if (!state.conversation_id && d.conversation_id) {
                 state.conversation_id = d.conversation_id;
                 setURL({ peer_id: state.peer_id, conversation_id: state.conversation_id });
@@ -390,12 +333,9 @@
         }
     });
 
-    // Init
     (async () => {
         try {
-            await ensureJWT();
-
-            // ✅ ensure me is set
+            // ensure uid exists
             const uidLS = (localStorage.getItem("sm_uid") || "").trim();
             if (!uidLS && window.APPWRITE_USER_ID) {
                 localStorage.setItem("sm_uid", window.APPWRITE_USER_ID);
@@ -406,7 +346,6 @@
 
             await loadInbox();
 
-            // auto open if URL has peer or convo
             if (state.peer_id || state.conversation_id) {
                 await openChat({ peer_id: state.peer_id, conversation_id: state.conversation_id });
             } else {

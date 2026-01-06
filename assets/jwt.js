@@ -2,7 +2,7 @@
 import { account } from "/assets/appwrite.js";
 
 /**
- * Creates (or refreshes) Appwrite JWT and stores it for Netlify Functions.
+ * Creates (or refreshes) Appwrite JWT and stores it for Hetzner API.
  * - window.SM_JWT
  * - localStorage.sm_jwt
  * - window.SM_REFRESH_JWT()
@@ -11,7 +11,7 @@ import { account } from "/assets/appwrite.js";
 
 async function refreshJWT() {
     try {
-        // throws if no session
+        // session var mı?
         await account.get();
 
         const jwtObj = await account.createJWT();
@@ -22,12 +22,14 @@ async function refreshJWT() {
         window.SM_JWT = jwt;
         localStorage.setItem("sm_jwt", jwt);
 
-        console.log(" sm_jwt updated");
+        console.log("✅ sm_jwt updated for Hetzner API");
         return jwt;
     } catch (e) {
-        // ✅ IMPORTANT: session yok diye tokenı silme
-        // Eğer localde jwt varsa onu bırak.
-        window.SM_JWT = window.SM_JWT || localStorage.getItem("sm_jwt") || "";
+        // session yoksa mevcut tokenı silme
+        window.SM_JWT =
+            window.SM_JWT ||
+            localStorage.getItem("sm_jwt") ||
+            "";
 
         console.warn("⚠ No session -> JWT refresh skipped (kept existing sm_jwt if any)");
         return null;
