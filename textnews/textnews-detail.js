@@ -5,6 +5,8 @@
     const grid = document.getElementById("textNewsGrid");
     if (!grid) return;
 
+    const API_BASE = "https://api.chriontoken.com";
+
     function fmt(t) {
         try {
             return new Date(t).toLocaleString("tr-TR", { dateStyle: "short", timeStyle: "short" });
@@ -23,8 +25,14 @@
     }
 
     async function fetchGrid(limit = 6) {
-        const r = await fetch(`/api/textnews?limit=${encodeURIComponent(limit)}`, { cache: "no-store" });
-        const out = await r.json().catch(() => ({}));
+        const url = `${API_BASE}/api/textnews?limit=${encodeURIComponent(limit)}`;
+        const r = await fetch(url, { cache: "no-store" });
+
+        // JSON değilse HTML döndü → Unexpected token < olmasın diye koruma
+        const ct = (r.headers.get("content-type") || "").toLowerCase();
+        const isJson = ct.includes("application/json");
+        const out = isJson ? await r.json().catch(() => ({})) : { error: await r.text().catch(() => "") };
+
         if (!r.ok) throw new Error(out?.error || `textnews grid failed (${r.status})`);
 
         const arr = out?.list || out?.data || out;
