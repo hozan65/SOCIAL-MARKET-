@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="826bd4b3-3518-4f74-9d5c-2af60740123f" name="market" url="https://chriontoken.com">
+        <fileTransfer accessType="SFTP" host="46.224.117.41" port="22" sshConfigId="3a00a2e5-1869-4c66-a705-00d698999880" sshConfig="root@46.224.117.41:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
