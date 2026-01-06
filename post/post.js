@@ -1,7 +1,6 @@
-// /post/post.js (FINAL - sm-api publish / UUID fix)
-// ✅ NO X-User-Id
-// ✅ Author UUID resolved on backend via JWT -> users.appwrite_uid -> users.id
-// ✅ Upload image + create analysis
+// /post/post.js (FINAL - sm-api publish)
+// ✅ Only Authorization Bearer sm_jwt
+// ✅ Backend resolves author UUID via users.appwrite_uid mapping
 
 console.log("✅ post.js loaded (sm-api publish)");
 
@@ -16,7 +15,7 @@ const publishBtn = document.getElementById("publishBtn");
 const $market = document.getElementById("market");
 const $pair = document.getElementById("pair");
 const $timeframe = document.getElementById("timeframe");
-const $category = document.getElementById("category"); // optional
+const $category = document.getElementById("category");
 const $content = document.getElementById("postContent");
 const $image = document.getElementById("image");
 
@@ -39,14 +38,12 @@ function parsePairs(str) {
         .filter(Boolean);
 }
 
-// ✅ JWT required for create
 function getJWT() {
     const jwt = (window.SM_JWT || localStorage.getItem("sm_jwt") || "").trim();
     if (!jwt) throw new Error("Login required (missing sm_jwt)");
     return jwt;
 }
 
-// ✅ JWT optional for upload (keep it soft)
 function getJWTSoft() {
     return (window.SM_JWT || localStorage.getItem("sm_jwt") || "").trim();
 }
@@ -64,13 +61,10 @@ async function uploadImage(file) {
     });
 
     const data = await r.json().catch(() => ({}));
-
-    // expected: { ok:true, url:"https://..../uploads/x.png" }  (optional: path:"/uploads/x.png")
     if (!r.ok || !data.ok || (!data.url && !data.path)) {
         throw new Error(data.error || `Upload failed (${r.status})`);
     }
 
-    // DB prefers path if server returns it, else url
     return data.path || data.url;
 }
 
@@ -90,7 +84,6 @@ async function createAnalysis(payload) {
     if (!r.ok || !j.ok) {
         throw new Error(j.error || j.detail || `Create failed (${r.status})`);
     }
-
     return j.analysis || j;
 }
 
