@@ -35,10 +35,7 @@ export async function syncUser() {
     try {
         const user = await account.get(); // throws if not logged
 
-        if (user?.$id) {
-            localStorage.setItem("sm_uid", user.$id);
-            window.APPWRITE_USER_ID = user.$id;
-        }
+        if (j?.user_id) localStorage.setItem("sm_user_id", String(j.user_id));
 
         const jwt = await ensureJwt();
 

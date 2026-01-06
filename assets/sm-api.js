@@ -4,8 +4,9 @@
     const API_BASE = "https://api.chriontoken.com";
 
     function getUID() {
-        return (localStorage.getItem("sm_uid") || "").trim();
+        return (localStorage.getItem("sm_user_id") || "").trim();
     }
+
 
     function getJWTOptional() {
         return (window.SM_JWT || localStorage.getItem("sm_jwt") || "").trim();
