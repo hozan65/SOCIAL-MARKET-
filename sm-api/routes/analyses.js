@@ -1,4 +1,3 @@
-// /sm-api/routes/analyses.js
 import express from "express";
 import { pool } from "../db.js";
 import { getBearer, getAppwriteUserFromJwt } from "../lib/appwrite-user.js";
@@ -6,25 +5,19 @@ import { getBearer, getAppwriteUserFromJwt } from "../lib/appwrite-user.js";
 const router = express.Router();
 router.use(express.json({ limit: "2mb" }));
 
-// ✅ AUTH middleware (JWT mandatory)
 async function requireUser(req, res, next) {
     try {
         const jwt = getBearer(req);
-        if (!jwt) return res.status(401).json({ ok: false, error: "missing_author" }); // frontend buna bakıyor
+        if (!jwt) return res.status(401).json({ ok: false, error: "missing_author" });
 
         const user = await getAppwriteUserFromJwt(jwt);
-        req.user = user; // { $id, email, name ... }
+        req.user = user;
         next();
     } catch (e) {
         return res.status(401).json({ ok: false, error: "invalid_jwt", detail: String(e?.message || e) });
     }
 }
 
-/* =========================================================
-   POST /api/analyses/create
-   - author_id: users.id (uuid)
-   - appwrite uid: req.user.$id  -> users.appwrite_uid -> users.id
-========================================================= */
 router.post("/create", requireUser, async (req, res) => {
     try {
         const appwrite_uid = String(req.user?.$id || "").trim();
@@ -35,7 +28,6 @@ router.post("/create", requireUser, async (req, res) => {
         const timeframe = String(req.body?.timeframe || "").trim();
         const content = String(req.body?.content || "").trim();
 
-        // pairs can be array OR comma string
         let pairs = req.body?.pairs;
         if (typeof pairs === "string") pairs = pairs.split(",").map((s) => s.trim()).filter(Boolean);
         if (!Array.isArray(pairs)) pairs = [];
@@ -49,7 +41,6 @@ router.post("/create", requireUser, async (req, res) => {
         if (!content) return res.status(400).json({ ok: false, error: "content_required" });
         if (!image_path) return res.status(400).json({ ok: false, error: "image_path_required" });
 
-        // ✅ map appwrite uid -> users.id (uuid)
         const ur = await pool.query(`SELECT id FROM users WHERE appwrite_uid = $1 LIMIT 1`, [appwrite_uid]);
         const author_uuid = ur.rows?.[0]?.id;
 
@@ -57,8 +48,7 @@ router.post("/create", requireUser, async (req, res) => {
             return res.status(400).json({
                 ok: false,
                 error: "user_not_found",
-                detail:
-                    "No row in users for this appwrite_uid. Ensure ensure_profile inserts users(appwrite_uid) after login.",
+                detail: "No row in users for this appwrite_uid.",
             });
         }
 
@@ -78,9 +68,6 @@ router.post("/create", requireUser, async (req, res) => {
     }
 });
 
-/* =========================================================
-   GET /api/analyses?limit=10&offset=0
-========================================================= */
 router.get("/", async (req, res) => {
     try {
         const limit = Math.min(50, Math.max(1, Number(req.query?.limit || 10) || 10));

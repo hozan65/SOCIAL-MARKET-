@@ -1,4 +1,3 @@
-// /sm-api/db.js
 import { Pool } from "pg";
 
 export const pool = new Pool({
@@ -9,7 +8,3 @@ export const pool = new Pool({
     password: process.env.PGPASSWORD || "",
     ssl: process.env.PGSSL === "1" ? { rejectUnauthorized: false } : false,
 });
-
-export async function q(sql, params = []) {
-    return pool.query(sql, params);
-}
