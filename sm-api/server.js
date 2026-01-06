@@ -212,7 +212,109 @@ app.get("/api/analyses", async (req, res) => {
     }
 });
 
+
+
+/* =========================
+   FOLLOWS
+========================= */
+
+// JWT -> appwrite_uid -> users.id(uuid)
+async function requireAuthorUuid(req, res) {
+    const jwt = getBearer(req);
+    if (!jwt) {
+        res.status(401).json({ ok: false, error: "missing_author" });
+        return null;
+    }
+
+    const payload = decodeJwtPayload(jwt);
+    const appwrite_uid = String(payload?.userId || "").trim();
+    if (!appwrite_uid) {
+        res.status(401).json({ ok: false, error: "missing_author" });
+        return null;
+    }
+
+    const ur = await q(`SELECT id FROM users WHERE appwrite_uid = $1 LIMIT 1`, [appwrite_uid]);
+    const me_uuid = ur.rows?.[0]?.id;
+    if (!me_uuid) {
+        res.status(400).json({ ok: false, error: "user_not_found" });
+        return null;
+    }
+
+    return me_uuid;
+}
+
+// GET /api/follows/is_following?target=<target_user_uuid>
+app.get("/api/follows/is_following", async (req, res) => {
+    try {
+        const me_uuid = await requireAuthorUuid(req, res);
+        if (!me_uuid) return;
+
+        const target = String(req.query?.target || "").trim();
+        if (!target) return res.status(400).json({ ok: false, error: "target_required" });
+
+        const r = await q(
+            `SELECT 1 FROM follows WHERE follower_id=$1 AND following_id=$2 LIMIT 1`,
+            [me_uuid, target]
+        );
+
+        return res.json({ ok: true, is_following: r.rowCount > 0 });
+    } catch (e) {
+        console.error("is_following error:", e);
+        return res.status(500).json({ ok: false, error: "is_following_failed", detail: String(e?.message || e) });
+    }
+});
+
+// POST /api/follows/toggle  body: { target: "<target_user_uuid>" }
+app.post("/api/follows/toggle", async (req, res) => {
+    try {
+        const me_uuid = await requireAuthorUuid(req, res);
+        if (!me_uuid) return;
+
+        const target = String(req.body?.target || "").trim();
+        if (!target) return res.status(400).json({ ok: false, error: "target_required" });
+        if (target === me_uuid) return res.status(400).json({ ok: false, error: "cannot_follow_self" });
+
+        // var mı?
+        const ex = await q(
+            `SELECT 1 FROM follows WHERE follower_id=$1 AND following_id=$2 LIMIT 1`,
+            [me_uuid, target]
+        );
+
+        if (ex.rowCount > 0) {
+            await q(`DELETE FROM follows WHERE follower_id=$1 AND following_id=$2`, [me_uuid, target]);
+            return res.json({ ok: true, is_following: false });
+        } else {
+            await q(`INSERT INTO follows (follower_id, following_id) VALUES ($1,$2)`, [me_uuid, target]);
+            return res.json({ ok: true, is_following: true });
+        }
+    } catch (e) {
+        console.error("toggle_follow error:", e);
+        return res.status(500).json({ ok: false, error: "toggle_follow_failed", detail: String(e?.message || e) });
+    }
+});
+
+// GET /api/follows/counts?user=<user_uuid>
+app.get("/api/follows/counts", async (req, res) => {
+    try {
+        const user = String(req.query?.user || "").trim();
+        if (!user) return res.status(400).json({ ok: false, error: "user_required" });
+
+        const followers = await q(`SELECT COUNT(*)::int AS c FROM follows WHERE following_id=$1`, [user]);
+        const following = await q(`SELECT COUNT(*)::int AS c FROM follows WHERE follower_id=$1`, [user]);
+
+        return res.json({
+            ok: true,
+            followers: followers.rows?.[0]?.c ?? 0,
+            following: following.rows?.[0]?.c ?? 0,
+        });
+    } catch (e) {
+        console.error("follows counts error:", e);
+        return res.status(500).json({ ok: false, error: "counts_failed", detail: String(e?.message || e) });
+    }
+});
+
 /* =========================
    START
 ========================= */
 app.listen(PORT, () => console.log(`✅ sm-api running on :${PORT}`));
+
